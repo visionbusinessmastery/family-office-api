@@ -127,7 +127,49 @@ def save_profile(profile: ProfileRequest):
         "message": "Profil enregistré",
         "profile": user_profile
     }
+@app.post("/stocks/analyse")
+def analyse_action(data: dict):
 
+    ticker = data.get("ticker")
+
+    if not ticker:
+        return {"error": "Ticker manquant"}
+
+    return {
+        "ticker": ticker.upper(),
+        "entreprise": "Entreprise simulée",
+        "score": 7,
+        "analyse": "Entreprise solide avec croissance stable.",
+        "forces": [
+            "Bonne croissance",
+            "Position dominante",
+            "Rentabilité solide"
+        ],
+        "risques": [
+            "Valorisation élevée",
+            "Sensibilité au marché"
+        ],
+        "strategie": "Accumulation progressive long terme"
+    }
+
+
+@app.get("/stockpicker")
+def stock_picker():
+
+    stocks = [
+        {"symbol": "AAPL", "company": "Apple"},
+        {"symbol": "MSFT", "company": "Microsoft"},
+        {"symbol": "NVDA", "company": "Nvidia"},
+        {"symbol": "LVMH", "company": "LVMH"},
+        {"symbol": "TSLA", "company": "Tesla"}
+    ]
+
+    result = "📈 Actions détectées par l'IA :\n\n"
+
+    for stock in stocks:
+        result += f"• {stock['company']} ({stock['symbol']})\n"
+
+    return {"result": result}
 # ======================
 # FUTURES EXTENSIONS
 # ======================
@@ -135,3 +177,4 @@ def save_profile(profile: ProfileRequest):
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
