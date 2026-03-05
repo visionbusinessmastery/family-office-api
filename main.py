@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import os
+import requests
+FMP_API_KEY = os.getenv("FMP_API_KEY")
 
 app = FastAPI(title="Family Office IA API", version="0.1")
 app.add_middleware(
@@ -152,24 +155,31 @@ def analyse_action(data: dict):
         "strategie": "Accumulation progressive long terme"
     }
 
-
 @app.get("/stockpicker")
 def stock_picker():
 
-    stocks = [
-        {"symbol": "AAPL", "company": "Apple"},
-        {"symbol": "MSFT", "company": "Microsoft"},
-        {"symbol": "NVDA", "company": "Nvidia"},
-        {"symbol": "LVMH", "company": "LVMH"},
-        {"symbol": "TSLA", "company": "Tesla"}
-    ]
+    url = f"https://financialmodelingprep.com/api/v3/stock-screener?marketCapMoreThan=10000000000&volumeMoreThan=1000000&limit=10&apikey={FMP_API_KEY}"
 
-    result = "📈 Actions détectées par l'IA :\n\n"
+    try:
 
-    for stock in stocks:
-        result += f"• {stock['company']} ({stock['symbol']})\n"
+        response = requests.get(url)
+        stocks = response.json()
 
-    return {"result": result}
+        result = "📈 Actions détectées par l'IA :\n\n"
+
+        for stock in stocks:
+
+            result += f"""• {stock['companyName']} ({stock['symbol']})
+Prix : {stock['price']} $
+Secteur : {stock['sector']}
+
+"""
+
+        return {"result": result}
+
+    except:
+        return {"result": "Erreur récupération données marché"}
+        
 # ======================
 # FUTURES EXTENSIONS
 # ======================
@@ -177,4 +187,5 @@ def stock_picker():
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
