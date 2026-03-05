@@ -158,11 +158,10 @@ def analyse_action(data: dict):
 @app.get("/stockpicker")
 def stock_picker():
 
-    # Vérification clé API
     if not FMP_API_KEY:
-        return {"result": "Clé API manquante (FMP_API_KEY)"}
+        return {"result": "Clé API manquante"}
 
-    url = f"https://financialmodelingprep.com/api/v3/stock-screener?marketCapMoreThan=10000000000&volumeMoreThan=1000000&limit=10&apikey={FMP_API_KEY}"
+    url = f"https://financialmodelingprep.com/stable/stock-screener?marketCapMoreThan=10000000000&volumeMoreThan=1000000&limit=10&apikey={FMP_API_KEY}"
 
     try:
 
@@ -181,8 +180,8 @@ Secteur : {stock['sector']}
 
         return {"result": result}
 
-    except:
-        return {"result": "Erreur récupération données marché"}
+    except Exception as e:
+        return {"result": f"Erreur récupération données marché : {str(e)}"}
         
 # ======================
 # FUTURES EXTENSIONS
@@ -191,6 +190,7 @@ Secteur : {stock['sector']}
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
 
 
