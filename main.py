@@ -85,51 +85,70 @@ def ia_analyse(request: IARequest):
         "note": "Analyse personnalisée – aide à la décision, pas un conseil réglementé"
     }
 
-@app.post("/budget/analyse")
-def budget_analyse(request: BudgetRequest):
-    reste = request.revenus - request.charges
-
-    situation = "équilibrée"
-    if reste < 0:
-        situation = "déficitaire"
-    elif reste > 0:
-        situation = "excédentaire"
-
-    return {
-        "revenus": request.revenus,
-        "charges": request.charges,
-        "reste": reste,
-        "situation": situation,
-        "suggestion": (
-            "Capacité d'investissement détectée"
-            if reste > 0
-            else "Optimisation budgétaire prioritaire"
-        )
-    }
-
 from pydantic import BaseModel
 
-# --- Modèle Profil ---
+# ======================
+# PROFIL FINANCIER UNIQUE
+# ======================
+
 class ProfileRequest(BaseModel):
+
+    # Revenus
     revenus: float
     charges: float
+
+    # Patrimoine
+    epargne: float
+    immobilier: float
+    investissements: float
+    crypto: float
+
+    # Objectifs
     objectif: str
     horizon: int
     risque: str
 
+    # Informations utilisateur
+    age: int
+    pays: str
+    experience: str
+    
 # --- Stockage simple (MVP) ---
 user_profile = {}
 
 @app.post("/profile")
 def save_profile(profile: ProfileRequest):
+
     global user_profile
     user_profile = profile.dict()
 
+    capacite = profile.revenus - profile.charges
+
+    patrimoine_total = (
+        profile.epargne
+        + profile.immobilier
+        + profile.investissements
+        + profile.crypto
+    )
+
     return {
         "status": "ok",
-        "message": "Profil enregistré",
-        "profile": user_profile
+        "message": "Profil enregistré avec succès",
+
+        "diagnostic": f"""
+📊 DIAGNOSTIC FINANCIER
+
+Revenus : {profile.revenus} €
+Charges : {profile.charges} €
+Capacité d'investissement : {capacite} €
+
+Patrimoine total : {patrimoine_total} €
+
+Profil : {profile.risque}
+Horizon : {profile.horizon} ans
+        """
     }
+    
 @app.post("/stocks/analyse")
 def analyse_action(data: dict):
 
@@ -190,6 +209,7 @@ Secteur : {stock['sector']}
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
 
 
