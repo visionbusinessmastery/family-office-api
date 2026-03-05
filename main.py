@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import requests
-FMP_API_KEY = os.getenv("kebnO8bJOC5h9rNdWYORb1buk7xykMEs")
+FMP_API_KEY = os.getenv("FMP_API_KEY")
 
 app = FastAPI(title="Family Office IA API", version="0.1")
 app.add_middleware(
@@ -187,6 +187,7 @@ Secteur : {stock['sector']}
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
 
 
