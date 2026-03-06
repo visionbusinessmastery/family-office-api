@@ -319,32 +319,42 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
+    ticker = ticker.upper()
+
     if not ALPHA_VANTAGE_API_KEY:
         return {"error": "Clé Alpha Vantage manquante"}
 
-    if not FMP_API_KEY:
-        return {"error": "Clé FMP manquante"}
-
     try:
 
-        stock = get_stock_data(ticker)
+        # 🔹 Alpha Vantage (prix)
+        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+        r = requests.get(url, timeout=10)
+        data_json = r.json()
 
-        if not stock["price"]:
-            return {"error": "Action introuvable"}
+        if "Global Quote" not in data_json:
+            return {"error": "Réponse API invalide"}
+
+        quote = data_json["Global Quote"]
+
+        price = quote.get("05. price")
+        change = quote.get("10. change percent")
+
+        if not price:
+            return {"error": "Données marché indisponibles"}
 
         return {
-            "ticker": stock["ticker"],
-            "entreprise": stock["company_name"],
-            "secteur": stock["sector"],
-            "prix": stock["price"],
-            "variation": stock["change_percent"],
-            "market_cap": stock["market_cap"],
-            "pe_ratio": stock["pe_ratio"],
-            "source": "Hybrid (Alpha + FMP + YFinance)"
+            "ticker": ticker,
+            "prix": float(price),
+            "variation": change,
+            "source": "Alpha Vantage"
         }
 
     except Exception as e:
-        return {"error": str(e)}
+
+        return {
+            "error": "Erreur serveur",
+            "detail": str(e)
+        }
 
 @app.get("/stockpicker")
 def stock_picker():
@@ -508,6 +518,7 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
