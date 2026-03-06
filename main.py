@@ -5,17 +5,16 @@ from typing import Optional
 import requests
 import os
 import time
-from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
-import os
 
 # ======================
 # CONFIG
 # ======================
 
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Family Office IA", version="3.0")
+app = FastAPI(title="Family Office IA", version="4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,9 +23,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL)
+# ======================
+# DATABASE (SAFE)
+# ======================
+
+engine = None
+
+if DATABASE_URL:
+    try:
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    except:
+        engine = None
 
 # ======================
 # STOCKAGE SIMPLE
@@ -34,7 +42,7 @@ engine = create_engine(DATABASE_URL)
 
 user_profile = {}
 cache = {}
-CACHE_DURATION = 900  # 15 minutes
+CACHE_DURATION = 900  # 15 min
 
 # ======================
 # MODELS
@@ -62,7 +70,6 @@ class ProfileRequest(BaseModel):
     age: int
     pays: str
     experience: str
-
 
 # ======================
 # UTILITAIRES
@@ -92,12 +99,12 @@ def calculate_investor_score(profile):
     if capacite > 0:
         score += 25
 
-    taux = capacite / profile.revenus if profile.revenus > 0 else 0
-
-    if taux > 0.2:
-        score += 25
-    elif taux > 0.1:
-        score += 15
+    if profile.revenus > 0:
+        taux = capacite / profile.revenus
+        if taux > 0.2:
+            score += 25
+        elif taux > 0.1:
+            score += 15
 
     patrimoine = (
         profile.epargne_cash +
@@ -118,7 +125,7 @@ def calculate_investor_score(profile):
     return min(score, 100)
 
 
-def generate_allocation(score, risque):
+def generate_allocation(risque):
 
     if risque == "Prudent":
         return {"actions": 40, "obligations": 40, "immobilier": 15, "liquidites": 5}
@@ -139,7 +146,6 @@ def generate_psych_profile(score):
 
     return "Investisseur stratégique avancé"
 
-
 # ======================
 # ROUTES
 # ======================
@@ -153,11 +159,11 @@ def root():
 def save_profile(profile: ProfileRequest):
 
     global user_profile
-    user_profile = profile.dict()
+    user_profile = profile
 
     score = calculate_investor_score(profile)
 
-    allocation = generate_allocation(score, profile.risque)
+    allocation = generate_allocation(profile.risque)
 
     psych = generate_psych_profile(score)
 
@@ -212,7 +218,7 @@ def analyse_action(data: dict):
 @app.get("/stockpicker")
 def stock_picker():
 
-    if not API_KEY or not user_profile:
+    if not API_KEY:
         return {"top_stocks": []}
 
     url = f"https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey={API_KEY}"
@@ -224,8 +230,6 @@ def stock_picker():
 
     gainers = data.get("top_gainers", [])
 
-    score = calculate_investor_score(type("obj",(object,),user_profile))
-
     top_stocks = []
 
     for stock in gainers[:5]:
@@ -233,25 +237,21 @@ def stock_picker():
         top_stocks.append({
             "symbol": stock.get("ticker"),
             "price": stock.get("price"),
-            "change": stock.get("change_percentage"),
-            "score": score
+            "change": stock.get("change_percentage")
         })
 
-    return {
-        "profil_score": score,
-        "top_stocks": top_stocks
-    }
+    return {"top_stocks": top_stocks}
 
-@app.get("/db-test")
-def db_test():
-    return {"status": "database endpoint ready"}
 
 @app.get("/db-check")
 def db_check():
 
+    if not engine:
+        return {"database": "not configured"}
+
     try:
         with engine.connect() as connection:
-            result = connection.execute(text("SELECT 1"))
+            connection.execute(text("SELECT 1"))
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
