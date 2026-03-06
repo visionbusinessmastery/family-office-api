@@ -13,10 +13,7 @@ from datetime import datetime, timedelta
 
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-app = FastAPI(
-    title="Family Office IA API",
-    version="2.0"
-)
+app = FastAPI(title="Family Office IA", version="3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,12 +24,12 @@ app.add_middleware(
 )
 
 # ======================
-# STOCKAGE SIMPLE (MVP)
+# STOCKAGE SIMPLE
 # ======================
 
 user_profile = {}
-stock_cache = {}
-CACHE_DURATION = timedelta(minutes=15)
+cache = {}
+CACHE_DURATION = 900  # 15 minutes
 
 # ======================
 # MODELS
@@ -43,11 +40,12 @@ class IARequest(BaseModel):
 
 
 class ProfileRequest(BaseModel):
-
     revenus: float
-    charges: float
+    charges_fixes: float
+    charges_variables: float
 
-    epargne: float
+    epargne_cash: float
+    epargne_bloquee: float
     immobilier: float
     investissements: float
     crypto: float
@@ -62,17 +60,89 @@ class ProfileRequest(BaseModel):
 
 
 # ======================
-# ROUTE TEST
+# UTILITAIRES
+# ======================
+
+def get_market_data(url):
+
+    if url in cache:
+        if time.time() - cache[url]["time"] < CACHE_DURATION:
+            return cache[url]["data"]
+
+    try:
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        cache[url] = {"data": data, "time": time.time()}
+        return data
+    except:
+        return None
+
+
+def calculate_investor_score(profile):
+
+    score = 0
+
+    capacite = profile.revenus - (profile.charges_fixes + profile.charges_variables)
+
+    if capacite > 0:
+        score += 25
+
+    taux = capacite / profile.revenus if profile.revenus > 0 else 0
+
+    if taux > 0.2:
+        score += 25
+    elif taux > 0.1:
+        score += 15
+
+    patrimoine = (
+        profile.epargne_cash +
+        profile.epargne_bloquee +
+        profile.immobilier +
+        profile.investissements +
+        profile.crypto
+    )
+
+    if patrimoine > 100000:
+        score += 25
+
+    if profile.experience == "Avancé":
+        score += 25
+    elif profile.experience == "Intermédiaire":
+        score += 15
+
+    return min(score, 100)
+
+
+def generate_allocation(score, risque):
+
+    if risque == "Prudent":
+        return {"actions": 40, "obligations": 40, "immobilier": 15, "liquidites": 5}
+
+    if risque == "Modéré":
+        return {"actions": 60, "obligations": 20, "immobilier": 15, "liquidites": 5}
+
+    return {"actions": 80, "obligations": 5, "immobilier": 10, "liquidites": 5}
+
+
+def generate_psych_profile(score):
+
+    if score < 40:
+        return "Investisseur prudent débutant"
+
+    if score < 70:
+        return "Investisseur en croissance"
+
+    return "Investisseur stratégique avancé"
+
+
+# ======================
+# ROUTES
 # ======================
 
 @app.get("/")
 def root():
-    return {"status": "Family Office IA API running"}
+    return {"status": "API active"}
 
-
-# ======================
-# PROFIL UTILISATEUR
-# ======================
 
 @app.post("/profile")
 def save_profile(profile: ProfileRequest):
@@ -80,137 +150,31 @@ def save_profile(profile: ProfileRequest):
     global user_profile
     user_profile = profile.dict()
 
-    capacite = profile.revenus - profile.charges
+    score = calculate_investor_score(profile)
+
+    allocation = generate_allocation(score, profile.risque)
+
+    psych = generate_psych_profile(score)
+
+    capacite = profile.revenus - (profile.charges_fixes + profile.charges_variables)
 
     patrimoine_total = (
-        profile.epargne +
+        profile.epargne_cash +
+        profile.epargne_bloquee +
         profile.immobilier +
         profile.investissements +
         profile.crypto
     )
 
-    # Détermination du profil investisseur
-    if profile.risque == "Prudent":
-        profil_investisseur = "Défensif"
-    elif profile.risque == "Modéré":
-        profil_investisseur = "Équilibré"
-    else:
-        profil_investisseur = "Dynamique"
-
     return {
         "status": "ok",
-        "message": "Profil enregistré",
-        "profil_investisseur": profil_investisseur,
+        "score_investisseur": score,
+        "profil_psychologique": psych,
+        "allocation_recommandee": allocation,
         "capacite_investissement": capacite,
         "patrimoine_total": patrimoine_total
     }
 
-
-# ======================
-# COACH IA
-# ======================
-
-@app.post("/ia/analyse")
-def ia_analyse(request: IARequest):
-
-    if not user_profile:
-        return {
-            "diagnostic": "Profil non renseigné",
-            "axes": ["Compléter votre profil"],
-            "plan_action": ["Enregistrer vos données financières"],
-            "note": "Profil requis"
-        }
-
-    revenus = user_profile["revenus"]
-    charges = user_profile["charges"]
-    reste = revenus - charges
-
-    axes = []
-
-    if reste <= 0:
-        axes.append("Optimisation budgétaire prioritaire")
-    else:
-        axes.append("Capacité d’investissement détectée")
-
-    return {
-        "diagnostic": f"Capacité mensuelle : {reste} €",
-        "axes": axes,
-        "plan_action": [
-            "Constituer épargne de sécurité",
-            "Investir progressivement",
-            "Diversifier les actifs"
-        ],
-        "note": "Analyse IA d'aide à la décision"
-    }
-
-
-# ======================
-# SCORE INTERNE
-# ======================
-
-def calculate_score(change):
-
-    try:
-        value = float(change.replace("%", ""))
-
-        if value > 5:
-            return 90
-        elif value > 2:
-            return 75
-        elif value > 0:
-            return 60
-        else:
-            return 40
-
-    except:
-        return 50
-
-
-# ======================
-# TOP GAINERS (UNE SEULE REQUÊTE)
-# ======================
-
-@app.get("/stockpicker")
-def stock_picker():
-
-    if not API_KEY:
-        return {"top_stocks": []}
-
-    try:
-
-        url = (
-            "https://www.alphavantage.co/query"
-            f"?function=TOP_GAINERS_LOSERS"
-            f"&apikey={API_KEY}"
-        )
-
-        r = requests.get(url)
-        data = r.json()
-
-        gainers = data.get("top_gainers", [])
-
-        top_stocks = []
-
-        for stock in gainers[:5]:
-
-            score = calculate_score(stock.get("change_percentage", "0%"))
-
-            top_stocks.append({
-                "symbol": stock.get("ticker"),
-                "price": stock.get("price"),
-                "change": stock.get("change_percentage"),
-                "score": score
-            })
-
-        return {"top_stocks": top_stocks}
-
-    except:
-        return {"top_stocks": []}
-
-
-# ======================
-# ANALYSE ACTION
-# ======================
 
 @app.post("/stocks/analyse")
 def analyse_action(data: dict):
@@ -220,108 +184,55 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
-    ticker = ticker.upper()
-
     if not API_KEY:
         return {"error": "Clé API manquante"}
 
-    try:
+    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker.upper()}&apikey={API_KEY}"
 
-        url = (
-            "https://www.alphavantage.co/query"
-            f"?function=GLOBAL_QUOTE"
-            f"&symbol={ticker}"
-            f"&apikey={API_KEY}"
-        )
+    data_json = get_market_data(url)
 
-        r = requests.get(url)
-        data_json = r.json()
+    if not data_json or "Global Quote" not in data_json:
+        return {"error": "Données indisponibles"}
 
-        # 🔎 Vérification exacte
-        if "Global Quote" not in data_json:
-            return {
-                "error": "Réponse API invalide",
-                "debug": data_json
-            }
-
-        quote = data_json["Global Quote"]
-
-        # Vérifier que le prix existe
-        if not quote.get("05. price"):
-            return {
-                "error": "Données incomplètes",
-                "debug": quote
-            }
-
-        return {
-            "ticker": ticker,
-            "prix": float(quote["05. price"]),
-            "variation": quote.get("10. change percent"),
-            "analyse": "Données temps réel Alpha Vantage",
-            "forces": ["Prix officiel", "Mise à jour quotidienne"],
-            "risques": ["Limite API gratuite"],
-            "strategie": "Analyse technique et fondamentale à ajouter"
-        }
-
-    except Exception as e:
-        return {"error": f"Erreur serveur: {str(e)}"}
-
-# ======================
-# IMMOBILIER
-# ======================
-
-@app.get("/realestate/opportunities")
-def realestate_opportunities():
+    quote = data_json["Global Quote"]
 
     return {
-        "real_estate": [
-            {"ville": "Lisbonne", "rendement": "6.5%"},
-            {"ville": "Dubaï", "rendement": "7.2%"},
-            {"ville": "Athènes", "rendement": "6%"}
-        ]
+        "ticker": ticker.upper(),
+        "prix": quote.get("05. price"),
+        "variation": quote.get("10. change percent"),
+        "source": "Alpha Vantage"
     }
 
 
-# ======================
-# BUSINESS
-# ======================
+@app.get("/stockpicker")
+def stock_picker():
 
-@app.get("/business/ideas")
-def business_ideas():
+    if not API_KEY or not user_profile:
+        return {"top_stocks": []}
+
+    url = f"https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey={API_KEY}"
+
+    data = get_market_data(url)
+
+    if not data:
+        return {"top_stocks": []}
+
+    gainers = data.get("top_gainers", [])
+
+    score = calculate_investor_score(type("obj",(object,),user_profile))
+
+    top_stocks = []
+
+    for stock in gainers[:5]:
+
+        top_stocks.append({
+            "symbol": stock.get("ticker"),
+            "price": stock.get("price"),
+            "change": stock.get("change_percentage"),
+            "score": score
+        })
 
     return {
-        "business_ideas": [
-            {"idea": "Agence IA pour PME"},
-            {"idea": "Location courte durée automatisée"},
-            {"idea": "Newsletter premium marchés financiers"}
-        ]
+        "profil_score": score,
+        "top_stocks": top_stocks
     }
-
-
-# ======================
-# TENDANCES
-# ======================
-
-@app.get("/market/trends")
-def market_trends():
-
-    return {
-        "secteurs_croissance": [
-            "Intelligence artificielle",
-            "Cyber sécurité",
-            "Semi-conducteurs",
-            "Energies renouvelables"
-        ],
-        "secteurs_declins": [
-            "Retail physique",
-            "Presse papier"
-        ],
-        "secteurs_emergents": [
-            "Spatial",
-            "Biotech longévité",
-            "Robotique"
-        ]
-    }
-
-
-
