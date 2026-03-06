@@ -277,7 +277,88 @@ def stock_picker():
 
     return {"top_stocks": top_stocks}
 
+# ======================
+# CREER UTILISATEUR
+# ======================
 
+class UserCreate(BaseModel):
+
+    email: str
+    revenus: float
+    charges: float
+
+    epargne: float
+    immobilier: float
+    investissements: float
+    crypto: float
+
+
+@app.post("/user/create")
+def create_user(user: UserCreate):
+
+    try:
+
+        patrimoine = (
+            user.epargne +
+            user.immobilier +
+            user.investissements +
+            user.crypto
+        )
+
+        capacite = user.revenus - user.charges
+
+        score = 0
+
+        if capacite > 0:
+            score += 40
+
+        if patrimoine > 100000:
+            score += 30
+
+        if capacite > user.revenus * 0.2:
+            score += 30
+
+        # profil psychologique
+
+        if score < 40:
+            profil = "Prudent"
+        elif score < 70:
+            profil = "Équilibré"
+        else:
+            profil = "Dynamique"
+
+        with engine.connect() as conn:
+
+            conn.execute(text("""
+                INSERT INTO users (email, revenus, charges, patrimoine, score, profil)
+                VALUES (:email, :revenus, :charges, :patrimoine, :score, :profil)
+            """), {
+
+                "email": user.email,
+                "revenus": user.revenus,
+                "charges": user.charges,
+                "patrimoine": patrimoine,
+                "score": score,
+                "profil": profil
+
+            })
+
+            conn.commit()
+
+        return {
+            "status": "user_created",
+            "email": user.email,
+            "score": score,
+            "profil": profil,
+            "patrimoine": patrimoine
+        }
+
+    except Exception as e:
+
+        return {
+            "error": str(e)
+        }
+        
 @app.get("/db-check")
 def db_check():
 
@@ -290,4 +371,5 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
