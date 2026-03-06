@@ -2,6 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from apscheduler.schedulers.background import BackgroundScheduler
+scheduler = BackgroundScheduler()
+
+def daily_scan():
+    print("Scan quotidien des opportunités...")
+
+scheduler.add_job(daily_scan, "interval", hours=24)
+
+scheduler.start()
+
 import os
 import requests
 FMP_API_KEY = os.getenv("FMP_API_KEY")
@@ -221,7 +231,86 @@ def stock_picker():
             })
 
     return {"stocks": stocks}
-        
+
+@app.get("/realestate/opportunities")
+def realestate_opportunities():
+
+    opportunities = [
+
+        {
+            "ville": "Lisbonne",
+            "rendement": "6.5%",
+            "raison": "Forte demande locative"
+        },
+
+        {
+            "ville": "Dubaï",
+            "rendement": "7.2%",
+            "raison": "Croissance démographique forte"
+        },
+
+        {
+            "ville": "Athènes",
+            "rendement": "6%",
+            "raison": "Marché en rattrapage"
+        }
+
+    ]
+
+    return {"real_estate": opportunities}
+
+@app.get("/business/ideas")
+def business_ideas():
+
+    ideas = [
+
+        {
+            "idea": "Agence IA pour PME",
+            "potential": "Très forte croissance"
+        },
+
+        {
+            "idea": "Location courte durée automatisée",
+            "potential": "Rentabilité élevée"
+        },
+
+        {
+            "idea": "Newsletter premium marchés financiers",
+            "potential": "Monétisation rapide"
+        }
+
+    ]
+
+    return {"business_ideas": ideas}
+
+@app.get("/market/trends")
+def market_trends():
+
+    trends = {
+
+        "secteurs_croissance": [
+            "Intelligence artificielle",
+            "Cyber sécurité",
+            "Semi-conducteurs",
+            "Energies renouvelables"
+        ],
+
+        "secteurs_declins": [
+            "Retail physique",
+            "Presse papier"
+        ],
+
+        "secteurs_emergents": [
+            "Spatial",
+            "Biotech longévité",
+            "Robotique"
+        ]
+
+    }
+
+    return trends
+
+
 # ======================
 # FUTURES EXTENSIONS
 # ======================
@@ -229,6 +318,7 @@ def stock_picker():
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
 
 
