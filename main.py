@@ -171,22 +171,33 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
-    url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+    try:
 
-    r = requests.get(url).json()
+        url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
 
-    if not r:
-        return {"error": "Action introuvable"}
+        r = requests.get(url)
 
-    stock = r[0]
+        if r.status_code != 200:
+            return {"error": "API marché indisponible"}
 
-    return {
-        "ticker": ticker.upper(),
-        "entreprise": stock["companyName"],
-        "secteur": stock["sector"],
-        "prix": stock["price"],
-        "description": stock["description"]
-    }
+        data = r.json()
+
+        if not data:
+            return {"error": "Action introuvable"}
+
+        stock = data[0]
+
+        return {
+            "ticker": ticker.upper(),
+            "entreprise": stock.get("companyName"),
+            "secteur": stock.get("sector"),
+            "prix": stock.get("price"),
+            "description": stock.get("description")
+        }
+
+    except Exception as e:
+
+        return {"error": "Erreur analyse action"}
 
 
 # ======================
@@ -208,21 +219,32 @@ def stock_picker():
 
     for symbol in symbols:
 
-        url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
+        try:
 
-        r = requests.get(url).json()
+            url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
 
-        if r:
-            stock = r[0]
+            r = requests.get(url)
+
+            if r.status_code != 200:
+                continue
+
+            data = r.json()
+
+            if not data:
+                continue
+
+            stock = data[0]
 
             stocks.append({
-                "symbol": stock["symbol"],
-                "price": stock["price"],
-                "change": stock["changesPercentage"]
+                "symbol": stock.get("symbol"),
+                "price": stock.get("price"),
+                "change": stock.get("changesPercentage")
             })
 
-    return {"stocks": stocks}
+        except:
+            continue
 
+    return {"stocks": stocks}
 
 # ======================
 # IMMOBILIER
@@ -290,3 +312,4 @@ def market_trends():
     }
 
     return trends
+
