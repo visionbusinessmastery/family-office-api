@@ -236,3 +236,7 @@ def stock_picker():
         "profil_score": score,
         "top_stocks": top_stocks
     }
+
+@app.get("/db-test")
+def db_test():
+    return {"status": "database endpoint ready"}
