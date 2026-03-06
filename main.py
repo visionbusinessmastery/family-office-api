@@ -106,6 +106,9 @@ class ProfileRequest(BaseModel):
     pays: str
     experience: str
 
+class BrainRequest(BaseModel):
+    question: str
+    
 # ======================
 # UTILITAIRES
 # ======================
@@ -180,6 +183,58 @@ def generate_psych_profile(score):
         return "Investisseur en croissance"
 
     return "Investisseur stratégique avancé"
+
+def generate_ai_response(question, user_data=None):
+
+    question = question.lower()
+
+    if "investir" in question or "investissement" in question:
+        return {
+            "theme": "Investissement",
+            "analyse": "Diversification recommandée entre actions, immobilier et technologie.",
+            "strategie": "Investissement progressif avec horizon long terme.",
+            "opportunites": [
+                "Actions IA",
+                "Semi-conducteurs",
+                "ETF Nasdaq",
+                "Immobilier international"
+            ]
+        }
+
+    if "crypto" in question:
+        return {
+            "theme": "Crypto",
+            "analyse": "Marché volatil mais avec potentiel long terme.",
+            "strategie": "Allocation limitée (5-10% du portefeuille).",
+            "opportunites": [
+                "Bitcoin",
+                "Ethereum",
+                "Infrastructure blockchain"
+            ]
+        }
+
+    if "business" in question:
+        return {
+            "theme": "Entrepreneuriat",
+            "analyse": "Les services IA et automatisation explosent.",
+            "strategie": "Créer des business digitaux scalables.",
+            "opportunites": [
+                "Agence IA",
+                "SaaS automatisation",
+                "Newsletter finance premium"
+            ]
+        }
+
+    return {
+        "theme": "Général",
+        "analyse": "Analyse stratégique basée sur votre profil.",
+        "strategie": "Diversification et gestion du risque.",
+        "opportunites": [
+            "Technologie",
+            "Energies renouvelables",
+            "IA"
+        ]
+    }
 
 # ======================
 # ROUTES
@@ -276,6 +331,25 @@ def stock_picker():
         })
 
     return {"top_stocks": top_stocks}
+
+@app.post("/ia/brain")
+def ia_brain(request: BrainRequest):
+
+    try:
+
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT * FROM users LIMIT 1"))
+            user_data = result.fetchone()
+
+    except:
+        user_data = None
+
+    response = generate_ai_response(request.question, user_data)
+
+    return {
+        "question": request.question,
+        "reponse_ia": response
+    }
 
 # ======================
 # CREER UTILISATEUR
@@ -393,6 +467,7 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
