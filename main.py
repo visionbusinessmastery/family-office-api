@@ -6,6 +6,8 @@ import requests
 import os
 import time
 from datetime import datetime, timedelta
+from sqlalchemy import create_engine, text
+import os
 
 # ======================
 # CONFIG
@@ -22,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
 
 # ======================
 # STOCKAGE SIMPLE
@@ -240,3 +245,13 @@ def stock_picker():
 @app.get("/db-test")
 def db_test():
     return {"status": "database endpoint ready"}
+
+@app.get("/db-check")
+def db_check():
+
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            return {"database": "connected"}
+    except Exception as e:
+        return {"database": "error", "detail": str(e)}
