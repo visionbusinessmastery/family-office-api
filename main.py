@@ -9,7 +9,7 @@ import os
 # CONFIG
 # ======================
 
-FMP_API_KEY = os.getenv("FMP_API_KEY")
+api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
 
 app = FastAPI(
     title="Family Office IA API",
@@ -171,34 +171,40 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
+    api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+
+    if not api_key:
+        return {"error": "Clé API manquante"}
+
     try:
 
-        url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+        url = (
+            "https://www.alphavantage.co/query"
+            f"?function=GLOBAL_QUOTE"
+            f"&symbol={ticker.upper()}"
+            f"&apikey={api_key}"
+        )
 
         r = requests.get(url)
+        data_json = r.json()
 
-        if r.status_code != 200:
-            return {"error": "API marché indisponible"}
+        quote = data_json.get("Global Quote", {})
 
-        data = r.json()
-
-        if not data:
+        if not quote:
             return {"error": "Action introuvable"}
-
-        stock = data[0]
 
         return {
             "ticker": ticker.upper(),
-            "entreprise": stock.get("companyName"),
-            "secteur": stock.get("sector"),
-            "prix": stock.get("price"),
-            "description": stock.get("description")
+            "prix": quote.get("05. price"),
+            "variation": quote.get("10. change percent"),
+            "analyse": "Données récupérées via Alpha Vantage",
+            "forces": ["Données temps réel"],
+            "risques": ["Limite de requêtes API"],
+            "strategie": "Analyse à enrichir avec indicateurs techniques"
         }
 
-    except Exception as e:
-
-        return {"error": "Erreur analyse action"}
-
+    except:
+        return {"error": "Erreur serveur"}
 
 # ======================
 # STOCK PICKER
@@ -206,12 +212,45 @@ def analyse_action(data: dict):
 
 @app.get("/stockpicker")
 def stock_picker():
-    return {
-        "stocks": [
-            {"symbol": "TEST1", "price": 100, "change": 1.5},
-            {"symbol": "TEST2", "price": 200, "change": -0.8}
-        ]
-    }
+
+    api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+
+    if not api_key:
+        return {"stocks": []}
+
+    # Liste d'actions à surveiller
+    symbols = ["TSLA", "AAPL", "MSFT", "NVDA", "GOOGL"]
+
+    stocks = []
+
+    for symbol in symbols:
+
+        try:
+
+            url = (
+                "https://www.alphavantage.co/query"
+                f"?function=GLOBAL_QUOTE"
+                f"&symbol={symbol}"
+                f"&apikey={api_key}"
+            )
+
+            r = requests.get(url)
+            data = r.json()
+
+            quote = data.get("Global Quote", {})
+
+            if quote:
+
+                stocks.append({
+                    "symbol": quote.get("01. symbol"),
+                    "price": quote.get("05. price"),
+                    "change": quote.get("10. change percent")
+                })
+
+        except:
+            continue
+
+    return {"stocks": stocks}
 
 # ======================
 # IMMOBILIER
@@ -279,6 +318,7 @@ def market_trends():
     }
 
     return trends
+
 
 
 
