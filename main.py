@@ -56,6 +56,24 @@ def ia_analyse(request: IARequest):
 
     reste = revenus - charges
 
+    taux_epargne = reste / revenus if revenus > 0 else 0
+
+    if taux_epargne < 0.1:
+        axes.append("Taux d'épargne faible (<10%)")
+    elif taux_epargne < 0.2:
+        axes.append("Taux d'épargne correct mais améliorable")
+    else:
+        axes.append("Excellente capacité d'investissement")
+
+    if risque == "Prudent":
+        profil = "Investisseur défensif"
+
+    elif risque == "Modéré":
+        profil = "Investisseur équilibré"
+
+    else:
+        profil = "Investisseur dynamique"
+    
     diagnostic = (
         f"Revenus mensuels : {revenus} €\n"
         f"Charges mensuelles : {charges} €\n"
@@ -157,21 +175,21 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
+    url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+
+    r = requests.get(url).json()
+
+    if not r:
+        return {"error": "Action introuvable"}
+
+    stock = r[0]
+
     return {
         "ticker": ticker.upper(),
-        "entreprise": "Entreprise simulée",
-        "score": 7,
-        "analyse": "Entreprise solide avec croissance stable.",
-        "forces": [
-            "Bonne croissance",
-            "Position dominante",
-            "Rentabilité solide"
-        ],
-        "risques": [
-            "Valorisation élevée",
-            "Sensibilité au marché"
-        ],
-        "strategie": "Accumulation progressive long terme"
+        "entreprise": stock["companyName"],
+        "secteur": stock["sector"],
+        "prix": stock["price"],
+        "description": stock["description"]
     }
 
 @app.get("/stockpicker")
@@ -180,27 +198,29 @@ def stock_picker():
     if not FMP_API_KEY:
         return {"result": "Clé API manquante"}
 
-    url = f"https://financialmodelingprep.com/stable/stock-screener?marketCapMoreThan=10000000000&volumeMoreThan=1000000&limit=10&apikey={FMP_API_KEY}"
+    symbols = [
+        "AAPL","MSFT","NVDA","GOOGL","AMZN",
+        "TSLA","META","V","ASML","LVMH"
+    ]
 
-    try:
+    stocks = []
 
-        response = requests.get(url)
-        stocks = response.json()
+    for symbol in symbols:
 
-        result = "📈 Actions détectées par l'IA :\n\n"
+        url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
 
-        for stock in stocks:
+        r = requests.get(url).json()
 
-            result += f"""• {stock['companyName']} ({stock['symbol']})
-Prix : {stock['price']} $
-Secteur : {stock['sector']}
+        if r:
+            stock = r[0]
 
-"""
+            stocks.append({
+                "symbol": stock["symbol"],
+                "price": stock["price"],
+                "change": stock["changesPercentage"]
+            })
 
-        return {"result": result}
-
-    except Exception as e:
-        return {"result": f"Erreur récupération données marché : {str(e)}"}
+    return {"stocks": stocks}
         
 # ======================
 # FUTURES EXTENSIONS
@@ -209,6 +229,7 @@ Secteur : {stock['sector']}
 # - Connexion Open Banking (Revolut)
 # - IA Coach avancé
 # - Stockage base de données
+
 
 
 
