@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 import os
 import time
+from datetime import datetime, timedelta
 
 # ======================
 # CONFIG
@@ -30,6 +31,8 @@ app.add_middleware(
 # ======================
 
 user_profile = {}
+stock_cache = {}
+CACHE_DURATION = timedelta(minutes=15)
 
 # ======================
 # MODELS
@@ -319,5 +322,6 @@ def market_trends():
             "Robotique"
         ]
     }
+
 
 
