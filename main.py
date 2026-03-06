@@ -206,40 +206,12 @@ def analyse_action(data: dict):
 
 @app.get("/stockpicker")
 def stock_picker():
-
-    if not FMP_API_KEY:
-        return {"stocks": []}
-
-    url = (
-        "https://financialmodelingprep.com/stable/stock-screener"
-        f"?marketCapMoreThan=10000000000"
-        f"&volumeMoreThan=1000000"
-        f"&limit=10"
-        f"&apikey={FMP_API_KEY}"
-    )
-
-    try:
-        r = requests.get(url)
-
-        if r.status_code != 200:
-            return {"stocks": []}
-
-        data = r.json()
-
-        stocks = []
-
-        for stock in data:
-
-            stocks.append({
-                "symbol": stock.get("symbol"),
-                "price": stock.get("price"),
-                "change": stock.get("changesPercentage")
-            })
-
-        return {"stocks": stocks}
-
-    except:
-        return {"stocks": []}
+    return {
+        "stocks": [
+            {"symbol": "TEST1", "price": 100, "change": 1.5},
+            {"symbol": "TEST2", "price": 200, "change": -0.8}
+        ]
+    }
 
 # ======================
 # IMMOBILIER
@@ -307,6 +279,7 @@ def market_trends():
     }
 
     return trends
+
 
 
 
