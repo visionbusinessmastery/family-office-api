@@ -2,12 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-from apscheduler.schedulers.background import BackgroundScheduler
-import os
 import requests
+import os
 
 # ======================
-# CONFIGURATION API
+# CONFIG
 # ======================
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
@@ -26,16 +25,10 @@ app.add_middleware(
 )
 
 # ======================
-# SCHEDULER
+# STOCKAGE MVP
 # ======================
 
-scheduler = BackgroundScheduler()
-
-def daily_scan():
-    print("Scan quotidien des opportunités...")
-
-scheduler.add_job(daily_scan, "interval", hours=24)
-scheduler.start()
+user_profile = {}
 
 # ======================
 # MODELS
@@ -47,32 +40,22 @@ class IARequest(BaseModel):
 
 class ProfileRequest(BaseModel):
 
-    # Revenus
     revenus: float
     charges: float
 
-    # Patrimoine
     epargne: float
     immobilier: float
     investissements: float
     crypto: float
 
-    # Objectifs
     objectif: str
     horizon: int
     risque: str
 
-    # Infos utilisateur
     age: int
     pays: str
     experience: str
 
-
-# ======================
-# STOCKAGE PROFIL (MVP)
-# ======================
-
-user_profile = {}
 
 # ======================
 # ROUTE TEST
@@ -82,8 +65,9 @@ user_profile = {}
 def root():
     return {"status": "Family Office IA API running"}
 
+
 # ======================
-# ENREGISTREMENT PROFIL
+# PROFIL UTILISATEUR
 # ======================
 
 @app.post("/profile")
@@ -95,17 +79,13 @@ def save_profile(profile: ProfileRequest):
     capacite = profile.revenus - profile.charges
 
     patrimoine_total = (
-        profile.epargne
-        + profile.immobilier
-        + profile.investissements
-        + profile.crypto
+        profile.epargne +
+        profile.immobilier +
+        profile.investissements +
+        profile.crypto
     )
 
-    return {
-        "status": "ok",
-        "message": "Profil enregistré avec succès",
-
-        "diagnostic": f"""
+    diagnostic = f"""
 📊 DIAGNOSTIC FINANCIER
 
 Revenus : {profile.revenus} €
@@ -114,13 +94,19 @@ Capacité d'investissement : {capacite} €
 
 Patrimoine total : {patrimoine_total} €
 
-Profil : {profile.risque}
+Profil de risque : {profile.risque}
 Horizon : {profile.horizon} ans
-        """
+"""
+
+    return {
+        "status": "ok",
+        "message": "Profil enregistré",
+        "diagnostic": diagnostic
     }
 
+
 # ======================
-# COACH PATRIMONIAL IA
+# COACH IA
 # ======================
 
 @app.post("/ia/analyse")
@@ -130,8 +116,8 @@ def ia_analyse(request: IARequest):
         return {
             "diagnostic": "Profil utilisateur non renseigné",
             "axes": ["Merci de compléter votre profil financier"],
-            "plan_action": ["Renseigner revenus, charges, objectifs"],
-            "note": "Profil requis pour une analyse personnalisée"
+            "plan_action": ["Renseigner revenus, charges et objectifs"],
+            "note": "Profil requis pour analyse personnalisée"
         }
 
     revenus = user_profile["revenus"]
@@ -154,16 +140,14 @@ def ia_analyse(request: IARequest):
 
     if reste <= 0:
         axes.append("Optimisation budgétaire prioritaire")
-    elif reste < revenus * 0.2:
-        axes.append("Capacité d'investissement modérée")
     else:
-        axes.append("Excellente capacité d'investissement")
+        axes.append("Capacité d’investissement détectée")
 
     axes.append(f"Objectif principal : {objectif}")
 
     plan_action = [
         "Construire une épargne de sécurité (3 à 6 mois de charges)",
-        "Investir progressivement selon le profil de risque",
+        "Mettre en place une stratégie d'investissement progressive",
         "Diversifier entre actions, immobilier et actifs alternatifs"
     ]
 
@@ -171,8 +155,9 @@ def ia_analyse(request: IARequest):
         "diagnostic": diagnostic,
         "axes": axes,
         "plan_action": plan_action,
-        "note": "Analyse IA – aide à la décision uniquement"
+        "note": "Analyse IA – aide à la décision"
     }
+
 
 # ======================
 # ANALYSE ACTION
@@ -198,34 +183,21 @@ def analyse_action(data: dict):
     return {
         "ticker": ticker.upper(),
         "entreprise": stock["companyName"],
-
-        "score": 7,
-
-        "analyse": f"{stock['companyName']} opère dans le secteur {stock['sector']}. Entreprise solide avec potentiel long terme.",
-
-        "forces": [
-            "Position de marché solide",
-            "Secteur porteur",
-            "Potentiel de croissance"
-        ],
-
-        "risques": [
-            "Volatilité du marché",
-            "Concurrence technologique"
-        ],
-
-        "strategie": "Accumulation progressive long terme"
+        "secteur": stock["sector"],
+        "prix": stock["price"],
+        "description": stock["description"]
     }
 
+
 # ======================
-# STOCK PICKER IA
+# STOCK PICKER
 # ======================
 
 @app.get("/stockpicker")
 def stock_picker():
 
     if not FMP_API_KEY:
-        return {"result": "Clé API manquante"}
+        return {"stocks": []}
 
     symbols = [
         "AAPL","MSFT","NVDA","GOOGL","AMZN",
@@ -241,7 +213,6 @@ def stock_picker():
         r = requests.get(url).json()
 
         if r:
-
             stock = r[0]
 
             stocks.append({
@@ -252,8 +223,9 @@ def stock_picker():
 
     return {"stocks": stocks}
 
+
 # ======================
-# OPPORTUNITES IMMOBILIER
+# IMMOBILIER
 # ======================
 
 @app.get("/realestate/opportunities")
@@ -261,27 +233,14 @@ def realestate_opportunities():
 
     opportunities = [
 
-        {
-            "ville": "Lisbonne",
-            "rendement": "6.5%",
-            "raison": "Forte demande locative"
-        },
-
-        {
-            "ville": "Dubaï",
-            "rendement": "7.2%",
-            "raison": "Croissance démographique forte"
-        },
-
-        {
-            "ville": "Athènes",
-            "rendement": "6%",
-            "raison": "Marché en rattrapage"
-        }
+        {"ville": "Lisbonne", "rendement": "6.5%"},
+        {"ville": "Dubaï", "rendement": "7.2%"},
+        {"ville": "Athènes", "rendement": "6%"}
 
     ]
 
     return {"real_estate": opportunities}
+
 
 # ======================
 # IDEES BUSINESS
@@ -292,27 +251,17 @@ def business_ideas():
 
     ideas = [
 
-        {
-            "idea": "Agence IA pour PME",
-            "potential": "Très forte croissance"
-        },
-
-        {
-            "idea": "Location courte durée automatisée",
-            "potential": "Rentabilité élevée"
-        },
-
-        {
-            "idea": "Newsletter premium marchés financiers",
-            "potential": "Monétisation rapide"
-        }
+        {"idea": "Agence IA pour PME"},
+        {"idea": "Location courte durée automatisée"},
+        {"idea": "Newsletter premium marchés financiers"}
 
     ]
 
     return {"business_ideas": ideas}
 
+
 # ======================
-# TENDANCES ECONOMIQUES
+# TENDANCES
 # ======================
 
 @app.get("/market/trends")
