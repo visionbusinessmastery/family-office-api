@@ -37,6 +37,41 @@ if DATABASE_URL:
         engine = None
 
 # ======================
+# CREATION TABLES
+# ======================
+
+def init_db():
+
+    try:
+
+        with engine.connect() as conn:
+
+            conn.execute(text("""
+
+            CREATE TABLE IF NOT EXISTS users (
+
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE,
+                revenus FLOAT,
+                charges FLOAT,
+                patrimoine FLOAT,
+                score INT,
+                profil TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+            )
+
+            """))
+
+            conn.commit()
+
+    except Exception as e:
+        print("DB init error:", e)
+
+
+init_db()
+
+# ======================
 # STOCKAGE SIMPLE
 # ======================
 
@@ -255,3 +290,4 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
