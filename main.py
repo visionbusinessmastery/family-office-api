@@ -217,6 +217,8 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
+    ticker = ticker.upper()
+
     if not API_KEY:
         return {"error": "Clé API manquante"}
 
@@ -225,43 +227,41 @@ def analyse_action(data: dict):
         url = (
             "https://www.alphavantage.co/query"
             f"?function=GLOBAL_QUOTE"
-            f"&symbol={ticker.upper()}"
+            f"&symbol={ticker}"
             f"&apikey={API_KEY}"
         )
 
         r = requests.get(url)
         data_json = r.json()
 
-        # 🔎 DEBUG TEMPORAIRE (très utile)
-        print(data_json)
-
-        # Vérification stricte
+        # 🔎 Vérification exacte
         if "Global Quote" not in data_json:
             return {
-                "error": "Action introuvable ou limite API atteinte",
+                "error": "Réponse API invalide",
                 "debug": data_json
             }
 
         quote = data_json["Global Quote"]
 
-        if not quote or not quote.get("01. symbol"):
-            return {"error": "Données action invalides"}
+        # Vérifier que le prix existe
+        if not quote.get("05. price"):
+            return {
+                "error": "Données incomplètes",
+                "debug": quote
+            }
 
         return {
-
-            "ticker": ticker.upper(),
-            "prix": quote.get("05. price"),
+            "ticker": ticker,
+            "prix": float(quote["05. price"]),
             "variation": quote.get("10. change percent"),
             "analyse": "Données temps réel Alpha Vantage",
-            "forces": ["Données officielles"],
-            "risques": ["Limite plan gratuit"],
-            "strategie": "À enrichir"
-
+            "forces": ["Prix officiel", "Mise à jour quotidienne"],
+            "risques": ["Limite API gratuite"],
+            "strategie": "Analyse technique et fondamentale à ajouter"
         }
 
     except Exception as e:
         return {"error": f"Erreur serveur: {str(e)}"}
-
 
 # ======================
 # IMMOBILIER
@@ -319,4 +319,5 @@ def market_trends():
             "Robotique"
         ]
     }
+
 
