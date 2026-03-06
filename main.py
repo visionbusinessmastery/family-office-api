@@ -210,14 +210,36 @@ def stock_picker():
     if not FMP_API_KEY:
         return {"stocks": []}
 
-    url = f"https://financialmodelingprep.com/api/v3/quote/AAPL?apikey={FMP_API_KEY}"
+    url = (
+        "https://financialmodelingprep.com/stable/stock-screener"
+        f"?marketCapMoreThan=10000000000"
+        f"&volumeMoreThan=1000000"
+        f"&limit=10"
+        f"&apikey={FMP_API_KEY}"
+    )
 
-    r = requests.get(url)
+    try:
+        r = requests.get(url)
 
-    return {
-        "status_code": r.status_code,
-        "response": r.text
-    }
+        if r.status_code != 200:
+            return {"stocks": []}
+
+        data = r.json()
+
+        stocks = []
+
+        for stock in data:
+
+            stocks.append({
+                "symbol": stock.get("symbol"),
+                "price": stock.get("price"),
+                "change": stock.get("changesPercentage")
+            })
+
+        return {"stocks": stocks}
+
+    except:
+        return {"stocks": []}
 
 # ======================
 # IMMOBILIER
@@ -285,5 +307,6 @@ def market_trends():
     }
 
     return trends
+
 
 
