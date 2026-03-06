@@ -4,8 +4,10 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import os
+import yfinance as yf 
 import time
 from sqlalchemy import create_engine, text
+import requests
 
 # ======================
 # CONFIG
@@ -13,6 +15,7 @@ from sqlalchemy import create_engine, text
 
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
+FMP_API_KEY = os.getenv("FMP_API_KEY")
 
 app = FastAPI(title="Family Office IA", version="4.0")
 
@@ -237,6 +240,37 @@ def generate_ai_response(question, user_data=None):
     }
 
 # ======================
+# FONCTION HYBRIDE ACTION
+# ======================
+
+def get_stock_data(ticker: str):
+
+    ticker = ticker.upper()
+
+    # 1️⃣ Alpha Vantage
+    alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+    alpha_data = requests.get(alpha_url).json().get("Global Quote", {})
+
+    # 2️⃣ FMP
+    fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+    fmp_data = requests.get(fmp_url).json()
+    fmp_data = fmp_data[0] if fmp_data else {}
+
+    # 3️⃣ YFinance
+    yf_ticker = yf.Ticker(ticker)
+    yf_info = yf_ticker.info
+
+    return {
+        "ticker": ticker,
+        "price": alpha_data.get("05. price"),
+        "change_percent": alpha_data.get("10. change percent"),
+        "company_name": fmp_data.get("companyName") or yf_info.get("shortName"),
+        "sector": fmp_data.get("sector") or yf_info.get("sector"),
+        "market_cap": fmp_data.get("mktCap") or yf_info.get("marketCap"),
+        "pe_ratio": fmp_data.get("pe") or yf_info.get("trailingPE")
+    }
+
+# ======================
 # ROUTES
 # ======================
 
@@ -285,25 +319,32 @@ def analyse_action(data: dict):
     if not ticker:
         return {"error": "Ticker manquant"}
 
-    if not API_KEY:
-        return {"error": "Clé API manquante"}
+    if not ALPHA_VANTAGE_API_KEY:
+        return {"error": "Clé Alpha Vantage manquante"}
 
-    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker.upper()}&apikey={API_KEY}"
+    if not FMP_API_KEY:
+        return {"error": "Clé FMP manquante"}
 
-    data_json = get_market_data(url)
+    try:
 
-    if not data_json or "Global Quote" not in data_json:
-        return {"error": "Données indisponibles"}
+        stock = get_stock_data(ticker)
 
-    quote = data_json["Global Quote"]
+        if not stock["price"]:
+            return {"error": "Action introuvable"}
 
-    return {
-        "ticker": ticker.upper(),
-        "prix": quote.get("05. price"),
-        "variation": quote.get("10. change percent"),
-        "source": "Alpha Vantage"
-    }
+        return {
+            "ticker": stock["ticker"],
+            "entreprise": stock["company_name"],
+            "secteur": stock["sector"],
+            "prix": stock["price"],
+            "variation": stock["change_percent"],
+            "market_cap": stock["market_cap"],
+            "pe_ratio": stock["pe_ratio"],
+            "source": "Hybrid (Alpha + FMP + YFinance)"
+        }
 
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/stockpicker")
 def stock_picker():
@@ -467,6 +508,7 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
