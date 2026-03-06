@@ -232,23 +232,35 @@ def analyse_action(data: dict):
         r = requests.get(url)
         data_json = r.json()
 
-        quote = data_json.get("Global Quote")
+        # 🔎 DEBUG TEMPORAIRE (très utile)
+        print(data_json)
 
-        if not quote:
-            return {"error": "Action introuvable"}
+        # Vérification stricte
+        if "Global Quote" not in data_json:
+            return {
+                "error": "Action introuvable ou limite API atteinte",
+                "debug": data_json
+            }
+
+        quote = data_json["Global Quote"]
+
+        if not quote or not quote.get("01. symbol"):
+            return {"error": "Données action invalides"}
 
         return {
+
             "ticker": ticker.upper(),
             "prix": quote.get("05. price"),
             "variation": quote.get("10. change percent"),
-            "analyse": "Données temps réel",
-            "forces": ["Prix actualisé"],
-            "risques": ["Limite API gratuite"],
-            "strategie": "Analyse avancée à développer"
+            "analyse": "Données temps réel Alpha Vantage",
+            "forces": ["Données officielles"],
+            "risques": ["Limite plan gratuit"],
+            "strategie": "À enrichir"
+
         }
 
-    except:
-        return {"error": "Erreur serveur"}
+    except Exception as e:
+        return {"error": f"Erreur serveur: {str(e)}"}
 
 
 # ======================
@@ -307,3 +319,4 @@ def market_trends():
             "Robotique"
         ]
     }
+
