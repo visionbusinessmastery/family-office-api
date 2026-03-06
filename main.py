@@ -358,6 +358,28 @@ def create_user(user: UserCreate):
         return {
             "error": str(e)
         }
+
+@app.get("/users")
+def list_users():
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT email, score, profil, patrimoine FROM users"))
+
+            users = []
+
+            for row in result:
+                users.append({
+                    "email": row[0],
+                    "score": row[1],
+                    "profil": row[2],
+                    "patrimoine": row[3]
+                })
+
+        return {"users": users}
+
+    except Exception as e:
+        return {"error": str(e)}
         
 @app.get("/db-check")
 def db_check():
@@ -371,5 +393,6 @@ def db_check():
             return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
