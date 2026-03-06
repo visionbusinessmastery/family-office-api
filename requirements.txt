@@ -2,6 +2,8 @@ fastapi
 uvicorn
 pydantic
 requests
+yfinance
 sqlalchemy
 psycopg2-binary
+
 
