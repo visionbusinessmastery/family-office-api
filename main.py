@@ -4,20 +4,18 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import os
-import yfinance as yf 
 import time
+from datetime import datetime
 from sqlalchemy import create_engine, text
-import requests
 
-# ======================
+# ==================================================
 # CONFIG
-# ======================
+# ==================================================
 
-API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
-FMP_API_KEY = os.getenv("FMP_API_KEY")
 
-app = FastAPI(title="Family Office IA", version="4.0")
+app = FastAPI(title="Family Office IA", version="5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,97 +25,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ======================
-# DATABASE (SAFE)
-# ======================
+# ==================================================
+# DATABASE
+# ==================================================
 
 engine = None
 
 if DATABASE_URL:
     try:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    except:
-        engine = None
-
-# ======================
-# CREATION TABLES
-# ======================
-
-def init_db():
-
-    try:
-
-        with engine.connect() as conn:
-
+        with engine.begin() as conn:
             conn.execute(text("""
-
-            CREATE TABLE IF NOT EXISTS users (
-
-                id SERIAL PRIMARY KEY,
-                email TEXT UNIQUE,
-                revenus FLOAT,
-                charges FLOAT,
-                patrimoine FLOAT,
-                score INT,
-                profil TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-            )
-
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT UNIQUE,
+                    revenus FLOAT,
+                    charges FLOAT,
+                    patrimoine FLOAT,
+                    score INT,
+                    profil TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
             """))
-
-            conn.commit()
-
     except Exception as e:
-        print("DB init error:", e)
+        print("DB INIT ERROR:", e)
 
+# ==================================================
+# CACHE
+# ==================================================
 
-init_db()
-
-# ======================
-# STOCKAGE SIMPLE
-# ======================
-
-user_profile = {}
 cache = {}
 CACHE_DURATION = 900  # 15 min
 
-# ======================
-# MODELS
-# ======================
-
-class IARequest(BaseModel):
-    message: str
-
-
-class ProfileRequest(BaseModel):
-    revenus: float
-    charges_fixes: float
-    charges_variables: float
-
-    epargne_cash: float
-    epargne_bloquee: float
-    immobilier: float
-    investissements: float
-    crypto: float
-
-    objectif: str
-    horizon: int
-    risque: str
-
-    age: int
-    pays: str
-    experience: str
-
-class BrainRequest(BaseModel):
-    question: str
-    
-# ======================
-# UTILITAIRES
-# ======================
-
-def get_market_data(url):
-
+def get_cached(url):
     if url in cache:
         if time.time() - cache[url]["time"] < CACHE_DURATION:
             return cache[url]["data"]
@@ -130,38 +70,51 @@ def get_market_data(url):
     except:
         return None
 
+# ==================================================
+# MODELS
+# ==================================================
 
-def calculate_investor_score(profile):
+class ProfileRequest(BaseModel):
+    email: Optional[str] = None
+    revenus: float
+    charges: float
+    epargne: float
+    immobilier: float
+    investissements: float
+    crypto: float
+    risque: str
+    experience: str
+
+class StockRequest(BaseModel):
+    ticker: str
+
+class BrainRequest(BaseModel):
+    question: str
+
+# ==================================================
+# UTILITAIRES
+# ==================================================
+
+def calculate_score(profile):
 
     score = 0
 
-    capacite = profile.revenus - (profile.charges_fixes + profile.charges_variables)
+    capacite = profile.revenus - profile.charges
+    patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
 
     if capacite > 0:
-        score += 25
-
-    if profile.revenus > 0:
-        taux = capacite / profile.revenus
-        if taux > 0.2:
-            score += 25
-        elif taux > 0.1:
-            score += 15
-
-    patrimoine = (
-        profile.epargne_cash +
-        profile.epargne_bloquee +
-        profile.immobilier +
-        profile.investissements +
-        profile.crypto
-    )
+        score += 30
 
     if patrimoine > 100000:
-        score += 25
+        score += 30
 
     if profile.experience == "Avancé":
-        score += 25
+        score += 20
     elif profile.experience == "Intermédiaire":
-        score += 15
+        score += 10
+
+    if profile.risque == "Dynamique":
+        score += 20
 
     return min(score, 100)
 
@@ -176,336 +129,146 @@ def generate_allocation(risque):
 
     return {"actions": 80, "obligations": 5, "immobilier": 10, "liquidites": 5}
 
-
-def generate_psych_profile(score):
-
-    if score < 40:
-        return "Investisseur prudent débutant"
-
-    if score < 70:
-        return "Investisseur en croissance"
-
-    return "Investisseur stratégique avancé"
-
-def generate_ai_response(question, user_data=None):
-
-    question = question.lower()
-
-    if "investir" in question or "investissement" in question:
-        return {
-            "theme": "Investissement",
-            "analyse": "Diversification recommandée entre actions, immobilier et technologie.",
-            "strategie": "Investissement progressif avec horizon long terme.",
-            "opportunites": [
-                "Actions IA",
-                "Semi-conducteurs",
-                "ETF Nasdaq",
-                "Immobilier international"
-            ]
-        }
-
-    if "crypto" in question:
-        return {
-            "theme": "Crypto",
-            "analyse": "Marché volatil mais avec potentiel long terme.",
-            "strategie": "Allocation limitée (5-10% du portefeuille).",
-            "opportunites": [
-                "Bitcoin",
-                "Ethereum",
-                "Infrastructure blockchain"
-            ]
-        }
-
-    if "business" in question:
-        return {
-            "theme": "Entrepreneuriat",
-            "analyse": "Les services IA et automatisation explosent.",
-            "strategie": "Créer des business digitaux scalables.",
-            "opportunites": [
-                "Agence IA",
-                "SaaS automatisation",
-                "Newsletter finance premium"
-            ]
-        }
-
-    return {
-        "theme": "Général",
-        "analyse": "Analyse stratégique basée sur votre profil.",
-        "strategie": "Diversification et gestion du risque.",
-        "opportunites": [
-            "Technologie",
-            "Energies renouvelables",
-            "IA"
-        ]
-    }
-
-# ======================
-# FONCTION HYBRIDE ACTION
-# ======================
-
-def get_stock_data(ticker: str):
-
-    ticker = ticker.upper()
-
-    # 1️⃣ Alpha Vantage
-    alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-    alpha_data = requests.get(alpha_url).json().get("Global Quote", {})
-
-    # 2️⃣ FMP
-    fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
-    fmp_data = requests.get(fmp_url).json()
-    fmp_data = fmp_data[0] if fmp_data else {}
-
-    # 3️⃣ YFinance
-    yf_ticker = yf.Ticker(ticker)
-    yf_info = yf_ticker.info
-
-    return {
-        "ticker": ticker,
-        "price": alpha_data.get("05. price"),
-        "change_percent": alpha_data.get("10. change percent"),
-        "company_name": fmp_data.get("companyName") or yf_info.get("shortName"),
-        "sector": fmp_data.get("sector") or yf_info.get("sector"),
-        "market_cap": fmp_data.get("mktCap") or yf_info.get("marketCap"),
-        "pe_ratio": fmp_data.get("pe") or yf_info.get("trailingPE")
-    }
-
-# ======================
+# ==================================================
 # ROUTES
-# ======================
+# ==================================================
 
 @app.get("/")
 def root():
     return {"status": "API active"}
 
+# -------------------------
+# PROFIL
+# -------------------------
 
 @app.post("/profile")
 def save_profile(profile: ProfileRequest):
 
-    global user_profile
-    user_profile = profile
-
-    score = calculate_investor_score(profile)
-
+    score = calculate_score(profile)
     allocation = generate_allocation(profile.risque)
 
-    psych = generate_psych_profile(score)
+    patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
 
-    capacite = profile.revenus - (profile.charges_fixes + profile.charges_variables)
-
-    patrimoine_total = (
-        profile.epargne_cash +
-        profile.epargne_bloquee +
-        profile.immobilier +
-        profile.investissements +
-        profile.crypto
-    )
+    if engine and profile.email:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    INSERT INTO users (email, revenus, charges, patrimoine, score, profil)
+                    VALUES (:email, :revenus, :charges, :patrimoine, :score, :profil)
+                    ON CONFLICT (email) DO UPDATE
+                    SET score=:score, patrimoine=:patrimoine
+                """), {
+                    "email": profile.email,
+                    "revenus": profile.revenus,
+                    "charges": profile.charges,
+                    "patrimoine": patrimoine,
+                    "score": score,
+                    "profil": profile.risque
+                })
+        except Exception as e:
+            print("DB ERROR:", e)
 
     return {
         "status": "ok",
         "score_investisseur": score,
-        "profil_psychologique": psych,
         "allocation_recommandee": allocation,
-        "capacite_investissement": capacite,
-        "patrimoine_total": patrimoine_total
+        "patrimoine_total": patrimoine
     }
 
+# -------------------------
+# ANALYSE ACTION (ALPHA)
+# -------------------------
 
 @app.post("/stocks/analyse")
-def analyse_action(data: dict):
-
-    ticker = data.get("ticker")
-
-    if not ticker:
-        return {"error": "Ticker manquant"}
-
-    ticker = ticker.upper()
+def analyse_stock(request: StockRequest):
 
     if not ALPHA_VANTAGE_API_KEY:
-        return {"error": "Clé Alpha Vantage manquante"}
+        return {"error": "Clé API manquante"}
 
-    try:
+    ticker = request.ticker.upper()
 
-        # 🔹 Alpha Vantage (prix)
-        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-        r = requests.get(url, timeout=10)
-        data_json = r.json()
+    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
 
-        if "Global Quote" not in data_json:
-            return {"error": "Réponse API invalide"}
+    data = get_cached(url)
 
-        quote = data_json["Global Quote"]
+    if not data or "Global Quote" not in data:
+        return {"error": "Données indisponibles"}
 
-        price = quote.get("05. price")
-        change = quote.get("10. change percent")
+    quote = data["Global Quote"]
 
-        if not price:
-            return {"error": "Données marché indisponibles"}
+    price = quote.get("05. price")
+    change = quote.get("10. change percent")
 
-        return {
-            "ticker": ticker,
-            "prix": float(price),
-            "variation": change,
-            "source": "Alpha Vantage"
-        }
-
-    except Exception as e:
-
-        return {
-            "error": "Erreur serveur",
-            "detail": str(e)
-        }
-
-@app.get("/stockpicker")
-def stock_picker():
-
-    if not API_KEY:
-        return {"top_stocks": []}
-
-    url = f"https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey={API_KEY}"
-
-    data = get_market_data(url)
-
-    if not data:
-        return {"top_stocks": []}
-
-    gainers = data.get("top_gainers", [])
-
-    top_stocks = []
-
-    for stock in gainers[:5]:
-
-        top_stocks.append({
-            "symbol": stock.get("ticker"),
-            "price": stock.get("price"),
-            "change": stock.get("change_percentage")
-        })
-
-    return {"top_stocks": top_stocks}
-
-@app.post("/ia/brain")
-def ia_brain(request: BrainRequest):
-
-    try:
-
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT * FROM users LIMIT 1"))
-            user_data = result.fetchone()
-
-    except:
-        user_data = None
-
-    response = generate_ai_response(request.question, user_data)
+    if not price:
+        return {"error": "Prix indisponible"}
 
     return {
-        "question": request.question,
-        "reponse_ia": response
+        "ticker": ticker,
+        "price": float(price),
+        "change_percent": change,
+        "source": "Alpha Vantage"
     }
 
-# ======================
-# CREER UTILISATEUR
-# ======================
+# -------------------------
+# STOCK PICKER SIMPLE
+# -------------------------
 
-class UserCreate(BaseModel):
+@app.get("/stockpicker")
+def stockpicker():
 
-    email: str
-    revenus: float
-    charges: float
+    if not ALPHA_VANTAGE_API_KEY:
+        return {"stocks": []}
 
-    epargne: float
-    immobilier: float
-    investissements: float
-    crypto: float
+    symbols = ["TSLA", "AAPL", "MSFT", "NVDA"]
 
+    results = []
 
-@app.post("/user/create")
-def create_user(user: UserCreate):
+    for symbol in symbols:
 
-    try:
+        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={ALPHA_VANTAGE_API_KEY}"
 
-        patrimoine = (
-            user.epargne +
-            user.immobilier +
-            user.investissements +
-            user.crypto
-        )
+        data = get_cached(url)
 
-        capacite = user.revenus - user.charges
+        if data and "Global Quote" in data:
+            quote = data["Global Quote"]
 
-        score = 0
-
-        if capacite > 0:
-            score += 40
-
-        if patrimoine > 100000:
-            score += 30
-
-        if capacite > user.revenus * 0.2:
-            score += 30
-
-        # profil psychologique
-
-        if score < 40:
-            profil = "Prudent"
-        elif score < 70:
-            profil = "Équilibré"
-        else:
-            profil = "Dynamique"
-
-        with engine.connect() as conn:
-
-            conn.execute(text("""
-                INSERT INTO users (email, revenus, charges, patrimoine, score, profil)
-                VALUES (:email, :revenus, :charges, :patrimoine, :score, :profil)
-            """), {
-
-                "email": user.email,
-                "revenus": user.revenus,
-                "charges": user.charges,
-                "patrimoine": patrimoine,
-                "score": score,
-                "profil": profil
-
+            results.append({
+                "symbol": symbol,
+                "price": quote.get("05. price"),
+                "change": quote.get("10. change percent")
             })
 
-            conn.commit()
+    return {"stocks": results}
+
+# -------------------------
+# IA BRAIN
+# -------------------------
+
+@app.post("/ia/brain")
+def brain(request: BrainRequest):
+
+    question = request.question.lower()
+
+    if "investir" in question:
 
         return {
-            "status": "user_created",
-            "email": user.email,
-            "score": score,
-            "profil": profil,
-            "patrimoine": patrimoine
+            "theme": "Investissement",
+            "analyse": "Diversification recommandée.",
+            "strategie": "Long terme progressif.",
+            "opportunites": ["Actions IA", "ETF", "Immobilier"]
         }
 
-    except Exception as e:
+    return {
+        "theme": "Général",
+        "analyse": "Analyse stratégique.",
+        "strategie": "Gestion du risque.",
+        "opportunites": ["Diversification"]
+    }
 
-        return {
-            "error": str(e)
-        }
+# -------------------------
+# DATABASE CHECK
+# -------------------------
 
-@app.get("/users")
-def list_users():
-
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT email, score, profil, patrimoine FROM users"))
-
-            users = []
-
-            for row in result:
-                users.append({
-                    "email": row[0],
-                    "score": row[1],
-                    "profil": row[2],
-                    "patrimoine": row[3]
-                })
-
-        return {"users": users}
-
-    except Exception as e:
-        return {"error": str(e)}
-        
 @app.get("/db-check")
 def db_check():
 
@@ -513,14 +276,8 @@ def db_check():
         return {"database": "not configured"}
 
     try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-            return {"database": "connected"}
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
-
-
-
-
-
-
