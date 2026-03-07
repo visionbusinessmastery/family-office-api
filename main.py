@@ -222,20 +222,20 @@ def analyse_stock(request: StockRequest):
     quote = data["Global Quote"]
 
     price = quote.get("05. price")
-change = quote.get("10. change percent")
+    change = quote.get("10. change percent")
 
-if not price:
-    return {"error": "Prix indisponible"}
+    if not price:
+        return {"error": "Prix indisponible"}
 
-analyse = analyse_investissement(price, change)
+    analyse = analyse_investissement(price, change)
 
-return {
-    "ticker": ticker,
-    "price": float(price),
-    "change_percent": change,
-    "source": "Alpha Vantage",
-    "analyse": analyse
-}
+    return {
+        "ticker": ticker,
+        "price": float(price),
+        "change_percent": change,
+        "source": "Alpha Vantage",
+        "analyse": analyse
+    }
 
 # -------------------------
 # STOCK PICKER SIMPLE
@@ -309,5 +309,6 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
