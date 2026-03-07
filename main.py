@@ -36,6 +36,7 @@ if DATABASE_URL:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
         with engine.begin() as conn:
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -46,6 +47,19 @@ if DATABASE_URL:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS portfolios (
+                    id SERIAL PRIMARY KEY,
+                    user_email TEXT,
+                    asset TEXT,
+                    asset_type TEXT,
+                    quantity FLOAT,
+                    buy_price FLOAT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
     except Exception as e:
         print("DB INIT ERROR:", e)
 
@@ -57,15 +71,28 @@ cache = {}
 CACHE_DURATION = 900
 
 def get_cached(url):
+
     if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
         return cache[url]["data"]
+
     try:
         r = requests.get(url, timeout=10)
+
+        if r.status_code != 200:
+            return None
+
         data = r.json()
-        cache[url] = {"data": data, "time": time.time()}
+
+        cache[url] = {
+            "data": data,
+            "time": time.time()
+        }
+
         return data
+
     except:
         return None
+
 
 # ==================================================
 # MODELS
@@ -82,33 +109,55 @@ class ProfileRequest(BaseModel):
     risque: str
     experience: str
 
+
 class StockRequest(BaseModel):
     ticker: str
 
+
 class BrainRequest(BaseModel):
     question: str
+
+
+class PortfolioRequest(BaseModel):
+    email: str
+    asset: str
+    asset_type: str
+    quantity: float
+    buy_price: float
+
 
 # ==================================================
 # SCORE INVESTISSEUR
 # ==================================================
 
 def calculate_score(profile):
+
     score = 0
+
     capacite = profile.revenus - profile.charges
-    patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
+    patrimoine = (
+        profile.epargne
+        + profile.immobilier
+        + profile.investissements
+        + profile.crypto
+    )
 
     if capacite > 0:
         score += 30
+
     if patrimoine > 100000:
         score += 30
+
     if profile.experience == "Avancé":
         score += 20
     elif profile.experience == "Intermédiaire":
         score += 10
+
     if profile.risque == "Dynamique":
         score += 20
 
     return min(score, 100)
+
 
 # ==================================================
 # PROJECTION PATRIMONIALE
@@ -126,14 +175,18 @@ def calculate_projection(patrimoine, allocation, years=10):
     total = 0
 
     for asset, percent in allocation.items():
+
         if asset in returns:
+
             weight = percent / 100
+
             total += patrimoine * weight * ((1 + returns[asset]) ** years)
 
     return round(total, 2)
 
+
 # ==================================================
-# STOCK ANALYSE (ALPHA + FMP + SCORING)
+# STOCK ANALYSE
 # ==================================================
 
 def calculate_advanced_score(change_percent, pe_ratio=None):
@@ -141,7 +194,8 @@ def calculate_advanced_score(change_percent, pe_ratio=None):
     score = 50
 
     try:
-        change = float(change_percent.replace("%",""))
+
+        change = float(change_percent.replace("%", ""))
 
         if change > 3:
             score += 25
@@ -153,7 +207,9 @@ def calculate_advanced_score(change_percent, pe_ratio=None):
             score -= 10
 
         if pe_ratio:
+
             pe = float(pe_ratio)
+
             if 0 < pe < 20:
                 score += 10
             elif pe > 40:
@@ -168,6 +224,9 @@ def calculate_advanced_score(change_percent, pe_ratio=None):
 def get_stock_data(ticker):
 
     ticker = ticker.upper()
+
+    if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
+        raise HTTPException(status_code=500, detail="API Keys manquantes")
 
     # Alpha Vantage
     alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
@@ -205,6 +264,7 @@ def get_stock_data(ticker):
         "sources": ["Alpha Vantage", "FMP"]
     }
 
+
 # ==================================================
 # ROUTES
 # ==================================================
@@ -213,9 +273,79 @@ def get_stock_data(ticker):
 def root():
     return {"status": "API active", "version": "7.0"}
 
-# -------------------------
+
+# ==================================================
+# PORTFOLIO
+# ==================================================
+
+@app.post("/portfolio/add")
+def add_asset(request: PortfolioRequest):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    try:
+
+        with engine.begin() as conn:
+
+            conn.execute(text("""
+                INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
+                VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
+            """), {
+                "email": request.email,
+                "asset": request.asset,
+                "asset_type": request.asset_type,
+                "quantity": request.quantity,
+                "buy_price": request.buy_price
+            })
+
+        return {"status": "actif ajouté", "asset": request.asset}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/portfolio/{email}")
+def get_portfolio(email: str):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    try:
+
+        with engine.connect() as conn:
+
+            result = conn.execute(text("""
+                SELECT asset, asset_type, quantity, buy_price
+                FROM portfolios
+                WHERE user_email = :email
+            """), {"email": email})
+
+            rows = result.fetchall()
+
+            portfolio = []
+
+            for r in rows:
+
+                portfolio.append({
+                    "asset": r[0],
+                    "type": r[1],
+                    "quantity": r[2],
+                    "buy_price": r[3]
+                })
+
+            return {
+                "email": email,
+                "portfolio": portfolio
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================================================
 # STOCK ANALYSE
-# -------------------------
+# ==================================================
 
 @app.post("/stocks/analyse")
 def analyse_stock(request: StockRequest):
@@ -230,18 +360,15 @@ def analyse_stock(request: StockRequest):
 
     return data
 
-# -------------------------
-# AI BRAIN ULTIME
-# -------------------------
+
+# ==================================================
+# AI BRAIN
+# ==================================================
 
 @app.post("/ia/brain")
 def brain(request: BrainRequest):
 
     question = request.question.lower()
-
-    # =========================
-    # PROFIL UTILISATEUR
-    # =========================
 
     user_data = None
 
@@ -254,7 +381,9 @@ def brain(request: BrainRequest):
                     ORDER BY created_at DESC
                     LIMIT 1
                 """))
+
                 row = result.fetchone()
+
                 if row:
                     user_data = {
                         "score": row[0],
@@ -265,6 +394,7 @@ def brain(request: BrainRequest):
             pass
 
     if user_data:
+
         score = user_data["score"]
         patrimoine = user_data["patrimoine"]
 
@@ -279,108 +409,10 @@ def brain(request: BrainRequest):
             risk = "Faible"
 
     else:
+
         niveau = "Profil Non Défini"
         risk = "Standard"
         patrimoine = 0
-
-    # =========================
-    # DEVELOPPEMENT PATRIMOINE (VERSION PREMIUM)
-    # =========================
-
-    if any(word in question for word in ["patrimoine", "développer", "croissance", "capital", "richesse"]):
-
-        allocation = {
-            "actions": 60,
-            "obligations": 20,
-            "immobilier": 15,
-            "liquidites": 5
-        }
-
-        projection_5 = calculate_projection(patrimoine, allocation, 5)
-        projection_10 = calculate_projection(patrimoine, allocation, 10)
-
-        return {
-            "theme": "Stratégie d'Accroissement Patrimonial",
-            "niveau_utilisateur": niveau,
-            "patrimoine_actuel": patrimoine,
-            "objectif_strategique": "Optimisation et effet composé long terme",
-
-            "analyse": (
-                "La croissance patrimoniale repose sur 4 piliers : "
-                "augmentation des revenus, "
-                "allocation stratégique du capital, "
-                "réinvestissement systématique, "
-                "et gestion du risque adaptée au profil."
-            ),
-
-            "strategie": {
-                "leviers": [
-                    "Investissement progressif automatisé (DCA)",
-                    "Réinvestissement des dividendes",
-                    "Diversification multi-actifs",
-                    "Optimisation fiscale"
-                ],
-                "gestion_risque": risk
-            },
-
-            "allocation_recommandee": allocation,
-
-            "plan_action": [
-                "Constituer un fonds de sécurité (6 mois de charges)",
-                "Mettre en place un investissement automatique mensuel",
-                "Diversifier sur ETF larges marchés",
-                "Suivre performance chaque mois",
-                "Rééquilibrer annuellement"
-            ],
-
-            "projection_5_ans": projection_5,
-            "projection_10_ans": projection_10,
-
-            "score_confiance": 95,
-            "niveau": "Stratégique"
-        }
-
-    # =========================
-    # ACTIONS / MARCHÉS
-    # =========================
-
-    if any(word in question for word in ["action", "bourse", "marché", "investir", "2026"]):
-
-        return {
-            "theme": "Stratégie Marchés 2026",
-            "niveau_utilisateur": niveau,
-
-            "analyse": (
-                "Les moteurs structurels 2026 sont : "
-                "Intelligence Artificielle, "
-                "Semi-conducteurs, Cloud, "
-                "Cybersécurité, ETF globaux et énergies stratégiques."
-            ),
-
-            "strategie": {
-                "approche": "Allocation en 3 piliers",
-                "piliers": [
-                    "Croissance technologique",
-                    "ETF larges marchés",
-                    "Secteurs défensifs"
-                ],
-                "adaptation_risque": risk
-            },
-
-            "allocation_recommandee": {
-                "etf_large_marche": "30%",
-                "actions_croissance": "30%",
-                "secteurs_defensifs": "20%",
-                "liquidites": "20%"
-            },
-
-            "score_confiance": 92,
-            "niveau": "Stratégique"
-        }
-
-    # =========================
-    # DEFAULT
-    # =========================
 
     return {
         "theme": "Conseil Patrimonial Global",
@@ -394,18 +426,23 @@ def brain(request: BrainRequest):
         "niveau": "Professionnel"
     }
 
-# -------------------------
+
+# ==================================================
 # DB CHECK
-# -------------------------
+# ==================================================
 
 @app.get("/db-check")
 def db_check():
+
     if not engine:
         return {"database": "not configured"}
+
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {"database": "connected"}
+
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
