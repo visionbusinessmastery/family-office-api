@@ -246,35 +246,92 @@ def brain(request: BrainRequest):
 
     q = request.question.lower()
 
-    if "investir" in q:
+    # ==============================
+    # INVESTISSEMENT ACTIONS
+    # ==============================
+
+    if "action" in q or "bourse" in q or "investir" in q:
 
         return {
-            "theme": "Investissement",
-            "analyse": "Marchés dynamiques en 2026 avec opportunités en technologie, IA et infrastructures.",
-            "strategie": "Approche multi-actifs avec gestion du risque et allocation progressive.",
+            "theme": "Stratégie Marchés Financiers",
+            "analyse": "Les marchés 2026 sont dominés par l'IA, la cybersécurité, les semi-conducteurs et les infrastructures cloud.",
+            "strategie": "Approche en 3 piliers : croissance, diversification et gestion du risque.",
+            "allocation_recommandee": {
+                "etf_technologie": "30%",
+                "actions_croissance": "30%",
+                "secteurs_defensifs": "20%",
+                "liquidites": "20%"
+            },
             "opportunites": [
-                "ETF technologiques",
+                "ETF S&P 500",
+                "ETF Nasdaq",
                 "Actions IA",
-                "Infrastructure cloud",
-                "Énergies renouvelables",
-                "Marchés émergents"
-            ]
+                "Semi-conducteurs",
+                "Cybersécurité",
+                "Énergies renouvelables"
+            ],
+            "niveau": "Stratégique"
         }
 
-    if "crypto" in q:
+    # ==============================
+    # CRYPTO
+    # ==============================
+
+    if "crypto" in q or "bitcoin" in q:
 
         return {
-            "theme": "Crypto",
-            "analyse": "Actif volatil mais stratégique dans une allocation moderne.",
-            "strategie": "Exposition limitée 5-10% max.",
-            "opportunites": ["Bitcoin", "Ethereum", "Infrastructure blockchain"]
+            "theme": "Stratégie Crypto",
+            "analyse": "La crypto reste un actif volatil mais stratégique dans une allocation moderne.",
+            "strategie": "Limiter l'exposition à 5-10% du portefeuille.",
+            "allocation_recommandee": {
+                "bitcoin": "50%",
+                "ethereum": "30%",
+                "altcoins_selectionnes": "20%"
+            },
+            "opportunites": [
+                "Bitcoin",
+                "Ethereum",
+                "Infrastructure blockchain",
+                "Tokenisation d'actifs"
+            ],
+            "niveau": "Tactique"
         }
+
+    # ==============================
+    # ENTREPRENEURIAT
+    # ==============================
+
+    if "business" in q or "entreprendre" in q:
+
+        return {
+            "theme": "Création de Richesse",
+            "analyse": "L'effet levier digital est la clé de la croissance patrimoniale.",
+            "strategie": "Créer des actifs scalables (digital, IA, automatisation).",
+            "opportunites": [
+                "Agence IA",
+                "SaaS",
+                "Formation en ligne",
+                "Automatisation business"
+            ],
+            "niveau": "Vision long terme"
+        }
+
+    # ==============================
+    # RÉPONSE STRATÉGIQUE GÉNÉRALE
+    # ==============================
 
     return {
-        "theme": "Stratégie Financière",
-        "analyse": "Optimisation globale du capital.",
-        "strategie": "Diversification intelligente.",
-        "opportunites": ["Actions", "ETF", "Immobilier", "Obligations"]
+        "theme": "Conseil Patrimonial Global",
+        "analyse": "Optimisation du capital via diversification multi-actifs.",
+        "strategie": "Répartition équilibrée entre croissance, protection et liquidité.",
+        "allocation_type": "Adaptée au profil investisseur",
+        "opportunites": [
+            "ETF mondiaux",
+            "Immobilier",
+            "Obligations",
+            "Actions internationales"
+        ],
+        "niveau": "Fondation"
     }
 
 # ==================================================
@@ -293,3 +350,4 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
