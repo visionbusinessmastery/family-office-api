@@ -207,10 +207,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
 
+    email = form_data.username.lower()
+
     with engine.connect() as conn:
+
         result = conn.execute(text("""
             SELECT password FROM users WHERE email=:email
-        """), {email = form_data.username.lower()})
+        """), {"email": email})
 
         row = result.fetchone()
 
@@ -220,12 +223,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not verify_password(form_data.password, row[0]):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
-        token = create_token({"sub": form_data.username.lower()})
+        token = create_token({"sub": email})
 
-        return {"access_token": token, "token_type": "bearer"}
+        return {
+            "access_token": token,
+            "token_type": "bearer"
+        }
         
-        return email.lower()
-
 # ==================================================
 # SCORE INVESTISSEUR
 # ==================================================
@@ -730,6 +734,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
