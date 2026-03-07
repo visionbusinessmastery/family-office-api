@@ -244,21 +244,81 @@ def analyse_stock(request: StockRequest):
 @app.post("/ia/brain")
 def brain(request: BrainRequest):
 
-    q = request.question.lower()
+    question = request.question.lower()
 
-    # ==============================
-    # INVESTISSEMENT ACTIONS
-    # ==============================
+    # =========================
+    # 1️⃣ RECUPERATION PROFIL
+    # =========================
 
-    if "action" in q or "bourse" in q or "investir" in q:
+    user_data = None
+
+    if engine:
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT score, profil, patrimoine
+                    FROM users
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """))
+                row = result.fetchone()
+
+                if row:
+                    user_data = {
+                        "score": row[0],
+                        "profil": row[1],
+                        "patrimoine": row[2]
+                    }
+        except:
+            pass
+
+    # =========================
+    # 2️⃣ NIVEAU UTILISATEUR
+    # =========================
+
+    if user_data:
+        score = user_data["score"]
+
+        if score >= 75:
+            niveau = "Investisseur Stratégique"
+            risk_level = "Élevé contrôlé"
+        elif score >= 50:
+            niveau = "Investisseur Équilibré"
+            risk_level = "Modéré"
+        else:
+            niveau = "Investisseur Prudent"
+            risk_level = "Faible"
+
+    else:
+        niveau = "Profil Non Défini"
+        risk_level = "Standard"
+
+    # =========================
+    # 3️⃣ ANALYSE INTELLIGENTE
+    # =========================
+
+    if any(word in question for word in ["action", "bourse", "marché", "investir"]):
 
         return {
             "theme": "Stratégie Marchés Financiers",
-            "analyse": "Les marchés 2026 sont dominés par l'IA, la cybersécurité, les semi-conducteurs et les infrastructures cloud.",
-            "strategie": "Approche en 3 piliers : croissance, diversification et gestion du risque.",
+            "niveau_utilisateur": niveau,
+            "analyse": (
+                "Les marchés sont dominés par l'IA, "
+                "la cybersécurité, les semi-conducteurs "
+                "et les infrastructures cloud."
+            ),
+            "strategie": {
+                "approche": "Diversification en 3 piliers",
+                "piliers": [
+                    "Croissance technologique",
+                    "Secteurs défensifs",
+                    "ETF larges marchés"
+                ],
+                "adaptation_risque": risk_level
+            },
             "allocation_recommandee": {
-                "etf_technologie": "30%",
                 "actions_croissance": "30%",
+                "etf_marches": "30%",
                 "secteurs_defensifs": "20%",
                 "liquidites": "20%"
             },
@@ -270,68 +330,45 @@ def brain(request: BrainRequest):
                 "Cybersécurité",
                 "Énergies renouvelables"
             ],
+            "score_confiance": 88,
             "niveau": "Stratégique"
         }
 
-    # ==============================
-    # CRYPTO
-    # ==============================
-
-    if "crypto" in q or "bitcoin" in q:
+    if "crypto" in question:
 
         return {
             "theme": "Stratégie Crypto",
-            "analyse": "La crypto reste un actif volatil mais stratégique dans une allocation moderne.",
-            "strategie": "Limiter l'exposition à 5-10% du portefeuille.",
-            "allocation_recommandee": {
-                "bitcoin": "50%",
-                "ethereum": "30%",
-                "altcoins_selectionnes": "20%"
+            "niveau_utilisateur": niveau,
+            "analyse": "Exposition mesurée recommandée selon volatilité.",
+            "strategie": {
+                "allocation_max": "5-10%",
+                "objectif": "Diversification long terme"
             },
-            "opportunites": [
-                "Bitcoin",
-                "Ethereum",
-                "Infrastructure blockchain",
-                "Tokenisation d'actifs"
-            ],
-            "niveau": "Tactique"
+            "opportunites": ["Bitcoin", "Ethereum"],
+            "score_confiance": 82,
+            "niveau": "Contrôlé"
         }
 
-    # ==============================
-    # ENTREPRENEURIAT
-    # ==============================
-
-    if "business" in q or "entreprendre" in q:
-
-        return {
-            "theme": "Création de Richesse",
-            "analyse": "L'effet levier digital est la clé de la croissance patrimoniale.",
-            "strategie": "Créer des actifs scalables (digital, IA, automatisation).",
-            "opportunites": [
-                "Agence IA",
-                "SaaS",
-                "Formation en ligne",
-                "Automatisation business"
-            ],
-            "niveau": "Vision long terme"
-        }
-
-    # ==============================
-    # RÉPONSE STRATÉGIQUE GÉNÉRALE
-    # ==============================
+    # =========================
+    # 4️⃣ REPONSE PAR DEFAUT
+    # =========================
 
     return {
         "theme": "Conseil Patrimonial Global",
-        "analyse": "Optimisation du capital via diversification multi-actifs.",
-        "strategie": "Répartition équilibrée entre croissance, protection et liquidité.",
-        "allocation_type": "Adaptée au profil investisseur",
+        "niveau_utilisateur": niveau,
+        "analyse": "Optimisation globale du capital selon profil.",
+        "strategie": {
+            "principe": "Diversification intelligente",
+            "gestion_risque": risk_level
+        },
         "opportunites": [
-            "ETF mondiaux",
-            "Immobilier",
+            "Actions",
+            "ETF",
             "Obligations",
-            "Actions internationales"
+            "Immobilier"
         ],
-        "niveau": "Fondation"
+        "score_confiance": 75,
+        "niveau": "Professionnel"
     }
 
 # ==================================================
@@ -350,4 +387,5 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
