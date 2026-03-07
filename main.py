@@ -3,6 +3,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import requests
+def analyse_investissement(price, change):
+
+    change_value = float(change.replace("%",""))
+
+    if change_value > 2:
+        signal = "momentum haussier"
+        strategie = "surveiller breakout"
+        trend = "bullish"
+
+    elif change_value < -2:
+        signal = "correction court terme"
+        strategie = "achat progressif possible"
+        trend = "bearish court terme"
+
+    else:
+        signal = "stabilisation"
+        strategie = "attendre confirmation"
+        trend = "neutre"
+
+    return {
+        "trend": trend,
+        "signal": signal,
+        "strategie": strategie
+    }
+
 import os
 import time
 from datetime import datetime
@@ -197,17 +222,20 @@ def analyse_stock(request: StockRequest):
     quote = data["Global Quote"]
 
     price = quote.get("05. price")
-    change = quote.get("10. change percent")
+change = quote.get("10. change percent")
 
-    if not price:
-        return {"error": "Prix indisponible"}
+if not price:
+    return {"error": "Prix indisponible"}
 
-    return {
-        "ticker": ticker,
-        "price": float(price),
-        "change_percent": change,
-        "source": "Alpha Vantage"
-    }
+analyse = analyse_investissement(price, change)
+
+return {
+    "ticker": ticker,
+    "price": float(price),
+    "change_percent": change,
+    "source": "Alpha Vantage",
+    "analyse": analyse
+}
 
 # -------------------------
 # STOCK PICKER SIMPLE
@@ -281,4 +309,5 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
