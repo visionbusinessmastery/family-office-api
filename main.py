@@ -239,6 +239,10 @@ def brain(request: BrainRequest):
 
     question = request.question.lower()
 
+    # =========================
+    # PROFIL UTILISATEUR
+    # =========================
+
     user_data = None
 
     if engine:
@@ -252,7 +256,11 @@ def brain(request: BrainRequest):
                 """))
                 row = result.fetchone()
                 if row:
-                    user_data = {"score": row[0], "profil": row[1], "patrimoine": row[2]}
+                    user_data = {
+                        "score": row[0],
+                        "profil": row[1],
+                        "patrimoine": row[2]
+                    }
         except:
             pass
 
@@ -261,7 +269,7 @@ def brain(request: BrainRequest):
         patrimoine = user_data["patrimoine"]
 
         if score >= 75:
-            niveau = "Family Office Niveau Avancé"
+            niveau = "Family Office Stratégique"
             risk = "Élevé contrôlé"
         elif score >= 50:
             niveau = "Investisseur Équilibré"
@@ -269,35 +277,121 @@ def brain(request: BrainRequest):
         else:
             niveau = "Investisseur Prudent"
             risk = "Faible"
+
     else:
         niveau = "Profil Non Défini"
         risk = "Standard"
         patrimoine = 0
 
-    # Développement patrimoine
-    if any(word in question for word in ["patrimoine", "croissance", "capital"]):
+    # =========================
+    # DEVELOPPEMENT PATRIMOINE (VERSION PREMIUM)
+    # =========================
 
-        allocation = {"actions": 60, "obligations": 20, "immobilier": 15, "liquidites": 5}
+    if any(word in question for word in ["patrimoine", "développer", "croissance", "capital", "richesse"]):
+
+        allocation = {
+            "actions": 60,
+            "obligations": 20,
+            "immobilier": 15,
+            "liquidites": 5
+        }
 
         projection_5 = calculate_projection(patrimoine, allocation, 5)
         projection_10 = calculate_projection(patrimoine, allocation, 10)
 
         return {
-            "theme": "Family Office Strategy",
-            "niveau": niveau,
+            "theme": "Stratégie d'Accroissement Patrimonial",
+            "niveau_utilisateur": niveau,
             "patrimoine_actuel": patrimoine,
+            "objectif_strategique": "Optimisation et effet composé long terme",
+
+            "analyse": (
+                "La croissance patrimoniale repose sur 4 piliers : "
+                "augmentation des revenus, "
+                "allocation stratégique du capital, "
+                "réinvestissement systématique, "
+                "et gestion du risque adaptée au profil."
+            ),
+
+            "strategie": {
+                "leviers": [
+                    "Investissement progressif automatisé (DCA)",
+                    "Réinvestissement des dividendes",
+                    "Diversification multi-actifs",
+                    "Optimisation fiscale"
+                ],
+                "gestion_risque": risk
+            },
+
             "allocation_recommandee": allocation,
+
+            "plan_action": [
+                "Constituer un fonds de sécurité (6 mois de charges)",
+                "Mettre en place un investissement automatique mensuel",
+                "Diversifier sur ETF larges marchés",
+                "Suivre performance chaque mois",
+                "Rééquilibrer annuellement"
+            ],
+
             "projection_5_ans": projection_5,
             "projection_10_ans": projection_10,
-            "score_confiance": 95
+
+            "score_confiance": 95,
+            "niveau": "Stratégique"
         }
 
+    # =========================
+    # ACTIONS / MARCHÉS
+    # =========================
+
+    if any(word in question for word in ["action", "bourse", "marché", "investir", "2026"]):
+
+        return {
+            "theme": "Stratégie Marchés 2026",
+            "niveau_utilisateur": niveau,
+
+            "analyse": (
+                "Les moteurs structurels 2026 sont : "
+                "Intelligence Artificielle, "
+                "Semi-conducteurs, Cloud, "
+                "Cybersécurité, ETF globaux et énergies stratégiques."
+            ),
+
+            "strategie": {
+                "approche": "Allocation en 3 piliers",
+                "piliers": [
+                    "Croissance technologique",
+                    "ETF larges marchés",
+                    "Secteurs défensifs"
+                ],
+                "adaptation_risque": risk
+            },
+
+            "allocation_recommandee": {
+                "etf_large_marche": "30%",
+                "actions_croissance": "30%",
+                "secteurs_defensifs": "20%",
+                "liquidites": "20%"
+            },
+
+            "score_confiance": 92,
+            "niveau": "Stratégique"
+        }
+
+    # =========================
+    # DEFAULT
+    # =========================
+
     return {
-        "theme": "Conseil Global",
-        "niveau": niveau,
-        "analyse": "Diversification intelligente multi-actifs.",
-        "gestion_risque": risk,
-        "score_confiance": 85
+        "theme": "Conseil Patrimonial Global",
+        "niveau_utilisateur": niveau,
+        "analyse": "Optimisation globale du capital selon profil.",
+        "strategie": {
+            "principe": "Diversification intelligente",
+            "gestion_risque": risk
+        },
+        "score_confiance": 85,
+        "niveau": "Professionnel"
     }
 
 # -------------------------
@@ -314,3 +408,4 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
