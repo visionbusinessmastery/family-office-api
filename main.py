@@ -221,9 +221,15 @@ def analyse_stock(request: StockRequest):
 # ==================================================
 @app.post("/ia/brain")
 def brain(request: BrainRequest):
+
     question = request.question.lower()
 
+    # =========================
+    # RECUPERATION PROFIL
+    # =========================
+
     user_data = None
+
     if engine:
         try:
             with engine.connect() as conn:
@@ -234,87 +240,145 @@ def brain(request: BrainRequest):
                     LIMIT 1
                 """))
                 row = result.fetchone()
+
                 if row:
-                    user_data = {"score": row[0], "profil": row[1], "patrimoine": row[2]}
+                    user_data = {
+                        "score": row[0],
+                        "profil": row[1],
+                        "patrimoine": row[2]
+                    }
         except:
             pass
 
+    # =========================
+    # NIVEAU UTILISATEUR
+    # =========================
+
     if user_data:
         score = user_data["score"]
+
         if score >= 75:
             niveau = "Investisseur Stratégique"
             risk_level = "Élevé contrôlé"
+            ambition = "Croissance maximale maîtrisée"
+
         elif score >= 50:
             niveau = "Investisseur Équilibré"
             risk_level = "Modéré"
+            ambition = "Croissance stable et sécurisée"
+
         else:
             niveau = "Investisseur Prudent"
             risk_level = "Faible"
+            ambition = "Protection du capital prioritaire"
+
+        patrimoine = user_data["patrimoine"]
+
     else:
         niveau = "Profil Non Défini"
         risk_level = "Standard"
+        ambition = "Analyse générique"
+        patrimoine = 0
 
-    # Actions / Marché 2026
-    if any(word in question for word in ["action","bourse","marché","investir","2026"]):
+    # =========================
+    # INTELLIGENCE CONTEXTUELLE
+    # =========================
+
+    # DEVELOPPEMENT PATRIMOINE
+    if any(word in question for word in ["patrimoine", "développer", "richesse", "capital", "croissance"]):
+
+        return {
+            "theme": "Stratégie d'Accroissement Patrimonial",
+            "niveau_utilisateur": niveau,
+            "patrimoine_actuel": patrimoine,
+            "objectif_strategique": ambition,
+
+            "analyse": (
+                "La croissance patrimoniale repose sur "
+                "3 leviers : augmentation des revenus, "
+                "allocation optimale du capital et "
+                "effet composé long terme."
+            ),
+
+            "strategie": {
+                "leviers": [
+                    "Investissement progressif automatisé",
+                    "Réinvestissement des gains",
+                    "Diversification multi-actifs"
+                ],
+                "gestion_risque": risk_level
+            },
+
+            "plan_action": [
+                "Constituer un fonds de sécurité (6 mois de charges)",
+                "Investir régulièrement (DCA)",
+                "Optimiser allocation selon profil",
+                "Suivre performance mensuellement"
+            ],
+
+            "score_confiance": 90,
+            "niveau": "Stratégique"
+        }
+
+    # ACTIONS / BOURSE
+    if any(word in question for word in ["action", "bourse", "marché", "investir", "2026"]):
+
         return {
             "theme": "Stratégie Marchés 2026",
             "niveau_utilisateur": niveau,
+
             "analyse": (
-                "Les tendances majeures 2026 sont : Intelligence Artificielle, "
-                "Semi-conducteurs, Cloud computing, Cybersécurité, "
-                "Énergies stratégiques et ETF globaux."
+                "Les moteurs structurels sont : "
+                "Intelligence Artificielle, "
+                "Semi-conducteurs, Cloud, "
+                "Cybersécurité et ETF globaux."
             ),
+
             "strategie": {
                 "approche": "Allocation en 3 piliers",
                 "piliers": [
-                    "Croissance technologique (IA, semi-conducteurs)",
-                    "ETF larges marchés (S&P 500, Nasdaq)",
-                    "Secteurs défensifs (santé, énergie, consommation)"
+                    "Croissance technologique",
+                    "ETF larges marchés",
+                    "Secteurs défensifs"
                 ],
                 "adaptation_risque": risk_level
             },
+
             "allocation_recommandee": {
                 "etf_large_marche": "30%",
                 "actions_croissance": "30%",
                 "secteurs_defensifs": "20%",
                 "liquidites": "20%"
             },
-            "opportunites_precises_2026": [
-                "ETF S&P 500 (SPY / VOO)",
-                "ETF Nasdaq 100 (QQQ)",
-                "ETF Intelligence Artificielle",
-                "NVIDIA (Semi-conducteurs)",
-                "Microsoft (Cloud & IA)",
-                "Apple (Écosystème)",
-                "ETF Cybersécurité",
-                "ETF Énergies renouvelables"
-            ],
+
             "score_confiance": 92,
             "niveau": "Stratégique"
         }
 
-    # Crypto
+    # CRYPTO
     if "crypto" in question:
+
         return {
-            "theme": "Stratégie Crypto 2026",
+            "theme": "Stratégie Crypto",
             "niveau_utilisateur": niveau,
-            "analyse": "Marché volatil mais structurellement en croissance.",
+            "analyse": "Exposition mesurée selon volatilité.",
             "strategie": {
-                "allocation_max_recommandee": "5-10%",
+                "allocation_max": "5-10%",
                 "objectif": "Diversification long terme"
             },
-            "opportunites": ["Bitcoin", "Ethereum"],
             "score_confiance": 85,
             "niveau": "Contrôlé"
         }
 
-    # Réponse par défaut
+    # REPONSE PAR DEFAUT
     return {
         "theme": "Conseil Patrimonial Global",
         "niveau_utilisateur": niveau,
-        "analyse": "Optimisation globale du capital selon profil.",
-        "strategie": {"principe":"Diversification intelligente", "gestion_risque": risk_level},
-        "opportunites":["Actions","ETF","Obligations","Immobilier"],
+        "analyse": "Optimisation globale du capital.",
+        "strategie": {
+            "principe": "Diversification intelligente",
+            "gestion_risque": risk_level
+        },
         "score_confiance": 80,
         "niveau": "Professionnel"
     }
@@ -332,3 +396,4 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
