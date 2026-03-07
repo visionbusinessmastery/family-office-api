@@ -475,24 +475,101 @@ def brain(request: BrainRequest):
 
     question = request.question.lower()
 
-    if "investir" in question:
+    # =========================
+    # DÉTECTION D’INTENTION
+    # =========================
+
+    investissement_keywords = [
+        "investir", "investissement", "action", "actions",
+        "bourse", "marché", "acheter", "opportunité",
+        "etf", "portefeuille"
+    ]
+
+    crypto_keywords = ["crypto", "bitcoin", "ethereum", "blockchain"]
+
+    business_keywords = ["business", "entreprise", "startup", "saaS"]
+
+    real_estate_keywords = ["immobilier", "location", "rendement locatif"]
+
+    # =========================
+    # LOGIQUE INTELLIGENTE
+    # =========================
+
+    if any(word in question for word in investissement_keywords):
 
         return {
-
-            "theme": "Investissement",
-            "analyse": "Diversification recommandée.",
-            "strategie": "Long terme progressif.",
-            "opportunites": ["Actions IA", "ETF", "Immobilier"]
-
+            "theme": "Stratégie d’Investissement",
+            "niveau": "Avancé",
+            "analyse": {
+                "resume": "Opportunité d’optimisation de portefeuille détectée.",
+                "contexte": "Marchés dynamiques nécessitant diversification et gestion du risque.",
+                "opportunite_generale": "Construction d’un portefeuille structuré."
+            },
+            "strategie": {
+                "court_terme": "Éviter le sur-engagement, privilégier les positions progressives.",
+                "moyen_terme": "Allocation sectorielle équilibrée.",
+                "long_terme": "Capitalisation sur les tendances structurelles (IA, tech, énergie)."
+            },
+            "secteurs_prioritaires": [
+                "Intelligence Artificielle",
+                "Technologie",
+                "Semi-conducteurs",
+                "Énergies renouvelables",
+                "ETF diversifiés"
+            ],
+            "gestion_du_risque": {
+                "diversification": "Essentielle",
+                "liquidites_recommandees": "5-20%",
+                "horizon_suggere": "3 à 10 ans"
+            }
         }
 
+    if any(word in question for word in crypto_keywords):
+
+        return {
+            "theme": "Crypto & Blockchain",
+            "niveau": "Intermédiaire",
+            "analyse": "Marché volatil mais fort potentiel structurel.",
+            "strategie": "Exposition limitée (5-10%).",
+            "opportunites": ["Bitcoin", "Ethereum", "Infrastructure blockchain"],
+            "gestion_du_risque": "Ne jamais surpondérer la crypto."
+        }
+
+    if any(word in question for word in business_keywords):
+
+        return {
+            "theme": "Entrepreneuriat",
+            "niveau": "Stratégique",
+            "analyse": "Création de valeur via actifs digitaux scalables.",
+            "strategie": "Business automatisé à faible coût initial.",
+            "opportunites": ["SaaS", "Agence IA", "Newsletter premium"],
+            "levier": "Automatisation + Marketing digital"
+        }
+
+    if any(word in question for word in real_estate_keywords):
+
+        return {
+            "theme": "Immobilier",
+            "analyse": "Actif stable générant cashflow.",
+            "strategie": "Focus rendement + localisation.",
+            "opportunites": ["Location meublée", "SCPI", "Immobilier international"]
+        }
+
+    # =========================
+    # RÉPONSE PAR DÉFAUT INTELLIGENTE
+    # =========================
+
     return {
-
-        "theme": "Général",
-        "analyse": "Analyse stratégique.",
-        "strategie": "Gestion du risque.",
-        "opportunites": ["Diversification"]
-
+        "theme": "Analyse Financière Globale",
+        "niveau": "Général",
+        "analyse": "Je peux analyser investissement, crypto, business ou immobilier.",
+        "strategie": "Pose une question plus spécifique pour une recommandation ciblée.",
+        "capacites": [
+            "Analyse de portefeuille",
+            "Stratégie long terme",
+            "Gestion du risque",
+            "Détection d’opportunités"
+        ]
     }
 
 
@@ -522,5 +599,6 @@ def db_check():
             "detail": str(e)
 
         }
+
 
 
