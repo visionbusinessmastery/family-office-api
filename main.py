@@ -1,11 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Optional
 import requests
 import os
 import time
 from sqlalchemy import create_engine, text
+from passlib.context import CryptContext
+from jose import jwt, JWTError
+from datetime import datetime, timedelta
+
 
 # ==================================================
 # CONFIG
@@ -15,7 +20,17 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Family Office AI", version="9.0")
+# 🔐 JWT CONFIG
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise Exception("SECRET_KEY missing")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+app = FastAPI(title="Family Office AI", version="10.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,7 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-return {"status": "API active", "version": "9.0"}
 
 # ==================================================
 # DATABASE
@@ -42,6 +56,7 @@ if DATABASE_URL:
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email TEXT UNIQUE,
+                    password TEXT,
                     score INT,
                     profil TEXT,
                     patrimoine FLOAT,
@@ -63,7 +78,7 @@ if DATABASE_URL:
 
     except Exception as e:
         print("DB INIT ERROR:", e)
-
+        
 # ==================================================
 # CACHE
 # ==================================================
@@ -126,6 +141,88 @@ class PortfolioRequest(BaseModel):
     quantity: float
     buy_price: float
 
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+
+# ==================================================
+# AUTH SYSTEM 
+# ==================================================
+
+def hash_password(password):
+    return pwd_context.hash(password)
+
+def verify_password(plain, hashed):
+    return pwd_context.verify(plain, hashed)
+
+def create_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Token invalide")
+        return email
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide")
+
+
+# ==================================================
+# REGISTER
+# ==================================================
+
+@app.post("/register")
+def register(user: UserRegister):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    hashed = hash_password(user.password)
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO users (email, password)
+                VALUES (:email, :password)
+            """), {"email": user.email, "password": hashed})
+
+        return {"status": "Utilisateur créé"}
+
+    except:
+        raise HTTPException(status_code=400, detail="Utilisateur existe déjà")
+
+# ==================================================
+# LOGIN
+# ==================================================
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT password FROM users WHERE email=:email
+        """), {"email": form_data.username})
+
+        row = result.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=400, detail="Identifiants invalides")
+
+        if not verify_password(form_data.password, row[0]):
+            raise HTTPException(status_code=400, detail="Mot de passe incorrect")
+
+        token = create_token({"sub": form_data.username})
+
+        return {"access_token": token, "token_type": "bearer"}
 
 # ==================================================
 # SCORE INVESTISSEUR
@@ -331,8 +428,8 @@ def analyse_portfolio(email):
 
     allocation_percent = {}
 
-    for k,v in allocation.items():
-        allocation_percent[k] = round((v/total_value)*100,2)
+    for k, v in allocation.items():
+        allocation_percent[k] = round((v/total_value)*100, 2) if total_value > 0 else 0
 
     diversification_score = min(len(allocation)*20,100)
 
@@ -428,7 +525,7 @@ def optimize_portfolio(email):
 
 @app.get("/")
 def root():
-    return {"status": "API active", "version": "7.0"}
+    return {"status": "API active", "version": "10.0"}
 
 
 # ==================================================
@@ -436,7 +533,8 @@ def root():
 # ==================================================
 
 @app.post("/portfolio/add")
-def add_asset(request: PortfolioRequest):
+def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
+    # current_user contient l'email de l'utilisateur authentifié
 
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
@@ -449,7 +547,7 @@ def add_asset(request: PortfolioRequest):
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
             """), {
-                "email": request.email,
+                "email": email,
                 "asset": request.asset,
                 "asset_type": request.asset_type,
                 "quantity": request.quantity,
@@ -462,8 +560,8 @@ def add_asset(request: PortfolioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/portfolio/{email}")
-def get_portfolio(email: str):
+@app.get("/portfolio")
+def get_portfolio(current_user: str = Depends(get_current_user)):
 
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
@@ -476,7 +574,7 @@ def get_portfolio(email: str):
                 SELECT asset, asset_type, quantity, buy_price
                 FROM portfolios
                 WHERE user_email = :email
-            """), {"email": email})
+            """), {"email": current_user})
 
             rows = result.fetchall()
 
@@ -492,41 +590,41 @@ def get_portfolio(email: str):
                 })
 
             return {
-                "email": email,
+                "email": current_user,
                 "portfolio": portfolio
             }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/portfolio/analyse/{email}")
-def portfolio_analysis(email: str):
+@app.get("/portfolio/analyse")
+def portfolio_analysis(current_user: str = Depends(get_current_user)):
 
-    result = analyse_portfolio(email)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Portefeuille vide")
-
-    return result
-
-@app.get("/portfolio/optimize/{email}")
-def portfolio_optimize(email: str):
-
-    result = optimize_portfolio(email)
+    result = analyse_portfolio(current_user)
 
     if not result:
         raise HTTPException(status_code=404, detail="Portefeuille vide")
 
     return result
+    
+@app.get("/portfolio/optimize")
+def portfolio_optimize(current_user: str = Depends(get_current_user)):
 
+    result = optimize_portfolio(current_user)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Portefeuille vide")
+
+    return result
+    
 # ==================================================
 # STOCK ANALYSE
 # ==================================================
 
 @app.post("/stocks/analyse")
-def analyse_stock(request: StockRequest):
-
-    if not ALPHA_VANTAGE_API_KEY:
+def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
+    
+    if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
         raise HTTPException(status_code=500, detail="API Key manquante")
 
     data = get_stock_data(request.ticker)
@@ -542,21 +640,20 @@ def analyse_stock(request: StockRequest):
 # ==================================================
 
 @app.post("/ia/brain")
-def brain(request: BrainRequest):
-
+def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
+    
     question = request.question.lower()
 
     user_data = None
 
     if engine:
         try:
-            with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT score, profil, patrimoine
-                    FROM users
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """))
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT score, profil, patrimoine
+                        FROM users
+                        WHERE email = :email
+                    """), {"email": current_user})
 
                 row = result.fetchone()
 
@@ -620,6 +717,5 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
-
 
 
