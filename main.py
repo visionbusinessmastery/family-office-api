@@ -373,24 +373,49 @@ def analyse_stock(request: StockRequest):
     if not price:
         return {"error": "Prix indisponible"}
 
-    analyse = analyse_investissement(price, change)
+    # =============================
+    # SCORE MOMENTUM
+    # =============================
 
-    score = score_action(price, change)
+    change_value = float(change.replace("%", ""))
 
-    rating = rating_action(score)
+    momentum_score = 50
+
+    if change_value > 3:
+        momentum_score += 30
+    elif change_value > 1:
+        momentum_score += 15
+    elif change_value < -3:
+        momentum_score -= 30
+    elif change_value < -1:
+        momentum_score -= 15
+
+    momentum_score = max(0, min(momentum_score, 100))
+
+    # =============================
+    # SCORE FINAL
+    # =============================
+
+    final_score = momentum_score
+
+    # Rating automatique
+
+    if final_score >= 70:
+        rating = "BUY"
+    elif final_score >= 50:
+        rating = "HOLD"
+    else:
+        rating = "SELL"
 
     return {
-
         "ticker": ticker,
         "price": float(price),
         "change_percent": change,
-        "score": score,
+        "momentum_score": momentum_score,
+        "final_score": final_score,
         "rating": rating,
-        "source": "Alpha Vantage",
-        "analyse": analyse
-
+        "source": "Alpha Vantage"
     }
-
 
 # ==================================================
 # STOCK PICKER
@@ -483,3 +508,4 @@ def db_check():
             "detail": str(e)
 
         }
+
