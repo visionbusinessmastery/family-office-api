@@ -10,11 +10,11 @@ from sqlalchemy import create_engine, text
 # ==================================================
 # CONFIG
 # ==================================================
-
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Family Office IA", version="6.0")
+app = FastAPI(title="Family Office IA", version="6.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,13 +27,11 @@ app.add_middleware(
 # ==================================================
 # DATABASE
 # ==================================================
-
 engine = None
 
 if DATABASE_URL:
     try:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
         with engine.begin() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -45,23 +43,18 @@ if DATABASE_URL:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-
     except Exception as e:
         print("DB INIT ERROR:", e)
 
 # ==================================================
 # CACHE
 # ==================================================
-
 cache = {}
 CACHE_DURATION = 900
 
 def get_cached(url):
-
-    if url in cache:
-        if time.time() - cache[url]["time"] < CACHE_DURATION:
-            return cache[url]["data"]
-
+    if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
+        return cache[url]["data"]
     try:
         r = requests.get(url, timeout=10)
         data = r.json()
@@ -73,7 +66,6 @@ def get_cached(url):
 # ==================================================
 # MODELS
 # ==================================================
-
 class ProfileRequest(BaseModel):
     email: Optional[str] = None
     revenus: float
@@ -94,62 +86,48 @@ class BrainRequest(BaseModel):
 # ==================================================
 # LOGIQUE SCORE
 # ==================================================
-
 def calculate_score(profile):
-
     score = 0
-
     capacite = profile.revenus - profile.charges
     patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
 
     if capacite > 0:
         score += 30
-
     if patrimoine > 100000:
         score += 30
-
     if profile.experience == "Avancé":
         score += 20
     elif profile.experience == "Intermédiaire":
         score += 10
-
     if profile.risque == "Dynamique":
         score += 20
 
     return min(score, 100)
 
 def generate_allocation(risque):
-
     if risque == "Prudent":
         return {"actions": 40, "obligations": 40, "immobilier": 15, "liquidites": 5}
-
     if risque == "Modéré":
         return {"actions": 60, "obligations": 20, "immobilier": 15, "liquidites": 5}
-
     return {"actions": 80, "obligations": 5, "immobilier": 10, "liquidites": 5}
 
 # ==================================================
 # ROOT
 # ==================================================
-
 @app.get("/")
 def root():
-    return {"status": "API active", "version": "6.0"}
+    return {"status": "API active", "version": "6.1"}
 
 # ==================================================
 # PROFILE
 # ==================================================
-
 @app.post("/profile")
 def save_profile(profile: ProfileRequest):
-
     score = calculate_score(profile)
     allocation = generate_allocation(profile.risque)
-
     patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
 
     if engine and profile.email:
-
         try:
             with engine.begin() as conn:
                 conn.execute(text("""
@@ -157,101 +135,95 @@ def save_profile(profile: ProfileRequest):
                     VALUES (:email, :score, :profil, :patrimoine)
                     ON CONFLICT (email)
                     DO UPDATE SET score=:score, patrimoine=:patrimoine
-                """), {
-                    "email": profile.email,
-                    "score": score,
-                    "profil": profile.risque,
-                    "patrimoine": patrimoine
-                })
+                """), {"email": profile.email, "score": score, "profil": profile.risque, "patrimoine": patrimoine})
         except Exception as e:
             print("DB ERROR:", e)
 
-    return {
-        "status": "ok",
-        "score_investisseur": score,
-        "allocation_recommandee": allocation,
-        "patrimoine_total": patrimoine
-    }
+    return {"status": "ok", "score_investisseur": score, "allocation_recommandee": allocation, "patrimoine_total": patrimoine}
 
 # ==================================================
-# STOCK ANALYSE
+# STOCK ANALYSE AVANCÉE (Alpha + FMP)
 # ==================================================
+def calculate_advanced_score(change_percent, pe_ratio=None):
+    score = 50
+    try:
+        change = float(change_percent.replace("%",""))
+        if change > 3:
+            score += 25
+        elif change > 1:
+            score += 10
+        elif change < -3:
+            score -= 25
+        elif change < -1:
+            score -= 10
+        if pe_ratio:
+            if 0 < float(pe_ratio) < 20:
+                score += 10
+            elif float(pe_ratio) > 40:
+                score -= 10
+    except:
+        pass
+    return max(0, min(score, 100))
 
-@app.post("/stocks/analyse")
-def analyse_stock(request: StockRequest):
+def get_stock_data(ticker):
+    ticker = ticker.upper()
 
-    if not ALPHA_VANTAGE_API_KEY:
-        raise HTTPException(status_code=500, detail="Clé API manquante")
+    # Alpha Vantage
+    alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+    alpha_data = get_cached(alpha_url)
+    alpha_quote = alpha_data.get("Global Quote", {}) if alpha_data else {}
 
-    ticker = request.ticker.upper()
+    # FMP
+    fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+    fmp_data = get_cached(fmp_url)
+    fmp_profile = fmp_data[0] if fmp_data else {}
 
-    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-
-    data = get_cached(url)
-
-    if not data or "Global Quote" not in data:
-        raise HTTPException(status_code=400, detail="Données indisponibles")
-
-    quote = data["Global Quote"]
-
-    price = quote.get("05. price")
-    change = quote.get("10. change percent")
+    price = alpha_quote.get("05. price")
+    change = alpha_quote.get("10. change percent")
+    pe_ratio = fmp_profile.get("pe")
 
     if not price:
-        raise HTTPException(status_code=400, detail="Prix indisponible")
+        return None
 
-    change_value = float(change.replace("%",""))
-
-    # Momentum
-    if change_value > 2:
-        trend = "bullish"
-        signal = "momentum haussier"
-        rating = "BUY"
-        momentum_score = 80
-
-    elif change_value < -2:
-        trend = "bearish"
-        signal = "correction"
-        rating = "SELL"
-        momentum_score = 30
-
-    else:
-        trend = "neutral"
-        signal = "stabilisation"
-        rating = "HOLD"
-        momentum_score = 50
-
+    momentum_score = calculate_advanced_score(change, pe_ratio)
     final_score = momentum_score
+
+    if final_score >= 70:
+        rating = "BUY"
+    elif final_score >= 50:
+        rating = "HOLD"
+    else:
+        rating = "SELL"
 
     return {
         "ticker": ticker,
         "price": float(price),
         "change_percent": change,
+        "company": fmp_profile.get("companyName"),
+        "sector": fmp_profile.get("sector"),
         "momentum_score": momentum_score,
         "final_score": final_score,
         "rating": rating,
-        "source": "Alpha Vantage",
-        "analyse": {
-            "trend": trend,
-            "signal": signal
-        }
+        "sources": ["Alpha Vantage", "FMP"]
     }
 
-# ==================================================
-# AI BRAIN (VERSION AMÉLIORÉE)
-# ==================================================
+@app.post("/stocks/analyse")
+def analyse_stock(request: StockRequest):
+    if not ALPHA_VANTAGE_API_KEY:
+        raise HTTPException(status_code=500, detail="API Key manquante")
+    data = get_stock_data(request.ticker)
+    if not data:
+        raise HTTPException(status_code=400, detail="Données indisponibles")
+    return data
 
+# ==================================================
+# IA BRAIN — FAMILY OFFICE 2026
+# ==================================================
 @app.post("/ia/brain")
 def brain(request: BrainRequest):
-
     question = request.question.lower()
 
-    # =========================
-    # 1️⃣ RECUPERATION PROFIL
-    # =========================
-
     user_data = None
-
     if engine:
         try:
             with engine.connect() as conn:
@@ -262,23 +234,13 @@ def brain(request: BrainRequest):
                     LIMIT 1
                 """))
                 row = result.fetchone()
-
                 if row:
-                    user_data = {
-                        "score": row[0],
-                        "profil": row[1],
-                        "patrimoine": row[2]
-                    }
+                    user_data = {"score": row[0], "profil": row[1], "patrimoine": row[2]}
         except:
             pass
 
-    # =========================
-    # 2️⃣ NIVEAU UTILISATEUR
-    # =========================
-
     if user_data:
         score = user_data["score"]
-
         if score >= 75:
             niveau = "Investisseur Stratégique"
             risk_level = "Élevé contrôlé"
@@ -292,23 +254,16 @@ def brain(request: BrainRequest):
         niveau = "Profil Non Défini"
         risk_level = "Standard"
 
-    # =========================
-    # 3️⃣ LOGIQUE INTELLIGENTE AVANCÉE
-    # =========================
-
-    if any(word in question for word in ["action", "bourse", "marché", "investir", "2026"]):
-
+    # Actions / Marché 2026
+    if any(word in question for word in ["action","bourse","marché","investir","2026"]):
         return {
             "theme": "Stratégie Marchés 2026",
             "niveau_utilisateur": niveau,
-
             "analyse": (
-                "Les tendances majeures 2026 sont : "
-                "Intelligence Artificielle, Semi-conducteurs, "
-                "Cloud computing, Cybersécurité, Énergies stratégiques "
-                "et ETF globaux."
+                "Les tendances majeures 2026 sont : Intelligence Artificielle, "
+                "Semi-conducteurs, Cloud computing, Cybersécurité, "
+                "Énergies stratégiques et ETF globaux."
             ),
-
             "strategie": {
                 "approche": "Allocation en 3 piliers",
                 "piliers": [
@@ -318,14 +273,12 @@ def brain(request: BrainRequest):
                 ],
                 "adaptation_risque": risk_level
             },
-
             "allocation_recommandee": {
                 "etf_large_marche": "30%",
                 "actions_croissance": "30%",
                 "secteurs_defensifs": "20%",
                 "liquidites": "20%"
             },
-
             "opportunites_precises_2026": [
                 "ETF S&P 500 (SPY / VOO)",
                 "ETF Nasdaq 100 (QQQ)",
@@ -336,17 +289,12 @@ def brain(request: BrainRequest):
                 "ETF Cybersécurité",
                 "ETF Énergies renouvelables"
             ],
-
             "score_confiance": 92,
             "niveau": "Stratégique"
         }
 
-    # =========================
-    # 4️⃣ CRYPTO
-    # =========================
-
+    # Crypto
     if "crypto" in question:
-
         return {
             "theme": "Stratégie Crypto 2026",
             "niveau_utilisateur": niveau,
@@ -360,24 +308,13 @@ def brain(request: BrainRequest):
             "niveau": "Contrôlé"
         }
 
-    # =========================
-    # 5️⃣ REPONSE PAR DEFAUT
-    # =========================
-
+    # Réponse par défaut
     return {
         "theme": "Conseil Patrimonial Global",
         "niveau_utilisateur": niveau,
         "analyse": "Optimisation globale du capital selon profil.",
-        "strategie": {
-            "principe": "Diversification intelligente",
-            "gestion_risque": risk_level
-        },
-        "opportunites": [
-            "Actions",
-            "ETF",
-            "Obligations",
-            "Immobilier"
-        ],
+        "strategie": {"principe":"Diversification intelligente", "gestion_risque": risk_level},
+        "opportunites":["Actions","ETF","Obligations","Immobilier"],
         "score_confiance": 80,
         "niveau": "Professionnel"
     }
@@ -385,20 +322,13 @@ def brain(request: BrainRequest):
 # ==================================================
 # DATABASE CHECK
 # ==================================================
-
 @app.get("/db-check")
 def db_check():
-
     if not engine:
         return {"database": "not configured"}
-
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
-
-
-
-
