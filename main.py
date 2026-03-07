@@ -665,7 +665,7 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
 
     if engine:
         try:
-         with engine.connect() as conn:
+            with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT score, profil, patrimoine
                 FROM users
@@ -735,6 +735,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
