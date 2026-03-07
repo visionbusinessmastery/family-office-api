@@ -1,3 +1,7 @@
+print("STARTING API...")
+print("DATABASE_URL:", DATABASE_URL)
+print("SECRET_KEY:", "OK" if SECRET_KEY else "MISSING")
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -735,6 +739,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
