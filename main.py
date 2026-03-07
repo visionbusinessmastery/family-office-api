@@ -441,16 +441,30 @@ def stockpicker():
 
             quote = data["Global Quote"]
 
-            results.append({
+            price = quote.get("05. price")
+            change = quote.get("10. change percent")
 
-                "symbol": symbol,
-                "price": quote.get("05. price"),
-                "change": quote.get("10. change percent")
+            if price and change:
 
-            })
+                # Calcul du momentum
+                momentum = analyse_investissement(price, change)
+
+                # Score
+                momentum_score = score_action(price, change)
+
+                # Rating
+                rating = rating_action(momentum_score)
+
+                results.append({
+                    "symbol": symbol,
+                    "price": float(price),
+                    "change": change,
+                    "momentum": momentum,
+                    "momentum_score": momentum_score,
+                    "rating": rating
+                })
 
     return {"stocks": results}
-
 
 # ==================================================
 # IA BRAIN
@@ -508,4 +522,5 @@ def db_check():
             "detail": str(e)
 
         }
+
 
