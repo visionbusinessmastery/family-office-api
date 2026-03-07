@@ -273,7 +273,7 @@ def brain(request: BrainRequest):
             pass
 
     # =========================
-    # 2️⃣ NIVEAU UTILISATEUR
+    # 2️⃣ DÉTERMINATION NIVEAU
     # =========================
 
     if user_data:
@@ -282,19 +282,23 @@ def brain(request: BrainRequest):
         if score >= 75:
             niveau = "Investisseur Stratégique"
             risk_level = "Élevé contrôlé"
+            allocation_base = 80
         elif score >= 50:
             niveau = "Investisseur Équilibré"
             risk_level = "Modéré"
+            allocation_base = 60
         else:
             niveau = "Investisseur Prudent"
             risk_level = "Faible"
+            allocation_base = 40
 
     else:
         niveau = "Profil Non Défini"
         risk_level = "Standard"
+        allocation_base = 50
 
     # =========================
-    # 3️⃣ ANALYSE INTELLIGENTE
+    # 3️⃣ LOGIQUE MARCHÉS
     # =========================
 
     if any(word in question for word in ["action", "bourse", "marché", "investir"]):
@@ -303,24 +307,24 @@ def brain(request: BrainRequest):
             "theme": "Stratégie Marchés Financiers",
             "niveau_utilisateur": niveau,
             "analyse": (
-                "Les marchés sont dominés par l'IA, "
-                "la cybersécurité, les semi-conducteurs "
-                "et les infrastructures cloud."
+                "Les marchés sont dominés par l’IA, "
+                "la cybersécurité, les semi-conducteurs, "
+                "le cloud et les énergies stratégiques."
             ),
             "strategie": {
-                "approche": "Diversification en 3 piliers",
+                "approche": "Diversification intelligente en 3 piliers",
                 "piliers": [
                     "Croissance technologique",
-                    "Secteurs défensifs",
-                    "ETF larges marchés"
+                    "ETF larges marchés",
+                    "Secteurs défensifs"
                 ],
                 "adaptation_risque": risk_level
             },
             "allocation_recommandee": {
-                "actions_croissance": "30%",
-                "etf_marches": "30%",
-                "secteurs_defensifs": "20%",
-                "liquidites": "20%"
+                "actions_croissance": f"{int(allocation_base * 0.4)}%",
+                "etf_marches": f"{int(allocation_base * 0.3)}%",
+                "secteurs_defensifs": f"{int(allocation_base * 0.2)}%",
+                "liquidites": f"{100 - allocation_base}%"
             },
             "opportunites": [
                 "ETF S&P 500",
@@ -330,36 +334,51 @@ def brain(request: BrainRequest):
                 "Cybersécurité",
                 "Énergies renouvelables"
             ],
-            "score_confiance": 88,
+            "score_confiance": 90,
             "niveau": "Stratégique"
         }
+
+    # =========================
+    # 4️⃣ LOGIQUE CRYPTO
+    # =========================
 
     if "crypto" in question:
 
         return {
             "theme": "Stratégie Crypto",
             "niveau_utilisateur": niveau,
-            "analyse": "Exposition mesurée recommandée selon volatilité.",
+            "analyse": (
+                "La crypto doit rester une composante "
+                "limitée et stratégique du portefeuille."
+            ),
             "strategie": {
                 "allocation_max": "5-10%",
-                "objectif": "Diversification long terme"
+                "objectif": "Diversification long terme",
+                "gestion_risque": risk_level
             },
-            "opportunites": ["Bitcoin", "Ethereum"],
-            "score_confiance": 82,
+            "opportunites": [
+                "Bitcoin",
+                "Ethereum"
+            ],
+            "score_confiance": 85,
             "niveau": "Contrôlé"
         }
 
     # =========================
-    # 4️⃣ REPONSE PAR DEFAUT
+    # 5️⃣ REPONSE GLOBALE PREMIUM
     # =========================
 
     return {
         "theme": "Conseil Patrimonial Global",
         "niveau_utilisateur": niveau,
-        "analyse": "Optimisation globale du capital selon profil.",
+        "analyse": (
+            "Optimisation globale du capital "
+            "selon profil, horizon et tolérance au risque."
+        ),
         "strategie": {
-            "principe": "Diversification intelligente",
-            "gestion_risque": risk_level
+            "principe": "Diversification multi-actifs",
+            "gestion_risque": risk_level,
+            "adaptation_score": score if user_data else "N/A"
         },
         "opportunites": [
             "Actions",
@@ -367,7 +386,7 @@ def brain(request: BrainRequest):
             "Obligations",
             "Immobilier"
         ],
-        "score_confiance": 75,
+        "score_confiance": 80,
         "niveau": "Professionnel"
     }
 
@@ -387,5 +406,6 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
