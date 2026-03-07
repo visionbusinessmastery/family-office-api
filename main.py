@@ -15,7 +15,7 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Family Office AI", version="7.0")
+app = FastAPI(title="Family Office AI", version="9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +24,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+return {"status": "API active", "version": "9.0"}
 
 # ==================================================
 # DATABASE
@@ -264,6 +265,162 @@ def get_stock_data(ticker):
         "sources": ["Alpha Vantage", "FMP"]
     }
 
+# ==================================================
+# PORTFOLIO ANALYSIS
+# ==================================================
+
+def analyse_portfolio(email):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    with engine.connect() as conn:
+
+        result = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolios
+            WHERE user_email = :email
+        """), {"email": email})
+
+        rows = result.fetchall()
+
+    if not rows:
+        return None
+
+    portfolio = []
+
+    total_value = 0
+    total_cost = 0
+
+    allocation = {}
+
+    for r in rows:
+
+        asset = r[0]
+        asset_type = r[1]
+        quantity = r[2]
+        buy_price = r[3]
+
+        market_price = buy_price
+
+        if asset_type == "stock":
+
+            data = get_stock_data(asset)
+
+            if data:
+                market_price = data["price"]
+
+        value = quantity * market_price
+        cost = quantity * buy_price
+
+        total_value += value
+        total_cost += cost
+
+        allocation[asset_type] = allocation.get(asset_type, 0) + value
+
+        portfolio.append({
+            "asset": asset,
+            "type": asset_type,
+            "quantity": quantity,
+            "buy_price": buy_price,
+            "market_price": market_price,
+            "value": round(value,2)
+        })
+
+    performance = total_value - total_cost
+
+    allocation_percent = {}
+
+    for k,v in allocation.items():
+        allocation_percent[k] = round((v/total_value)*100,2)
+
+    diversification_score = min(len(allocation)*20,100)
+
+    if diversification_score >= 70:
+        risk = "Diversifié"
+    elif diversification_score >= 40:
+        risk = "Modéré"
+    else:
+        risk = "Concentré"
+
+    return {
+
+        "email": email,
+
+        "portfolio_value": round(total_value,2),
+
+        "portfolio_cost": round(total_cost,2),
+
+        "performance": round(performance,2),
+
+        "diversification_score": diversification_score,
+
+        "risk_profile": risk,
+
+        "allocation": allocation_percent,
+
+        "assets": portfolio
+
+    }
+    
+# ==================================================
+# PORTFOLIO OPTIMIZER
+# ==================================================
+
+def optimize_portfolio(email):
+
+    data = analyse_portfolio(email)
+
+    if not data:
+        return None
+
+    allocation = data["allocation"]
+
+    # allocation cible simple (robo advisor basique)
+    target = {
+        "stock": 60,
+        "crypto": 10,
+        "etf": 20,
+        "cash": 10
+    }
+
+    adjustments = []
+
+    for asset in target:
+
+        current = allocation.get(asset, 0)
+        target_weight = target[asset]
+
+        diff = round(target_weight - current, 2)
+
+        if abs(diff) > 5:
+
+            if diff > 0:
+                action = "Augmenter"
+            else:
+                action = "Réduire"
+
+            adjustments.append({
+                "asset_type": asset,
+                "current": current,
+                "target": target_weight,
+                "action": action,
+                "difference_percent": diff
+            })
+
+    return {
+
+        "email": email,
+
+        "current_allocation": allocation,
+
+        "target_allocation": target,
+
+        "recommendations": adjustments,
+
+        "message": "Optimisation basée sur un modèle robo-advisor simple"
+
+    }
 
 # ==================================================
 # ROUTES
@@ -342,6 +499,25 @@ def get_portfolio(email: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/portfolio/analyse/{email}")
+def portfolio_analysis(email: str):
+
+    result = analyse_portfolio(email)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Portefeuille vide")
+
+    return result
+
+@app.get("/portfolio/optimize/{email}")
+def portfolio_optimize(email: str):
+
+    result = optimize_portfolio(email)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Portefeuille vide")
+
+    return result
 
 # ==================================================
 # STOCK ANALYSE
@@ -444,5 +620,6 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
