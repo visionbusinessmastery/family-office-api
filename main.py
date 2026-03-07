@@ -1,37 +1,18 @@
+# ==================================================
+# IMPORTS
+# ==================================================
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+
 import requests
-def analyse_investissement(price, change):
-
-    change_value = float(change.replace("%",""))
-
-    if change_value > 2:
-        signal = "momentum haussier"
-        strategie = "surveiller breakout"
-        trend = "bullish"
-
-    elif change_value < -2:
-        signal = "correction court terme"
-        strategie = "achat progressif possible"
-        trend = "bearish court terme"
-
-    else:
-        signal = "stabilisation"
-        strategie = "attendre confirmation"
-        trend = "neutre"
-
-    return {
-        "trend": trend,
-        "signal": signal,
-        "strategie": strategie
-    }
-
 import os
 import time
-from datetime import datetime
+
 from sqlalchemy import create_engine, text
+
 
 # ==================================================
 # CONFIG
@@ -40,7 +21,10 @@ from sqlalchemy import create_engine, text
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Family Office IA", version="5.0")
+app = FastAPI(
+    title="Family Office IA",
+    version="5.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ==================================================
 # DATABASE
 # ==================================================
@@ -57,9 +42,16 @@ app.add_middleware(
 engine = None
 
 if DATABASE_URL:
+
     try:
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True
+        )
+
         with engine.begin() as conn:
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -72,34 +64,53 @@ if DATABASE_URL:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
+
     except Exception as e:
+
         print("DB INIT ERROR:", e)
 
+
 # ==================================================
-# CACHE
+# CACHE API
 # ==================================================
 
 cache = {}
-CACHE_DURATION = 900  # 15 min
+
+CACHE_DURATION = 900
+
 
 def get_cached(url):
+
     if url in cache:
+
         if time.time() - cache[url]["time"] < CACHE_DURATION:
+
             return cache[url]["data"]
 
     try:
+
         r = requests.get(url, timeout=10)
+
         data = r.json()
-        cache[url] = {"data": data, "time": time.time()}
+
+        cache[url] = {
+            "data": data,
+            "time": time.time()
+        }
+
         return data
+
     except:
+
         return None
+
 
 # ==================================================
 # MODELS
 # ==================================================
 
 class ProfileRequest(BaseModel):
+
     email: Optional[str] = None
     revenus: float
     charges: float
@@ -110,14 +121,19 @@ class ProfileRequest(BaseModel):
     risque: str
     experience: str
 
+
 class StockRequest(BaseModel):
+
     ticker: str
 
+
 class BrainRequest(BaseModel):
+
     question: str
 
+
 # ==================================================
-# UTILITAIRES
+# SCORE INVESTISSEUR
 # ==================================================
 
 def calculate_score(profile):
@@ -125,7 +141,13 @@ def calculate_score(profile):
     score = 0
 
     capacite = profile.revenus - profile.charges
-    patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
+
+    patrimoine = (
+        profile.epargne +
+        profile.immobilier +
+        profile.investissements +
+        profile.crypto
+    )
 
     if capacite > 0:
         score += 30
@@ -135,6 +157,7 @@ def calculate_score(profile):
 
     if profile.experience == "Avancé":
         score += 20
+
     elif profile.experience == "Intermédiaire":
         score += 10
 
@@ -144,53 +167,175 @@ def calculate_score(profile):
     return min(score, 100)
 
 
+# ==================================================
+# ALLOCATION PORTEFEUILLE
+# ==================================================
+
 def generate_allocation(risque):
 
     if risque == "Prudent":
-        return {"actions": 40, "obligations": 40, "immobilier": 15, "liquidites": 5}
+
+        return {
+            "actions": 40,
+            "obligations": 40,
+            "immobilier": 15,
+            "liquidites": 5
+        }
 
     if risque == "Modéré":
-        return {"actions": 60, "obligations": 20, "immobilier": 15, "liquidites": 5}
 
-    return {"actions": 80, "obligations": 5, "immobilier": 10, "liquidites": 5}
+        return {
+            "actions": 60,
+            "obligations": 20,
+            "immobilier": 15,
+            "liquidites": 5
+        }
+
+    return {
+        "actions": 80,
+        "obligations": 5,
+        "immobilier": 10,
+        "liquidites": 5
+    }
+
 
 # ==================================================
-# ROUTES
+# ANALYSE ACTION
+# ==================================================
+
+def analyse_investissement(price, change):
+
+    change_value = float(change.replace("%", ""))
+
+    if change_value > 2:
+
+        signal = "momentum haussier"
+        strategie = "surveiller breakout"
+        trend = "bullish"
+
+    elif change_value < -2:
+
+        signal = "correction court terme"
+        strategie = "achat progressif possible"
+        trend = "bearish court terme"
+
+    else:
+
+        signal = "stabilisation"
+        strategie = "attendre confirmation"
+        trend = "neutre"
+
+    return {
+        "trend": trend,
+        "signal": signal,
+        "strategie": strategie
+    }
+
+
+# ==================================================
+# SCORE ACTION
+# ==================================================
+
+def score_action(price, change):
+
+    score = 50
+
+    change_value = float(change.replace("%", ""))
+
+    if change_value > 3:
+
+        score += 20
+
+    elif change_value > 1:
+
+        score += 10
+
+    elif change_value < -3:
+
+        score -= 20
+
+    elif change_value < -1:
+
+        score -= 10
+
+    return max(0, min(score, 100))
+
+
+# ==================================================
+# RATING ACTION
+# ==================================================
+
+def rating_action(score):
+
+    if score >= 70:
+        return "BUY"
+
+    elif score >= 50:
+        return "HOLD"
+
+    return "SELL"
+
+
+# ==================================================
+# ROUTE ROOT
 # ==================================================
 
 @app.get("/")
 def root():
-    return {"status": "API active"}
 
-# -------------------------
-# PROFIL
-# -------------------------
+    return {
+        "status": "API active",
+        "version": "5.0"
+    }
+
+
+# ==================================================
+# PROFIL INVESTISSEUR
+# ==================================================
 
 @app.post("/profile")
 def save_profile(profile: ProfileRequest):
 
     score = calculate_score(profile)
+
     allocation = generate_allocation(profile.risque)
 
-    patrimoine = profile.epargne + profile.immobilier + profile.investissements + profile.crypto
+    patrimoine = (
+        profile.epargne +
+        profile.immobilier +
+        profile.investissements +
+        profile.crypto
+    )
 
     if engine and profile.email:
+
         try:
+
             with engine.begin() as conn:
+
                 conn.execute(text("""
+
                     INSERT INTO users (email, revenus, charges, patrimoine, score, profil)
+
                     VALUES (:email, :revenus, :charges, :patrimoine, :score, :profil)
+
                     ON CONFLICT (email) DO UPDATE
+
                     SET score=:score, patrimoine=:patrimoine
+
                 """), {
+
                     "email": profile.email,
                     "revenus": profile.revenus,
                     "charges": profile.charges,
                     "patrimoine": patrimoine,
                     "score": score,
                     "profil": profile.risque
+
                 })
+
         except Exception as e:
+
             print("DB ERROR:", e)
 
     return {
@@ -200,9 +345,10 @@ def save_profile(profile: ProfileRequest):
         "patrimoine_total": patrimoine
     }
 
-# -------------------------
-# ANALYSE ACTION (ALPHA)
-# -------------------------
+
+# ==================================================
+# ANALYSE ACTION
+# ==================================================
 
 @app.post("/stocks/analyse")
 def analyse_stock(request: StockRequest):
@@ -229,17 +375,26 @@ def analyse_stock(request: StockRequest):
 
     analyse = analyse_investissement(price, change)
 
+    score = score_action(price, change)
+
+    rating = rating_action(score)
+
     return {
+
         "ticker": ticker,
         "price": float(price),
         "change_percent": change,
+        "score": score,
+        "rating": rating,
         "source": "Alpha Vantage",
         "analyse": analyse
+
     }
 
-# -------------------------
-# STOCK PICKER SIMPLE
-# -------------------------
+
+# ==================================================
+# STOCK PICKER
+# ==================================================
 
 @app.get("/stockpicker")
 def stockpicker():
@@ -258,19 +413,23 @@ def stockpicker():
         data = get_cached(url)
 
         if data and "Global Quote" in data:
+
             quote = data["Global Quote"]
 
             results.append({
+
                 "symbol": symbol,
                 "price": quote.get("05. price"),
                 "change": quote.get("10. change percent")
+
             })
 
     return {"stocks": results}
 
-# -------------------------
+
+# ==================================================
 # IA BRAIN
-# -------------------------
+# ==================================================
 
 @app.post("/ia/brain")
 def brain(request: BrainRequest):
@@ -280,22 +439,27 @@ def brain(request: BrainRequest):
     if "investir" in question:
 
         return {
+
             "theme": "Investissement",
             "analyse": "Diversification recommandée.",
             "strategie": "Long terme progressif.",
             "opportunites": ["Actions IA", "ETF", "Immobilier"]
+
         }
 
     return {
+
         "theme": "Général",
         "analyse": "Analyse stratégique.",
         "strategie": "Gestion du risque.",
         "opportunites": ["Diversification"]
+
     }
 
-# -------------------------
+
+# ==================================================
 # DATABASE CHECK
-# -------------------------
+# ==================================================
 
 @app.get("/db-check")
 def db_check():
@@ -304,11 +468,18 @@ def db_check():
         return {"database": "not configured"}
 
     try:
+
         with engine.connect() as conn:
+
             conn.execute(text("SELECT 1"))
+
         return {"database": "connected"}
+
     except Exception as e:
-        return {"database": "error", "detail": str(e)}
 
+        return {
 
+            "database": "error",
+            "detail": str(e)
 
+        }
