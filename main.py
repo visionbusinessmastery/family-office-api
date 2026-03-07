@@ -28,7 +28,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 app = FastAPI(title="Family Office AI", version="10.0")
 
@@ -135,7 +135,6 @@ class BrainRequest(BaseModel):
 
 
 class PortfolioRequest(BaseModel):
-    email: str
     asset: str
     asset_type: str
     quantity: float
@@ -183,6 +182,7 @@ def register(user: UserRegister):
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
 
+    email = user.email.lower()
     hashed = hash_password(user.password)
 
     try:
@@ -190,11 +190,11 @@ def register(user: UserRegister):
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
-            """), {"email": user.email, "password": hashed})
+            """), {"email": email, "password": hashed})
 
         return {"status": "Utilisateur créé"}
 
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Utilisateur existe déjà")
 
 # ==================================================
@@ -210,7 +210,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT password FROM users WHERE email=:email
-        """), {"email": form_data.username})
+        """), {email = form_data.username.lower()})
 
         row = result.fetchone()
 
@@ -220,9 +220,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not verify_password(form_data.password, row[0]):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
-        token = create_token({"sub": form_data.username})
+        token = create_token({"sub": form_data.username.lower()})
 
         return {"access_token": token, "token_type": "bearer"}
+        
+        return email.lower()
 
 # ==================================================
 # SCORE INVESTISSEUR
@@ -334,7 +336,7 @@ def get_stock_data(ticker):
     # FMP
     fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
     fmp_data = get_cached(fmp_url)
-    fmp_profile = fmp_data[0] if fmp_data else {}
+    fmp_profile = fmp_data[0] if fmp_data and len(fmp_data) > 0 else {}
 
     price = alpha_quote.get("05. price")
     change = alpha_quote.get("10. change percent")
@@ -547,7 +549,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
             """), {
-                "email": email,
+                "email": current_user,
                 "asset": request.asset,
                 "asset_type": request.asset_type,
                 "quantity": request.quantity,
@@ -644,6 +646,17 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
     
     question = request.question.lower()
 
+    theme = "Conseil Patrimonial Global"
+
+    if "immobilier" in question:
+        theme = "Investissement Immobilier"
+
+    elif "crypto" in question:
+        theme = "Investissement Crypto"
+
+    elif "bourse" in question:
+        theme = "Investissement Boursier"
+
     user_data = None
 
     if engine:
@@ -655,7 +668,7 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
                         WHERE email = :email
                     """), {"email": current_user})
 
-                row = result.fetchone()
+                    row = result.fetchone()
 
                 if row:
                     user_data = {
@@ -688,7 +701,7 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
         patrimoine = 0
 
     return {
-        "theme": "Conseil Patrimonial Global",
+        "theme": theme,
         "niveau_utilisateur": niveau,
         "analyse": "Optimisation globale du capital selon profil.",
         "strategie": {
@@ -717,5 +730,6 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
