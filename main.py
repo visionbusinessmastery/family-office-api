@@ -546,7 +546,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=500, detail="Database non connectée")
 
     try:
-
+        
         with engine.begin() as conn:
 
             conn.execute(text("""
@@ -674,7 +674,7 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
 
             row = result.fetchone()
 
-    if row:
+        if row:
             user_data = {
                 "score": row[0],
                 "profil": row[1],
@@ -735,6 +735,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
