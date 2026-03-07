@@ -273,7 +273,7 @@ def brain(request: BrainRequest):
             pass
 
     # =========================
-    # 2️⃣ DÉTERMINATION NIVEAU
+    # 2️⃣ NIVEAU UTILISATEUR
     # =========================
 
     if user_data:
@@ -282,103 +282,95 @@ def brain(request: BrainRequest):
         if score >= 75:
             niveau = "Investisseur Stratégique"
             risk_level = "Élevé contrôlé"
-            allocation_base = 80
         elif score >= 50:
             niveau = "Investisseur Équilibré"
             risk_level = "Modéré"
-            allocation_base = 60
         else:
             niveau = "Investisseur Prudent"
             risk_level = "Faible"
-            allocation_base = 40
-
     else:
         niveau = "Profil Non Défini"
         risk_level = "Standard"
-        allocation_base = 50
 
     # =========================
-    # 3️⃣ LOGIQUE MARCHÉS
+    # 3️⃣ LOGIQUE INTELLIGENTE AVANCÉE
     # =========================
 
-    if any(word in question for word in ["action", "bourse", "marché", "investir"]):
+    if any(word in question for word in ["action", "bourse", "marché", "investir", "2026"]):
 
         return {
-            "theme": "Stratégie Marchés Financiers",
+            "theme": "Stratégie Marchés 2026",
             "niveau_utilisateur": niveau,
+
             "analyse": (
-                "Les marchés sont dominés par l’IA, "
-                "la cybersécurité, les semi-conducteurs, "
-                "le cloud et les énergies stratégiques."
+                "Les tendances majeures 2026 sont : "
+                "Intelligence Artificielle, Semi-conducteurs, "
+                "Cloud computing, Cybersécurité, Énergies stratégiques "
+                "et ETF globaux."
             ),
+
             "strategie": {
-                "approche": "Diversification intelligente en 3 piliers",
+                "approche": "Allocation en 3 piliers",
                 "piliers": [
-                    "Croissance technologique",
-                    "ETF larges marchés",
-                    "Secteurs défensifs"
+                    "Croissance technologique (IA, semi-conducteurs)",
+                    "ETF larges marchés (S&P 500, Nasdaq)",
+                    "Secteurs défensifs (santé, énergie, consommation)"
                 ],
                 "adaptation_risque": risk_level
             },
+
             "allocation_recommandee": {
-                "actions_croissance": f"{int(allocation_base * 0.4)}%",
-                "etf_marches": f"{int(allocation_base * 0.3)}%",
-                "secteurs_defensifs": f"{int(allocation_base * 0.2)}%",
-                "liquidites": f"{100 - allocation_base}%"
+                "etf_large_marche": "30%",
+                "actions_croissance": "30%",
+                "secteurs_defensifs": "20%",
+                "liquidites": "20%"
             },
-            "opportunites": [
-                "ETF S&P 500",
-                "ETF Nasdaq",
-                "Actions IA",
-                "Semi-conducteurs",
-                "Cybersécurité",
-                "Énergies renouvelables"
+
+            "opportunites_precises_2026": [
+                "ETF S&P 500 (SPY / VOO)",
+                "ETF Nasdaq 100 (QQQ)",
+                "ETF Intelligence Artificielle",
+                "NVIDIA (Semi-conducteurs)",
+                "Microsoft (Cloud & IA)",
+                "Apple (Écosystème)",
+                "ETF Cybersécurité",
+                "ETF Énergies renouvelables"
             ],
-            "score_confiance": 90,
+
+            "score_confiance": 92,
             "niveau": "Stratégique"
         }
 
     # =========================
-    # 4️⃣ LOGIQUE CRYPTO
+    # 4️⃣ CRYPTO
     # =========================
 
     if "crypto" in question:
 
         return {
-            "theme": "Stratégie Crypto",
+            "theme": "Stratégie Crypto 2026",
             "niveau_utilisateur": niveau,
-            "analyse": (
-                "La crypto doit rester une composante "
-                "limitée et stratégique du portefeuille."
-            ),
+            "analyse": "Marché volatil mais structurellement en croissance.",
             "strategie": {
-                "allocation_max": "5-10%",
-                "objectif": "Diversification long terme",
-                "gestion_risque": risk_level
+                "allocation_max_recommandee": "5-10%",
+                "objectif": "Diversification long terme"
             },
-            "opportunites": [
-                "Bitcoin",
-                "Ethereum"
-            ],
+            "opportunites": ["Bitcoin", "Ethereum"],
             "score_confiance": 85,
             "niveau": "Contrôlé"
         }
 
     # =========================
-    # 5️⃣ REPONSE GLOBALE PREMIUM
+    # 5️⃣ REPONSE PAR DEFAUT
     # =========================
 
     return {
         "theme": "Conseil Patrimonial Global",
         "niveau_utilisateur": niveau,
-        "analyse": (
-            "Optimisation globale du capital "
-            "selon profil, horizon et tolérance au risque."
-        ),
+        "analyse": "Optimisation globale du capital selon profil.",
         "strategie": {
-            "principe": "Diversification multi-actifs",
-            "gestion_risque": risk_level,
-            "adaptation_score": score if user_data else "N/A"
+            "principe": "Diversification intelligente",
+            "gestion_risque": risk_level
         },
         "opportunites": [
             "Actions",
@@ -406,6 +398,7 @@ def db_check():
         return {"database": "connected"}
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
