@@ -188,14 +188,20 @@ def register(user: UserRegister):
     try:
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO users (email, password)
-                VALUES (:email, :password)
-            """), {"email": email, "password": hashed})
+                INSERT INTO users (email, password, score, profil, patrimoine)
+                VALUES (:email, :password, :score, :profil, :patrimoine)
+            """), {
+                "email": email,
+                "password": hashed,
+                "score": 50,
+                "profil": "équilibré",
+                "patrimoine": 0
+            })
 
         return {"status": "Utilisateur créé"}
 
-    except Exception:
-        raise HTTPException(status_code=400, detail="Utilisateur existe déjà")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==================================================
 # LOGIN
@@ -735,6 +741,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
