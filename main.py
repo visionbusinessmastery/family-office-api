@@ -666,23 +666,23 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
     if engine:
         try:
             with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT score, profil, patrimoine
-                FROM users
-                WHERE email = :email
-            """), {"email": current_user})
+                result = conn.execute(text("""
+                    SELECT score, profil, patrimoine
+                    FROM users
+                    WHERE email = :email
+                """), {"email": current_user})
 
-            row = result.fetchone()
+                row = result.fetchone()
 
-         if row:
-            user_data = {
-                "score": row[0],
-                "profil": row[1],
-                "patrimoine": row[2]
-            }
+            if row:
+                user_data = {
+                    "score": row[0],
+                    "profil": row[1],
+                    "patrimoine": row[2]
+                }
 
-    except:
-        pass
+        except:
+            pass
 
     if user_data:
 
@@ -735,6 +735,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
