@@ -188,16 +188,16 @@ def register(user: UserRegister):
     try:
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO users (email, password, score, profil, patrimoine)
-                VALUES (:email, :password, :score, :profil, :patrimoine)
-            """), {
-                "email": email,
-                "password": hashed,
-                "score": 50,
-                "profil": "equilibre",
-                "patrimoine": 0
-            })
-
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE,
+                password TEXT,
+                score INTEGER DEFAULT 50,
+                profil TEXT DEFAULT 'equilibre',
+                patrimoine FLOAT DEFAULT 0
+            )
+            """))
+            
         return {"status": "Utilisateur créé"}
 
     except Exception as e:
@@ -741,6 +741,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
