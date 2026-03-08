@@ -186,22 +186,32 @@ def register(user: UserRegister):
     hashed = hash_password(user.password)
 
     try:
+
         with engine.begin() as conn:
+
+            # vérifier si utilisateur existe
+            result = conn.execute(text("""
+                SELECT email FROM users WHERE email=:email
+            """), {"email": email})
+
+            existing = result.fetchone()
+
+            if existing:
+                raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
+
+            # INSERT utilisateur
             conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email TEXT UNIQUE,
-                password TEXT,
-                score INTEGER DEFAULT 50,
-                profil TEXT DEFAULT 'equilibre',
-                patrimoine FLOAT DEFAULT 0
-            )
-            """))
-            
+                INSERT INTO users (email, password)
+                VALUES (:email, :password)
+            """), {
+                "email": email,
+                "password": hashed
+            })
+
         return {"status": "Utilisateur créé"}
 
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
         
 # ==================================================
 # LOGIN
@@ -741,6 +751,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
