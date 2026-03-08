@@ -194,7 +194,7 @@ def register(user: UserRegister):
                 "email": email,
                 "password": hashed,
                 "score": 50,
-                "profil": "équilibré",
+                "profil": "equilibre",
                 "patrimoine": 0
             })
 
@@ -202,7 +202,7 @@ def register(user: UserRegister):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+        
 # ==================================================
 # LOGIN
 # ==================================================
@@ -741,6 +741,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
