@@ -201,7 +201,7 @@ def register(user: UserRegister):
         return {"status": "Utilisateur créé"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}
         
 # ==================================================
 # LOGIN
@@ -741,6 +741,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
