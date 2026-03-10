@@ -193,7 +193,6 @@ def register(user: UserRegister):
 
         with engine.begin() as conn:
 
-            # vérifier si utilisateur existe
             result = conn.execute(text("""
                 SELECT email FROM users WHERE email=:email
             """), {"email": email})
@@ -203,7 +202,6 @@ def register(user: UserRegister):
             if existing:
                 raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
 
-            # INSERT utilisateur
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
@@ -213,6 +211,9 @@ def register(user: UserRegister):
             })
 
         return {"status": "Utilisateur créé"}
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -755,6 +756,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
