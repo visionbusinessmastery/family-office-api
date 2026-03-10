@@ -20,6 +20,10 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# FIX Render Postgres
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # 🔐 JWT CONFIG
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -751,6 +755,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
