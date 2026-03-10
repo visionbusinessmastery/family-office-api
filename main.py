@@ -212,11 +212,9 @@ def register(user: UserRegister):
 
         return {"status": "Utilisateur créé"}
 
-    except HTTPException:
-        raise
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print("REGISTER ERROR:", e)   # 👈 LA LIGNE MAGIQUE
+        raise HTTPException(status_code=500, detail="Erreur serveur")
         
 # ==================================================
 # LOGIN
@@ -756,6 +754,7 @@ def db_check():
 
     except Exception as e:
         return {"database": "error", "detail": str(e)}
+
 
 
 
