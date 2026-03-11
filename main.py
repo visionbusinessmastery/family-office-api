@@ -57,15 +57,19 @@ if DATABASE_URL:
         with engine.begin() as conn:
 
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE users (
                     id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE,
-                    password TEXT,
-                    score INT,
+                    email TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    revenus NUMERIC DEFAULT 0,
+                    charges NUMERIC DEFAULT 0,
+                    patrimoine NUMERIC DEFAULT 0,
+                    score INTEGER DEFAULT 0,
                     profil TEXT,
-                    patrimoine FLOAT,
+                    role TEXT DEFAULT 'user',
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                );
             """))
 
             conn.execute(text("""
@@ -180,41 +184,53 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # REGISTER
 # ==================================================
 
-@app.post("/register")
-def register(user: UserRegister):
+# ==================================================
+# DATABASE
+# ==================================================
 
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database non connectée")
+engine = None
 
-    email = user.email.lower()
-    hashed = hash_password(user.password)
-
+if DATABASE_URL:
     try:
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
         with engine.begin() as conn:
 
-            result = conn.execute(text("""
-                SELECT email FROM users WHERE email=:email
-            """), {"email": email})
-
-            existing = result.fetchone()
-
-            if existing:
-                raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
+            conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT,
+                revenus NUMERIC DEFAULT 0,
+                charges NUMERIC DEFAULT 0,
+                patrimoine NUMERIC DEFAULT 0,
+                score INTEGER DEFAULT 0,
+                profil TEXT,
+                role TEXT DEFAULT 'user',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """))
 
             conn.execute(text("""
-                INSERT INTO users (email, password)
-                VALUES (:email, :password)
-            """), {
-                "email": email,
-                "password": hashed
-            })
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS password TEXT
+            """))
 
-        return {"status": "Utilisateur créé"}
+            conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS portfolios (
+                id SERIAL PRIMARY KEY,
+                user_email TEXT,
+                asset TEXT,
+                asset_type TEXT,
+                quantity FLOAT,
+                buy_price FLOAT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """))
 
     except Exception as e:
-        print("REGISTER ERROR:", e)   # 👈 LA LIGNE MAGIQUE
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+        print("DB INIT ERROR:", e)
         
 # ==================================================
 # LOGIN
@@ -777,6 +793,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
