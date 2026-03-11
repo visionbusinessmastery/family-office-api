@@ -762,6 +762,21 @@ def test_db():
         return {"db": "ok"}
 
 
+@app.get("/test-users")
+def test_users():
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT * FROM users LIMIT 1"))
+        return {"status": "table users ok"}
+
+@app.get("/schema")
+def schema():
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='users'
+        """))
+        return [row[0] for row in result]
 
 
 
