@@ -31,7 +31,7 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 app = FastAPI(title="Family Office AI", version="10.0")
@@ -111,51 +111,42 @@ class UserRegister(BaseModel):
     password: str
 
 # ==================================================
-# AUTH SYSTEM 
+# AUTH SYSTEM
 # ==================================================
 
-def hash_password(password):
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain, hashed):
-    return pwd_context.verify(plain, hashed)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 def create_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    return jwt.encode(
+        to_encode,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
+
         if email is None:
             raise HTTPException(status_code=401, detail="Token invalide")
+
         return email
+
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
-
-
-# ==================================================
-# REGISTER ENDPOINT
-# ==================================================
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Pydantic schema
-class UserRegister(BaseModel):
-    email: str
-    password: str
-
-# Fonction de hash
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-# Fonction de vérification (utile pour login)
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
 
 # ======================
 # REGISTER
@@ -811,6 +802,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
