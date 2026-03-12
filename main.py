@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 import requests
 import os
@@ -107,8 +107,8 @@ class PortfolioRequest(BaseModel):
 
 
 class UserRegister(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
 
 # ======================
 # REGISTER
@@ -810,6 +810,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
