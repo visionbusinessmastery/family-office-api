@@ -164,13 +164,16 @@ def register(user: UserRegister):
 # AUTH SYSTEM
 # ==================================================
 
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256"],
+    deprecated="auto"
+)
+
 def hash_password(password: str) -> str:
-    password = password[:72]
     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    plain_password = plain_password[:72]
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(password: str, hashed: str) -> bool:
+    return pwd_context.verify(password, hashed)
 
 def create_token(data: dict):
     to_encode = data.copy()
@@ -807,6 +810,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
