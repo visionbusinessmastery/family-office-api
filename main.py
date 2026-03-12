@@ -43,50 +43,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ==================================================
-# DATABASE
-# ==================================================
-
-engine = None
-
-if DATABASE_URL:
-    try:
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
-        with engine.begin() as conn:
-
-            conn.execute(text("""
-                CREATE TABLE users (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    revenus NUMERIC DEFAULT 0,
-                    charges NUMERIC DEFAULT 0,
-                    patrimoine NUMERIC DEFAULT 0,
-                    score INTEGER DEFAULT 0,
-                    profil TEXT,
-                    role TEXT DEFAULT 'user',
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """))
-
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS portfolios (
-                    id SERIAL PRIMARY KEY,
-                    user_email TEXT,
-                    asset TEXT,
-                    asset_type TEXT,
-                    quantity FLOAT,
-                    buy_price FLOAT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-
-    except Exception as e:
-        print("DB INIT ERROR:", e)
-        
+      
 # ==================================================
 # CACHE
 # ==================================================
@@ -184,14 +141,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # REGISTER ENDPOINT
 # ==================================================
 
-from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy import text
-from pydantic import BaseModel
-from passlib.context import CryptContext
-
-# Objet FastAPI
-app = FastAPI()
-
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -211,6 +160,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # ======================
 # REGISTER
 # ======================
+
 @app.post("/register")
 def register(user: UserRegister):
 
@@ -221,18 +171,18 @@ def register(user: UserRegister):
     hashed = hash_password(user.password)
 
     try:
+
         with engine.begin() as conn:
 
-            # Vérifie si l'utilisateur existe déjà
             result = conn.execute(text("""
                 SELECT email FROM users WHERE email=:email
             """), {"email": email})
 
             existing = result.fetchone()
+
             if existing:
                 raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
 
-            # Insère le nouvel utilisateur
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
@@ -244,9 +194,13 @@ def register(user: UserRegister):
         return {"status": "Utilisateur créé"}
 
     except Exception as e:
-        # 👈 ligne de debug pour Render
+
         print("REGISTER ERROR:", e)
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # ==================================================
 # DATABASE
@@ -857,6 +811,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
