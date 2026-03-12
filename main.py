@@ -114,8 +114,6 @@ class UserRegister(BaseModel):
 # AUTH SYSTEM
 # ==================================================
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -188,10 +186,7 @@ def register(user: UserRegister):
 
         print("REGISTER ERROR:", e)
 
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==================================================
 # DATABASE
@@ -802,6 +797,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
