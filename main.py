@@ -156,13 +156,14 @@ def register(user: UserRegister):
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
 
-    email = user.email.lower()
-    hashed = hash_password(user.password)
-
     try:
+
+        email = user.email.lower()
+        hashed = hash_password(user.password)
 
         with engine.begin() as conn:
 
+            # vérifier si utilisateur existe
             result = conn.execute(text("""
                 SELECT email FROM users WHERE email=:email
             """), {"email": email})
@@ -170,8 +171,12 @@ def register(user: UserRegister):
             existing = result.fetchone()
 
             if existing:
-                raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Utilisateur déjà existant"
+                )
 
+            # insertion
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
@@ -186,7 +191,10 @@ def register(user: UserRegister):
 
         print("REGISTER ERROR:", e)
 
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # ==================================================
 # DATABASE
@@ -797,6 +805,7 @@ def schema():
             WHERE table_name='users'
         """))
         return [row[0] for row in result]
+
 
 
 
