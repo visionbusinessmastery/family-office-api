@@ -31,7 +31,7 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 app = FastAPI(title="Family Office AI", version="10.0")
@@ -117,42 +117,28 @@ class UserRegister(BaseModel):
 @app.post("/register")
 def register(user: UserRegister):
 
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database non connectée")
+    email = user.email.lower()
+    hashed = hash_password(user.password)
 
-    try:
+    with engine.begin() as conn:
 
-        email = user.email.lower()
-        hashed = pwd_context.hash(user.password.strip()[:72])
+        result = conn.execute(text("""
+            SELECT email FROM users WHERE email=:email
+        """), {"email": email})
 
-        with engine.begin() as conn:
+        if result.fetchone():
+            raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
 
-            result = conn.execute(text("""
-                SELECT email FROM users WHERE email=:email
-            """), {"email": email})
+        conn.execute(text("""
+            INSERT INTO users (email, password)
+            VALUES (:email, :password)
+        """), {
+            "email": email,
+            "password": hashed
+        })
 
-            existing = result.fetchone()
-
-            if existing:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Utilisateur déjà existant"
-                )
-
-            conn.execute(text("""
-                INSERT INTO users (email, password)
-                VALUES (:email, :password)
-            """), {
-                "email": email,
-                "password": hashed
-            })
-
-        return {"status": "Utilisateur créé"}
-
-    except Exception as e:
-        print("REGISTER ERROR:", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
+    return {"status": "Utilisateur créé"}
+    
 # ==================================================
 # AUTH SYSTEM
 # ==================================================
