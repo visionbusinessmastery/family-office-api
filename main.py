@@ -223,6 +223,39 @@ def create_token(data: dict):
         algorithm=ALGORITHM
     )
 
+
+# ==================================================
+# GET CURRENT USER
+# ==================================================
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+
+    try:
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        email = payload.get("sub")
+
+        if email is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Token invalide"
+            )
+
+        return email
+
+    except JWTError:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Token invalide"
+        )
+
+
 # ==================================================
 # LOGIN
 # ==================================================
@@ -256,6 +289,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             "token_type": "bearer"
         }
 
+
 # ======================
 # REGISTER
 # ======================
@@ -288,7 +322,8 @@ def register(user: UserRegister):
 
     return {"status": "Utilisateur créé"}
            
-        
+
+
 # ==================================================
 # SCORE INVESTISSEUR
 # ==================================================
@@ -346,6 +381,7 @@ def calculate_projection(patrimoine, allocation, years=10):
             total += patrimoine * weight * ((1 + returns[asset]) ** years)
 
     return round(total, 2)
+
 
 
 # ==================================================
@@ -524,7 +560,8 @@ def analyse_portfolio(email):
         "assets": portfolio
 
     }
-    
+
+
 # ==================================================
 # PORTFOLIO OPTIMIZER
 # ==================================================
