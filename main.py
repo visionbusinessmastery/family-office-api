@@ -115,6 +115,7 @@ class UserRegister(BaseModel):
 # ======================
 
 @app.post("/register")
+
 def register(user: UserRegister, db: Session = Depends(get_db)):
 
     hashed_password = pwd_context.hash(user.password.strip()[:72])
@@ -129,6 +130,53 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     return {"message": "User created"}
+
+@app.post("/register")
+
+def register(user: UserRegister):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    try:
+
+        email = user.email.lower()
+        hashed = hash_password(user.password)
+
+        with engine.begin() as conn:
+
+            # vérifier si utilisateur existe
+            result = conn.execute(text("""
+                SELECT email FROM users WHERE email=:email
+            """), {"email": email})
+
+            existing = result.fetchone()
+
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Utilisateur déjà existant"
+                )
+
+            # insertion
+            conn.execute(text("""
+                INSERT INTO users (email, password)
+                VALUES (:email, :password)
+            """), {
+                "email": email,
+                "password": hashed
+            })
+
+        return {"status": "Utilisateur créé"}
+
+    except Exception as e:
+
+        print("REGISTER ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # ==================================================
 # AUTH SYSTEM
