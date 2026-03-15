@@ -24,13 +24,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# 🔐 JWT CONFIG
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise Exception("SECRET_KEY missing")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -118,7 +111,7 @@ class UserRegister(BaseModel):
 def register(user: UserRegister):
 
     email = user.email.lower()
-    hashed = hash_password(user.password)
+    password = password(user.password)
 
     with engine.begin() as conn:
 
@@ -134,7 +127,7 @@ def register(user: UserRegister):
             VALUES (:email, :password)
         """), {
             "email": email,
-            "password": hashed
+            "password": password
         })
 
     return {"status": "Utilisateur créé"}
