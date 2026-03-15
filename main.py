@@ -5,7 +5,6 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
-from jose import jwt, JWTError
 from datetime import datetime, timedelta
 import requests
 import os
@@ -22,8 +21,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # FIX Render Postgres
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 app = FastAPI(title="Family Office AI", version="10.0")
