@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from sqlalchemy import create_engine, text
@@ -43,36 +43,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-      
+
 # ==================================================
-# CACHE
+# MODELS
 # ==================================================
 
-cache = {}
-CACHE_DURATION = 900
+class ProfileRequest(BaseModel):
+    email: Optional[str] = None
+    revenus: float
+    charges: float
+    epargne: float
+    immobilier: float
+    investissements: float
+    crypto: float
+    risque: str
+    experience: str
 
-def get_cached(url):
 
-    if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
-        return cache[url]["data"]
+class StockRequest(BaseModel):
+    ticker: str
 
-    try:
-        r = requests.get(url, timeout=10)
 
-        if r.status_code != 200:
-            return None
+class BrainRequest(BaseModel):
+    question: str
 
-        data = r.json()
 
-        cache[url] = {
-            "data": data,
-            "time": time.time()
-        }
+class PortfolioRequest(BaseModel):
+    asset: str
+    asset_type: str
+    quantity: float
+    buy_price: float
 
-        return data
 
-    except:
-        return None
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
 
 
 # ==================================================
@@ -110,41 +115,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
 
-# ======================
-# REGISTER
-# ======================
 
-@app.post("/register")
-def register(user: UserRegister):
-
-def hash_password(password: str):
-    return pwd_context.hash(password)
-
-def verify_password(password: str, hashed: str):
-    return pwd_context.verify(password, hashed)
-    
-    email = user.email.lower()
-    password = password(user.password)
-
-    with engine.begin() as conn:
-
-        result = conn.execute(text("""
-            SELECT email FROM users WHERE email=:email
-        """), {"email": email})
-
-        if result.fetchone():
-            raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
-
-        conn.execute(text("""
-            INSERT INTO users (email, password)
-            VALUES (:email, :password)
-        """), {
-            "email": email,
-            "password": password
-        })
-
-    return {"status": "Utilisateur créé"}
-           
 # ==================================================
 # DATABASE
 # ==================================================
@@ -194,6 +165,32 @@ if DATABASE_URL:
         print("DB INIT ERROR:", e)
         
 # ==================================================
+# AUTH FUNCTIONS
+# ==================================================
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+def verify_password(password: str, hashed: str):
+    return pwd_context.verify(password, hashed)
+
+def create_token(data: dict):
+
+    to_encode = data.copy()
+
+    expire = datetime.utcnow() + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    to_encode.update({"exp": expire})
+
+    return jwt.encode(
+        to_encode,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+# ==================================================
 # LOGIN
 # ==================================================
 
@@ -225,6 +222,39 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             "access_token": token,
             "token_type": "bearer"
         }
+
+# ======================
+# REGISTER
+# ======================
+
+@app.post("/register")
+def register(user: UserRegister):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    email = user.email.lower()
+    hashed_password = hash_password(user.password)
+
+    with engine.begin() as conn:
+
+        result = conn.execute(text("""
+            SELECT email FROM users WHERE email=:email
+        """), {"email": email})
+
+        if result.fetchone():
+            raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
+
+        conn.execute(text("""
+            INSERT INTO users (email, password)
+            VALUES (:email, :password)
+        """), {
+            "email": email,
+            "password": hashed_password
+        })
+
+    return {"status": "Utilisateur créé"}
+           
         
 # ==================================================
 # SCORE INVESTISSEUR
@@ -713,7 +743,36 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
         "niveau": "Professionnel"
     }
 
+# ==================================================
+# CACHE
+# ==================================================
 
+cache = {}
+CACHE_DURATION = 900
+
+def get_cached(url):
+
+    if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
+        return cache[url]["data"]
+
+    try:
+        r = requests.get(url, timeout=10)
+
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+
+        cache[url] = {
+            "data": data,
+            "time": time.time()
+        }
+
+        return data
+
+    except:
+        return None
+        
 # ==================================================
 # DB CHECK
 # ==================================================
