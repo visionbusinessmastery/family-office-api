@@ -164,6 +164,39 @@ if DATABASE_URL:
     except Exception as e:
         print("DB INIT ERROR:", e)
         
+
+# ==================================================
+# CACHE
+# ==================================================
+
+cache = {}
+CACHE_DURATION = 900
+
+def get_cached(url):
+
+    if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
+        return cache[url]["data"]
+
+    try:
+        r = requests.get(url, timeout=10)
+
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+
+        cache[url] = {
+            "data": data,
+            "time": time.time()
+        }
+
+        return data
+
+    except:
+        return None
+        
+
+
 # ==================================================
 # AUTH FUNCTIONS
 # ==================================================
@@ -551,6 +584,8 @@ def optimize_portfolio(email):
 
     }
 
+
+
 # ==================================================
 # ROUTES
 # ==================================================
@@ -560,6 +595,7 @@ def root():
     return {"status": "API active", "version": "10.0"}
 
 
+    
 # ==================================================
 # PORTFOLIO
 # ==================================================
@@ -648,7 +684,9 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Portefeuille vide")
 
     return result
-    
+
+
+
 # ==================================================
 # STOCK ANALYSE
 # ==================================================
@@ -743,36 +781,7 @@ def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
         "niveau": "Professionnel"
     }
 
-# ==================================================
-# CACHE
-# ==================================================
 
-cache = {}
-CACHE_DURATION = 900
-
-def get_cached(url):
-
-    if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
-        return cache[url]["data"]
-
-    try:
-        r = requests.get(url, timeout=10)
-
-        if r.status_code != 200:
-            return None
-
-        data = r.json()
-
-        cache[url] = {
-            "data": data,
-            "time": time.time()
-        }
-
-        return data
-
-    except:
-        return None
-        
 # ==================================================
 # DB CHECK
 # ==================================================
