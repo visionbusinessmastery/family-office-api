@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from openai import OpenAI
 import requests
 import os
 import time
@@ -18,6 +19,7 @@ import time
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # FIX Render Postgres
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -561,6 +563,39 @@ def analyse_portfolio(email):
 
     }
 
+@app.post("/stocks/analyse")
+def analyse_stock(data: dict, user: str = Depends(get_current_user)):
+
+    ticker = data.get("ticker")
+
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker manquant")
+
+    try:
+
+        stock = yf.Ticker(ticker)
+        info = stock.info
+
+        if not info:
+            raise HTTPException(status_code=400, detail="Données indisponibles")
+
+        price = info.get("currentPrice") or info.get("regularMarketPrice")
+        market_cap = info.get("marketCap")
+        pe = info.get("trailingPE")
+        sector = info.get("sector")
+
+        return {
+            "ticker": ticker,
+            "price": price,
+            "market_cap": market_cap,
+            "pe_ratio": pe,
+            "sector": sector
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erreur analyse: {str(e)}")
+
+
 
 # ==================================================
 # PORTFOLIO OPTIMIZER
@@ -747,76 +782,40 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
 # ==================================================
 
 @app.post("/ia/brain")
-def brain(request: BrainRequest, current_user: str = Depends(get_current_user)):
-    
-    question = request.question.lower()
+def brain(data: dict, user: str = Depends(get_current_user)):
 
-    theme = "Conseil Patrimonial Global"
+    question = data.get("question")
 
-    if "immobilier" in question:
-        theme = "Investissement Immobilier"
+    if not question:
+        raise HTTPException(status_code=400, detail="Question manquante")
 
-    elif "crypto" in question:
-        theme = "Investissement Crypto"
+    try:
 
-    elif "bourse" in question:
-        theme = "Investissement Boursier"
-
-    user_data = None
-
-    if engine:
-        try:
-            with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT score, profil, patrimoine
-                    FROM users
-                    WHERE email = :email
-                """), {"email": current_user})
-
-                row = result.fetchone()
-
-            if row:
-                user_data = {
-                    "score": row[0],
-                    "profil": row[1],
-                    "patrimoine": row[2]
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Tu es un conseiller financier expert en gestion de patrimoine et family office."
+                },
+                {
+                    "role": "user",
+                    "content": question
                 }
+            ]
+        )
 
-        except:
-            pass
+        answer = response.choices[0].message.content
 
-    if user_data:
+        return {
+            "question": question,
+            "answer": answer
+        }
 
-        score = user_data["score"]
-        patrimoine = user_data["patrimoine"]
+    except Exception as e:
 
-        if score >= 75:
-            niveau = "Family Office Stratégique"
-            risk = "Élevé contrôlé"
-        elif score >= 50:
-            niveau = "Investisseur Équilibré"
-            risk = "Modéré"
-        else:
-            niveau = "Investisseur Prudent"
-            risk = "Faible"
-
-    else:
-
-        niveau = "Profil Non Défini"
-        risk = "Standard"
-        patrimoine = 0
-
-    return {
-        "theme": theme,
-        "niveau_utilisateur": niveau,
-        "analyse": "Optimisation globale du capital selon profil.",
-        "strategie": {
-            "principe": "Diversification intelligente",
-            "gestion_risque": risk
-        },
-        "score_confiance": 85,
-        "niveau": "Professionnel"
-    }
+        raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
+        
 
 
 # ==================================================
