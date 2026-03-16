@@ -11,6 +11,7 @@ from openai import OpenAI
 import requests
 import os
 import time
+import yfinance as yf
 
 # ==================================================
 # CONFIG
@@ -764,6 +765,17 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
 # ==================================================
 
 @app.post("/stocks/analyse")
+def get_stock_price(ticker):
+
+    price = get_price_fmp(ticker)
+
+    if price:
+        return price
+
+    price = get_price_yahoo(ticker)
+
+    return price
+    
 def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
     
     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
