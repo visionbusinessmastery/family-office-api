@@ -13,4 +13,4 @@ python-jose[cryptography]
 python-multipart
 pydantic[email]
 
-
+openai
