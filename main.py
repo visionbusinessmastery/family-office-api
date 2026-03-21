@@ -812,6 +812,21 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
 
     return data
 
+def get_price(ticker):
+    # 1. FMP (fiable)
+    price = get_price_fmp(ticker)
+    if price:
+        return price
+
+    # 2. Alpha Vantage (backup)
+    price = get_price_alpha(ticker)
+    if price:
+        return price
+
+    # 3. Yahoo (last resort)
+    price = get_price_yahoo(ticker)
+    return price
+
 
 # ==================================================
 # AI BRAIN
