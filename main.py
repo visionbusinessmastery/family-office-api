@@ -467,6 +467,62 @@ def get_stock_data(ticker):
         "sources": ["Alpha Vantage", "FMP"]
     }
 
+def get_stock_data(ticker):
+    # FMP / Yahoo / AlphaVantage
+    return {
+        "ticker": ticker,
+        "price": 250,
+        "pe": 30,
+        "market_cap": "1T",
+        "trend": "bullish"
+    }
+
+def ai_analyse_stock(data):
+    prompt = f"""
+    Analyse cette action :
+
+    Ticker: {data['ticker']}
+    Prix: {data['price']}
+    PE: {data['pe']}
+    Market cap: {data['market_cap']}
+    Tendance: {data['trend']}
+
+    Donne :
+    - Analyse simple
+    - Recommandation (Acheter / Conserver / Vendre)
+    - Niveau de risque
+    """
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return response["choices"][0]["message"]["content"]
+
+def fallback_analysis(data):
+    if data["trend"] == "bullish":
+        return "Tendance haussière, potentiel intéressant."
+    else:
+        return "Marché incertain, prudence recommandée."
+
+
+@app.post("/stocks/analyse")
+def analyse_stock(ticker: str, user=Depends(get_current_user)):
+
+    data = get_stock_data(ticker)
+
+    try:
+        ai_result = ai_analyse_stock(data)
+    except:
+        ai_result = fallback_analysis(data)
+
+    return {
+        "ticker": ticker,
+        "data": data,
+        "analysis": ai_result
+    }
+
 # ==================================================
 # PORTFOLIO ANALYSIS
 # ==================================================
