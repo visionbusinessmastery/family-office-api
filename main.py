@@ -828,7 +828,22 @@ def brain(data: dict, user: str = Depends(get_current_user)):
 
         raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
         
+def ask_ai(question):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": question}]
+        )
+        return response.choices[0].message.content
 
+    except Exception as e:
+        return "L'IA est temporairement indisponible. Réessaie plus tard."
+
+def fallback_response(question):
+    if "patrimoine" in question.lower():
+        return "Pour développer ton patrimoine : investir en bourse, immobilier, et diversifier tes revenus."
+    
+    return "Service IA temporairement indisponible."
 
 # ==================================================
 # DB CHECK
