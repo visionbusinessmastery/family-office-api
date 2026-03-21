@@ -766,6 +766,29 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
 # ==================================================
 
 @app.post("/stocks/analyse")
+
+def get_price(ticker):
+    stock = yf.Ticker(ticker)
+    data = stock.history(period="1d")
+
+    print("DEBUG DATA:", data)
+
+    if data.empty:
+        return None
+
+    return data["Close"].iloc[-1]
+
+def get_price(ticker):
+    stock = yf.Ticker(ticker)
+    data = stock.history(period="1d")
+
+    print("DEBUG DATA:", data)
+
+    if data.empty:
+        return None
+
+    return data["Close"].iloc[-1]
+    
 def get_stock_price(ticker):
 
     price = get_price_fmp(ticker)
