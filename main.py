@@ -21,6 +21,7 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI()
 
 # FIX Render Postgres
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -828,6 +829,23 @@ def brain(data: dict, user: str = Depends(get_current_user)):
 
         raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
         
+def ask_ai(user, question):
+    portfolio = get_user_portfolio(user)
+
+    prompt = f"""
+    Tu es un expert en gestion de patrimoine.
+
+    Données utilisateur :
+    {portfolio}
+
+    Question :
+    {question}
+
+    Donne une réponse personnalisée avec recommandations concrètes.
+    """
+
+    return call_openai(prompt)
+    
 def ask_ai(question):
     try:
         response = client.chat.completions.create(
