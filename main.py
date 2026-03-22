@@ -581,7 +581,8 @@ def analyse_portfolio(email):
         quantity = r[2]
         buy_price = r[3]
 
-        market_price = buy_price
+        data = get_stock_data(asset)
+        market_price = data["price"]
 
         if asset_type == "stock":
 
@@ -767,6 +768,8 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
             conn.execute(text("""
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
+                SELECT * FROM portfolios 
+                WHERE user_email=:email AND asset=:asset
             """), {
                 "email": current_user,
                 "asset": request.asset,
@@ -780,7 +783,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+   
 @app.get("/portfolio")
 
 def get_portfolio(current_user: str = Depends(get_current_user)):
@@ -850,8 +853,8 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
 # ==================================================
 
 @app.post("/stocks/analyse")
-
 def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
+    return get_stock_data(request.ticker)
     
     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
         raise HTTPException(status_code=500, detail="API Key manquante")
