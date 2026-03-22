@@ -230,6 +230,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # ==================================================
 
 @app.post("/login")
+
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     if not engine:
@@ -259,6 +260,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         }
 
 @app.get("/dev/token")
+
 def get_test_token():
     token = create_token({"sub": "test@gmail.com"})
     return {
@@ -267,6 +269,7 @@ def get_test_token():
     }
 
 @app.get("/me")
+
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
 
@@ -276,6 +279,7 @@ def me(user: str = Depends(get_current_user)):
 # ======================
 
 @app.post("/register")
+
 def register(user: UserRegister):
 
     if not engine:
@@ -391,6 +395,7 @@ def resolve_ticker(query: str):
 # ==================================================
 
 @app.post("/stocks/analyse")
+
 def analyse_stock(ticker: str, user=Depends(get_current_user)):
 
     resolved_ticker = resolve_ticker(ticker)
@@ -640,6 +645,7 @@ def analyse_portfolio(email):
     }
 
 @app.post("/stocks/analyse")
+
 def analyse_stock(data: dict, user: str = Depends(get_current_user)):
 
     ticker = data.get("ticker")
@@ -733,7 +739,6 @@ def optimize_portfolio(email):
     }
 
 
-
 # ==================================================
 # ROUTES
 # ==================================================
@@ -749,6 +754,7 @@ def root():
 # ==================================================
 
 @app.post("/portfolio/add")
+
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
     # current_user contient l'email de l'utilisateur authentifié
 
@@ -777,6 +783,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
 
 @app.get("/portfolio")
+
 def get_portfolio(current_user: str = Depends(get_current_user)):
 
     if not engine:
@@ -813,7 +820,9 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/portfolio/analyse")
+
 def portfolio_analysis(current_user: str = Depends(get_current_user)):
 
     result = analyse_portfolio(current_user)
@@ -823,7 +832,9 @@ def portfolio_analysis(current_user: str = Depends(get_current_user)):
 
     return result
     
+
 @app.get("/portfolio/optimize")
+
 def portfolio_optimize(current_user: str = Depends(get_current_user)):
 
     result = optimize_portfolio(current_user)
@@ -833,25 +844,25 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
 
     return result
 
-const API_URL = "https://family-office-api-n4sv.onrender.com";
+    const API_URL = "https://family-office-api-n4sv.onrender.com";
 
-export const api = {
-  login: async (email, password) => {
-    const res = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+    export const api = {
+      login: async (email, password) => {
+        const res = await fetch(`${API_URL}/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: `username=${email}&password=${password}`
+        });
+
+        const data = await res.json();
+        localStorage.setItem("token", data.access_token);
+        return data;
       },
-      body: `username=${email}&password=${password}`
-    });
 
-    const data = await res.json();
-    localStorage.setItem("token", data.access_token);
-    return data;
-  },
-
-  request: async (endpoint, options = {}) => {
-    const token = localStorage.getItem("token");
+      request: async (endpoint, options = {}) => {
+        const token = localStorage.getItem("token");
 
     return fetch(`${API_URL}${endpoint}`, {
       ...options,
@@ -898,15 +909,6 @@ def get_price(ticker):
     # 3. Yahoo (last resort)
     price = get_price_yahoo(ticker)
     return price
-
-async function analyseStock(ticker) {
-  const response = await apiRequest(
-    `https://family-office-api-n4sv.onrender.com/stocks/analyse?ticker=${ticker}`,
-    "POST"
-  );
-
-  return response.json();
-}
 
 
 # ==================================================
