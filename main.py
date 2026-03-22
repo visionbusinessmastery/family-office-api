@@ -260,49 +260,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @app.get("/dev/token")
 def get_test_token():
-    token = create_access_token(
-        data={"sub": "2test2@gmail.com"},
-        expires_delta=timedelta(days=7)  # long pour dev
-    )
+    token = create_token({"sub": "test@gmail.com"})
     return {
         "access_token": token,
         "token_type": "bearer"
     }
 
-async function login(email, password) {
-  const response = await fetch("https://family-office-api-n4sv.onrender.com/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: `username=${email}&password=${password}`
-  });
-
-  const data = await response.json();
-
-  // 🔥 stockage token
-  localStorage.setItem("token", data.access_token);
-
-  return data;
-}
-
-async function apiRequest(url, method = "GET", body = null) {
-  const token = localStorage.getItem("token");
-
-  return fetch(url, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: body ? JSON.stringify(body) : null
-  });
-}
-
-if (response.status === 401) {
-  localStorage.removeItem("token");
-  window.location.href = "/login";
-}
+@app.get("/me")
+def me(user: str = Depends(get_current_user)):
+    return {"user": user}
 
 
 # ======================
@@ -906,39 +872,6 @@ export const api = {
 
 @app.post("/stocks/analyse")
 
-def get_price(ticker):
-    stock = yf.Ticker(ticker)
-    data = stock.history(period="1d")
-
-    print("DEBUG DATA:", data)
-
-    if data.empty:
-        return None
-
-    return data["Close"].iloc[-1]
-
-def get_price(ticker):
-    stock = yf.Ticker(ticker)
-    data = stock.history(period="1d")
-
-    print("DEBUG DATA:", data)
-
-    if data.empty:
-        return None
-
-    return data["Close"].iloc[-1]
-    
-def get_stock_price(ticker):
-
-    price = get_price_fmp(ticker)
-
-    if price:
-        return price
-
-    price = get_price_yahoo(ticker)
-
-    return price
-    
 def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
     
     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
