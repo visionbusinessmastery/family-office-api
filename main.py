@@ -22,7 +22,6 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-client = OpenAI()
 
 # FIX Render Postgres
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -844,38 +843,7 @@ def portfolio_optimize(current_user: str = Depends(get_current_user)):
 
     return result
 
-    const API_URL = "https://family-office-api-n4sv.onrender.com";
-
-    export const api = {
-      login: async (email, password) => {
-        const res = await fetch(`${API_URL}/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: `username=${email}&password=${password}`
-        });
-
-        const data = await res.json();
-        localStorage.setItem("token", data.access_token);
-        return data;
-      },
-
-      request: async (endpoint, options = {}) => {
-        const token = localStorage.getItem("token");
-
-    return fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        ...(options.headers || {})
-      }
-    });
-  }
-};
-
-
+   
 
 # ==================================================
 # STOCK ANALYSE
@@ -894,22 +862,6 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=400, detail="Données indisponibles")
 
     return data
-
-def get_price(ticker):
-    # 1. FMP (fiable)
-    price = get_price_fmp(ticker)
-    if price:
-        return price
-
-    # 2. Alpha Vantage (backup)
-    price = get_price_alpha(ticker)
-    if price:
-        return price
-
-    # 3. Yahoo (last resort)
-    price = get_price_yahoo(ticker)
-    return price
-
 
 # ==================================================
 # AI BRAIN
@@ -954,7 +906,7 @@ def ask_ai(user, question):
     portfolio = get_user_portfolio(user)
 
     prompt = f"""
-    Tu es un expert en gestion de patrimoine.
+    Tu es un expert en gestion de patrimoine, en immobilier, en investissement boursier et private equity, en création, développement et reprise d'entreprise physique ou en ligne.
 
     Données utilisateur :
     {portfolio}
