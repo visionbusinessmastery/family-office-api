@@ -66,43 +66,7 @@ class ProfileRequest(BaseModel):
 
 class StockRequest(BaseModel):
     ticker: str
-
-
-class BrainRequest(BaseModel):
-    question: str
-
-
-class PortfolioRequest(BaseModel):
-    asset: str
-    asset_type: str
-    quantity: float
-    buy_price: float
-
-
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
-
-
-# ==================================================
-# MODELS
-# ==================================================
-
-class ProfileRequest(BaseModel):
-    email: Optional[str] = None
-    revenus: float
-    charges: float
-    epargne: float
-    immobilier: float
-    investissements: float
-    crypto: float
-    risque: str
-    experience: str
-
-
-class StockRequest(BaseModel):
-    ticker: str
-
+    
 
 class BrainRequest(BaseModel):
     question: str
@@ -392,25 +356,44 @@ def calculate_projection(patrimoine, allocation, years=10):
 # STOCK ANALYSE
 # ==================================================
 
+# -------- RESOLVE TICKER --------
+def resolve_ticker(query: str):
+
+    query = query.strip().upper()
+
+    # Si déjà ticker
+    if len(query) <= 5 and " " not in query:
+        return query
+
+    # Recherche via FMP
+    url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=1&apikey={FMP_API_KEY}"
+    data = get_cached(url)
+
+    if data and len(data) > 0:
+        return data[0]["symbol"]
+
+    return None
+
+
+# -------- SCORE --------
 def calculate_advanced_score(change_percent, pe_ratio=None):
 
     score = 50
 
     try:
+        if change_percent:
+            change = float(change_percent.replace("%", ""))
 
-        change = float(change_percent.replace("%", ""))
-
-        if change > 3:
-            score += 25
-        elif change > 1:
-            score += 10
-        elif change < -3:
-            score -= 25
-        elif change < -1:
-            score -= 10
+            if change > 3:
+                score += 25
+            elif change > 1:
+                score += 10
+            elif change < -3:
+                score -= 25
+            elif change < -1:
+                score -= 10
 
         if pe_ratio:
-
             pe = float(pe_ratio)
 
             if 0 < pe < 20:
@@ -424,6 +407,7 @@ def calculate_advanced_score(change_percent, pe_ratio=None):
     return max(0, min(score, 100))
 
 
+# -------- DATA --------
 def get_stock_data(ticker):
 
     ticker = ticker.upper()
@@ -431,61 +415,61 @@ def get_stock_data(ticker):
     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
         raise HTTPException(status_code=500, detail="API Keys manquantes")
 
-    # Alpha Vantage
-    alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-    alpha_data = get_cached(alpha_url)
-    alpha_quote = alpha_data.get("Global Quote", {}) if alpha_data else {}
+    try:
+        # Alpha Vantage
+        alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+        alpha_data = get_cached(alpha_url)
+        alpha_quote = alpha_data.get("Global Quote", {}) if alpha_data else {}
 
-    # FMP
-    fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
-    fmp_data = get_cached(fmp_url)
-    fmp_profile = fmp_data[0] if fmp_data and len(fmp_data) > 0 else {}
+        # FMP
+        fmp_url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+        fmp_data = get_cached(fmp_url)
+        fmp_profile = fmp_data[0] if fmp_data and len(fmp_data) > 0 else {}
 
-    price = alpha_quote.get("05. price")
-    change = alpha_quote.get("10. change percent")
+        price = alpha_quote.get("05. price")
+        change = alpha_quote.get("10. change percent")
 
-    if not price:
+        if not price:
+            return None
+
+        momentum_score = calculate_advanced_score(change, fmp_profile.get("pe"))
+
+        if momentum_score >= 70:
+            rating = "BUY"
+        elif momentum_score >= 50:
+            rating = "HOLD"
+        else:
+            rating = "SELL"
+
+        return {
+            "ticker": ticker,
+            "price": float(price),
+            "change_percent": change,
+            "company": fmp_profile.get("companyName"),
+            "sector": fmp_profile.get("sector"),
+            "pe": fmp_profile.get("pe"),
+            "market_cap": fmp_profile.get("mktCap"),
+            "trend": "bullish" if momentum_score >= 50 else "bearish",
+            "momentum_score": momentum_score,
+            "rating": rating,
+            "sources": ["Alpha Vantage", "FMP"]
+        }
+
+    except:
         return None
 
-    momentum_score = calculate_advanced_score(change, fmp_profile.get("pe"))
 
-    if momentum_score >= 70:
-        rating = "BUY"
-    elif momentum_score >= 50:
-        rating = "HOLD"
-    else:
-        rating = "SELL"
-
-    return {
-        "ticker": ticker,
-        "price": float(price),
-        "change_percent": change,
-        "company": fmp_profile.get("companyName"),
-        "sector": fmp_profile.get("sector"),
-        "momentum_score": momentum_score,
-        "rating": rating,
-        "sources": ["Alpha Vantage", "FMP"]
-    }
-
-def get_stock_data(ticker):
-    # FMP / Yahoo / AlphaVantage
-    return {
-        "ticker": ticker,
-        "price": 250,
-        "pe": 30,
-        "market_cap": "1T",
-        "trend": "bullish"
-    }
-
+# -------- IA --------
 def ai_analyse_stock(data):
+
     prompt = f"""
     Analyse cette action :
 
     Ticker: {data['ticker']}
     Prix: {data['price']}
-    PE: {data['pe']}
-    Market cap: {data['market_cap']}
-    Tendance: {data['trend']}
+    PE: {data.get('pe')}
+    Market cap: {data.get('market_cap')}
+    Tendance: {data.get('trend')}
 
     Donne :
     - Analyse simple
@@ -493,35 +477,51 @@ def ai_analyse_stock(data):
     - Niveau de risque
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
 
-    return response["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
 
+    except:
+        return fallback_analysis(data)
+
+
+# -------- FALLBACK --------
 def fallback_analysis(data):
-    if data["trend"] == "bullish":
-        return "Tendance haussière, potentiel intéressant."
+
+    if data.get("trend") == "bullish":
+        return "Tendance haussière, potentiel intéressant (fallback)."
     else:
-        return "Marché incertain, prudence recommandée."
+        return "Marché incertain, prudence recommandée (fallback)."
 
 
+# -------- ENDPOINT --------
 @app.post("/stocks/analyse")
 def analyse_stock(ticker: str, user=Depends(get_current_user)):
 
-    data = get_stock_data(ticker)
+    resolved_ticker = resolve_ticker(ticker)
 
-    try:
-        ai_result = ai_analyse_stock(data)
-    except:
-        ai_result = fallback_analysis(data)
+    if not resolved_ticker:
+        raise HTTPException(status_code=404, detail="Entreprise introuvable")
+
+    data = get_stock_data(resolved_ticker)
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Données indisponibles")
+
+    ai_result = ai_analyse_stock(data)
 
     return {
-        "ticker": ticker,
+        "input": ticker,
+        "ticker": resolved_ticker,
+        "name": data.get("company"),
         "data": data,
         "analysis": ai_result
     }
+        
 
 # ==================================================
 # PORTFOLIO ANALYSIS
