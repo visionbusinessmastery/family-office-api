@@ -394,15 +394,14 @@ def resolve_ticker(query: str):
 # ==================================================
 
 @app.post("/stocks/analyse")
+def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
+    
+    data = get_stock_data(request.ticker)
 
-def analyse_stock(ticker: str, user=Depends(get_current_user)):
+    if not data:
+        raise HTTPException(status_code=400, detail="Données indisponibles")
 
-    resolved_ticker = resolve_ticker(ticker)
-
-    if not resolved_ticker:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
-
-    data = get_stock_data(resolved_ticker)
+    return data
 
     if not data:
         raise HTTPException(status_code=404, detail="Données indisponibles")
@@ -463,8 +462,8 @@ def get_stock_data(ticker):
 
     ticker = ticker.upper()
 
-    if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
-        raise HTTPException(status_code=500, detail="API Keys manquantes")
+     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
+        raise HTTPException(status_code=500, detail="API Key manquante")
 
     # Alpha Vantage
     alpha_url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
@@ -601,7 +600,7 @@ def analyse_portfolio(email):
 
         portfolio.append({
             "asset": asset,
-            "type": asset_type,
+            "asset_type = asset_type.lower(),
             "quantity": quantity,
             "buy_price": buy_price,
             "market_price": market_price,
@@ -644,11 +643,20 @@ def analyse_portfolio(email):
 
     }
 
+    if asset_type in ["stock", "action"]:
+        data = get_stock_data(asset)
+
+        if data:
+            market_price = data["price"]
+        else:
+            market_price = buy_price  # fallback
+        
 @app.post("/stocks/analyse")
 
 def analyse_stock(data: dict, user: str = Depends(get_current_user)):
 
     ticker = data.get("ticker")
+    asset_type = asset_type.lower()
 
     if not ticker:
         raise HTTPException(status_code=400, detail="Ticker manquant")
@@ -668,6 +676,7 @@ def analyse_stock(data: dict, user: str = Depends(get_current_user)):
 
         return {
             "ticker": ticker,
+            "asset_type = asset_type.lower()
             "price": price,
             "market_cap": market_cap,
             "pe_ratio": pe,
@@ -857,7 +866,7 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
     return get_stock_data(request.ticker)
     
     if not ALPHA_VANTAGE_API_KEY or not FMP_API_KEY:
-        raise HTTPException(status_code=500, detail="API Key manquante")
+    return None  # fallback safe
 
     data = get_stock_data(request.ticker)
 
