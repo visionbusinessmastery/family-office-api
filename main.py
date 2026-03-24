@@ -422,7 +422,7 @@ def analyse_portfolio_data(portfolio):
     }
 
 
-@router.post("/portfolio/analyse")
+@app.post("/portfolio/analyse")
 def analyse_portfolio(current_user: str = Depends(get_current_user)):
     user_portfolio = fake_portfolios.get(current_user, [])
 
