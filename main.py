@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException
 from openai import OpenAI
 import requests
 import os
@@ -396,6 +397,69 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
                 } for r in result.fetchall()
             ]
         }
+
+# ==================================================
+# PORTFOLIO ANALYSE
+# ==================================================
+
+def analyse_portfolio_data(portfolio):
+    total_value = 0
+    asset_distribution = {}
+
+    for asset in portfolio:
+        value = asset["quantity"] * asset["buy_price"]
+        total_value += value
+
+        asset_type = asset["type"].lower()
+        asset_distribution[asset_type] = asset_distribution.get(asset_type, 0) + value
+
+    diversification = len(asset_distribution)
+
+    return {
+        "total_value": total_value,
+        "diversification_score": diversification,
+        "distribution": asset_distribution
+    }
+
+
+@router.post("/portfolio/analyse")
+def analyse_portfolio(current_user: str = Depends(get_current_user)):
+    user_portfolio = fake_portfolios.get(current_user, [])
+
+    if not user_portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio vide")
+
+    analysis = analyse_portfolio_data(user_portfolio)
+
+    # 🧠 Prompt IA
+    prompt = f"""
+    Analyse ce portefeuille :
+
+    Valeur totale : {analysis['total_value']}
+    Diversification : {analysis['diversification_score']}
+    Répartition : {analysis['distribution']}
+
+    Donne :
+    - Forces
+    - Risques
+    - Recommandations concrètes
+    """
+
+    try:
+        ai_response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        advice = ai_response["choices"][0]["message"]["content"]
+
+    except Exception:
+        advice = "Analyse IA indisponible pour le moment"
+
+    return {
+        "analysis": analysis,
+        "ai_advice": advice
+    }
 
 # ==================================================
 # IA
