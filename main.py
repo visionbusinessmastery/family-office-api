@@ -362,19 +362,37 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
 
-    with engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
-            VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
-        """), {
-            "email": current_user,
-            "asset": request.asset,
-            "asset_type": request.asset_type,
-            "quantity": request.quantity,
-            "buy_price": request.buy_price
-        })
+    asset = request.asset.upper()
+    asset_type = request.asset_type.upper()
 
-    return {"status": "actif ajouté"}
+    with engine.begin() as conn:
+
+        try:
+            # =========================
+            # UPSERT (ANTI-DOUBLON SQL)
+            # =========================
+            conn.execute(text("""
+                INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
+                VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
+                ON CONFLICT (user_email, asset)
+                DO UPDATE SET
+                    quantity = portfolios.quantity + EXCLUDED.quantity,
+                    buy_price = (
+                        (portfolios.quantity * portfolios.buy_price) +
+                        (EXCLUDED.quantity * EXCLUDED.buy_price)
+                    ) / (portfolios.quantity + EXCLUDED.quantity)
+            """), {
+                "email": current_user,
+                "asset": asset,
+                "asset_type": asset_type,
+                "quantity": request.quantity,
+                "buy_price": request.buy_price
+            })
+
+            return {"status": "actif ajouté ou mis à jour"}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/portfolio")
