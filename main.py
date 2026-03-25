@@ -131,7 +131,8 @@ if DATABASE_URL:
                 asset_type TEXT,
                 quantity FLOAT,
                 buy_price FLOAT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_email, asset)
             )
             """))
 
@@ -409,9 +410,6 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/portfolio/add")
-def add_asset(data: Asset, db: Session = Depends(get_db), user: str = Depends(get_current_user)):
     try:
         asset = data.asset.upper()
 
