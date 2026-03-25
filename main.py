@@ -6,7 +6,6 @@ from typing import Optional
 from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from openai import OpenAI
 import requests
