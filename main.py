@@ -402,7 +402,37 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
 # PORTFOLIO ANALYSE
 # ==================================================
 
-def analyse_portfolio_data(portfolio):
+@app.post("/portfolio/analyse")
+def analyse_portfolio(current_user: str = Depends(get_current_user)):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    # =========================
+    # 1. GET USER PORTFOLIO
+    # =========================
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolios
+            WHERE user_email=:email
+        """), {"email": current_user})
+
+        portfolio = [
+            {
+                "asset": r[0],
+                "type": r[1],
+                "quantity": r[2],
+                "buy_price": r[3]
+            } for r in result.fetchall()
+        ]
+
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio vide")
+
+    # =========================
+    # 2. CALCUL ANALYSE
+    # =========================
     total_value = 0
     asset_distribution = {}
 
@@ -415,29 +445,21 @@ def analyse_portfolio_data(portfolio):
 
     diversification = len(asset_distribution)
 
-    return {
+    analysis = {
         "total_value": total_value,
         "diversification_score": diversification,
         "distribution": asset_distribution
     }
 
-
-@app.post("/portfolio/analyse")
-def analyse_portfolio(current_user: str = Depends(get_current_user)):
-    user_portfolio = fake_portfolios.get(current_user, [])
-
-    if not user_portfolio:
-        raise HTTPException(status_code=404, detail="Portfolio vide")
-
-    analysis = analyse_portfolio_data(user_portfolio)
-
-    # 🧠 Prompt IA
+    # =========================
+    # 3. IA ADVICE (CORRIGÉ)
+    # =========================
     prompt = f"""
     Analyse ce portefeuille :
 
-    Valeur totale : {analysis['total_value']}
-    Diversification : {analysis['diversification_score']}
-    Répartition : {analysis['distribution']}
+    Valeur totale : {total_value}
+    Diversification : {diversification}
+    Répartition : {asset_distribution}
 
     Donne :
     - Forces
@@ -446,21 +468,23 @@ def analyse_portfolio(current_user: str = Depends(get_current_user)):
     """
 
     try:
-        ai_response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
 
-        advice = ai_response["choices"][0]["message"]["content"]
+        advice = response.choices[0].message.content
 
-    except Exception:
-        advice = "Analyse IA indisponible pour le moment"
+    except Exception as e:
+        advice = f"IA indisponible: {str(e)}"
 
+    # =========================
+    # 4. RETURN
+    # =========================
     return {
         "analysis": analysis,
         "ai_advice": advice
     }
-
 # ==================================================
 # IA
 # ==================================================
