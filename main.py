@@ -13,12 +13,7 @@ import requests
 import os
 import time
 import yfinance as yf
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.database import get_db
-from auth import get_current_user
-from pydantic import BaseModel
-from sqlalchemy import text
+
 
 # ==================================================
 # CONFIG
@@ -28,8 +23,6 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY")
-
-router = APIRouter()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
