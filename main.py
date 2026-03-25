@@ -13,6 +13,12 @@ import os
 import time
 import yfinance as yf
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from database import get_db
+from auth import get_current_user
+from pydantic import BaseModel
+from sqlalchemy import text
 
 # ==================================================
 # CONFIG
@@ -22,6 +28,8 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY")
+
+router = APIRouter()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -364,6 +372,45 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
 # ==================================================
 
 @app.post("/portfolio/add")
+def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
+
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database non connectée")
+
+    asset = request.asset.upper()
+    asset_type = request.asset_type.upper()
+
+    with engine.begin() as conn:
+
+        try:
+            # =========================
+            # UPSERT (ANTI-DOUBLON SQL)
+            # =========================
+            conn.execute(text("""
+                INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
+                VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
+                ON CONFLICT (user_email, asset)
+                DO UPDATE SET
+                    quantity = portfolios.quantity + EXCLUDED.quantity,
+                    buy_price = (
+                        (portfolios.quantity * portfolios.buy_price) +
+                        (EXCLUDED.quantity * EXCLUDED.buy_price)
+                    ) / (portfolios.quantity + EXCLUDED.quantity)
+            """), {
+                "email": current_user,
+                "asset": asset,
+                "asset_type": asset_type,
+                "quantity": request.quantity,
+                "buy_price": request.buy_price
+            })
+
+            return {"status": "actif ajouté ou mis à jour"}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/portfolio/add")
 def add_asset(data: Asset, db: Session = Depends(get_db), user: str = Depends(get_current_user)):
     try:
         asset = data.asset.upper()
