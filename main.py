@@ -273,12 +273,12 @@ COMPANY_TO_TICKER = {
 def normalize_ticker(input_value: str):
     value = input_value.lower().strip()
 
-    # si déjà ticker
-    if len(value) <= 5:
-        return value.upper()
+    # 1. vérifier si c’est un nom connu
+    if value in COMPANY_TO_TICKER:
+        return COMPANY_TO_TICKER[value]
 
-    # sinon mapping nom → ticker
-    return COMPANY_TO_TICKER.get(value, value.upper())
+    # 2. sinon considérer que c’est un ticker
+    return value.upper()
 
 
 def calculate_advanced_score(change_percent, pe_ratio=None):
