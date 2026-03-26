@@ -468,16 +468,57 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
             WHERE user_email=:email
         """), {"email": current_user})
 
-        return {
-            "portfolio": [
-                {
-                    "asset": r[0],
-                    "type": r[1],
-                    "quantity": r[2],
-                    "buy_price": r[3]
-                } for r in result.fetchall()
-            ]
+        portfolio = [
+            {
+                "asset": r[0],
+                "type": r[1],
+                "quantity": float(r[2]),
+                "buy_price": float(r[3])
+            } for r in result.fetchall()
+        ]
+
+    enriched_portfolio = []
+    total_value = 0
+    total_cost = 0
+
+    for asset in portfolio:
+
+        stock_data = get_stock_data(asset["asset"])
+
+        current_price = stock_data.get("price") if stock_data else None
+
+        if current_price:
+            value = asset["quantity"] * current_price
+            cost = asset["quantity"] * asset["buy_price"]
+            performance = ((current_price - asset["buy_price"]) / asset["buy_price"]) * 100
+        else:
+            value = 0
+            cost = asset["quantity"] * asset["buy_price"]
+            performance = 0
+
+        total_value += value
+        total_cost += cost
+
+        enriched_portfolio.append({
+            "asset": asset["asset"],
+            "type": asset["type"],
+            "quantity": asset["quantity"],
+            "buy_price": asset["buy_price"],
+            "current_price": current_price,
+            "value": round(value, 2),
+            "performance": round(performance, 2)
+        })
+
+    total_performance = ((total_value - total_cost) / total_cost * 100) if total_cost > 0 else 0
+
+    return {
+        "portfolio": enriched_portfolio,
+        "summary": {
+            "total_value": round(total_value, 2),
+            "total_cost": round(total_cost, 2),
+            "total_performance": round(total_performance, 2)
         }
+    }
 
 # ==================================================
 # PORTFOLIO ANALYSE
@@ -594,53 +635,6 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 @app.get("/")
 def root():
     return {"status": "API active", "version": "10.1"}
-
-# ==================================================
-# FIX DATA BASE A ENLEVER PAR LA SUITE
-# ==================================================
-
-@app.get("/fix-db")
-def fix_db():
-    if not engine:
-        return {"error": "no db"}
-
-    with engine.begin() as conn:
-
-        # 🔍 voir les doublons
-        duplicates = conn.execute(text("""
-        SELECT user_email, asset, COUNT(*)
-        FROM portfolios
-        GROUP BY user_email, asset
-        HAVING COUNT(*) > 1;
-        """)).fetchall()
-
-        print("DOUBLONS:", duplicates)
-
-        # 🧨 supprimer TOUTES les lignes en double (on garde 1 seule)
-        conn.execute(text("""
-        DELETE FROM portfolios
-        WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM portfolios
-            GROUP BY user_email, asset
-        );
-        """))
-
-        # 🔥 supprimer ancienne contrainte si elle existe
-        conn.execute(text("""
-        ALTER TABLE portfolios
-        DROP CONSTRAINT IF EXISTS unique_user_asset;
-        """))
-
-        # 🧱 recréer contrainte propre
-        conn.execute(text("""
-        ALTER TABLE portfolios
-        ADD CONSTRAINT unique_user_asset UNIQUE (user_email, asset);
-        """))
-
-    return {"status": "database fixed clean"}
-
-
 
 
 
