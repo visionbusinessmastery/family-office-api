@@ -606,24 +606,39 @@ def fix_db():
 
     with engine.begin() as conn:
 
-        # 🔥 supprimer doublons
+        # 🔍 voir les doublons
+        duplicates = conn.execute(text("""
+        SELECT user_email, asset, COUNT(*)
+        FROM portfolios
+        GROUP BY user_email, asset
+        HAVING COUNT(*) > 1;
+        """)).fetchall()
+
+        print("DOUBLONS:", duplicates)
+
+        # 🧨 supprimer TOUTES les lignes en double (on garde 1 seule)
         conn.execute(text("""
-        DELETE FROM portfolios a
-        USING portfolios b
-        WHERE a.ctid < b.ctid
-        AND a.user_email = b.user_email
-        AND a.asset = b.asset;
+        DELETE FROM portfolios
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM portfolios
+            GROUP BY user_email, asset
+        );
         """))
 
-        # 🔥 ajouter contrainte UNIQUE
+        # 🔥 supprimer ancienne contrainte si elle existe
+        conn.execute(text("""
+        ALTER TABLE portfolios
+        DROP CONSTRAINT IF EXISTS unique_user_asset;
+        """))
+
+        # 🧱 recréer contrainte propre
         conn.execute(text("""
         ALTER TABLE portfolios
         ADD CONSTRAINT unique_user_asset UNIQUE (user_email, asset);
         """))
 
-    return {"status": "database fixed"}
-
-
+    return {"status": "database fixed clean"}
 
 
 
