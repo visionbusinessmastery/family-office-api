@@ -256,6 +256,31 @@ def me(user: str = Depends(get_current_user)):
 # STOCK DATA
 # ==================================================
 
+COMPANY_TO_TICKER = {
+    "nvidia": "NVDA",
+    "tesla": "TSLA",
+    "apple": "AAPL",
+    "amazon": "AMZN",
+    "microsoft": "MSFT",
+    "alphabet": "GOOGL",
+    "google": "GOOGL",
+    "meta": "META",
+    "facebook": "META",
+    "netflix": "NFLX",
+    "phunware": "PHUN",
+}
+
+def normalize_ticker(input_value: str):
+    value = input_value.lower().strip()
+
+    # si déjà ticker
+    if len(value) <= 5:
+        return value.upper()
+
+    # sinon mapping nom → ticker
+    return COMPANY_TO_TICKER.get(value, value.upper())
+
+
 def calculate_advanced_score(change_percent, pe_ratio=None):
     score = 50
 
@@ -287,7 +312,7 @@ def calculate_advanced_score(change_percent, pe_ratio=None):
 
 def get_stock_data(ticker: str):
 
-    ticker = ticker.upper()
+    ticker = normalize_ticker(ticker)
 
     # =========================
     # 1. TRY ALPHA VANTAGE
@@ -348,8 +373,12 @@ def get_stock_data(ticker: str):
         price = info.get("currentPrice") or info.get("regularMarketPrice")
 
         if not price:
-            return None
-
+            return {
+                "ticker": ticker,
+                "price": None,
+                "error": "price unavailable"
+            }
+  
         return {
             "ticker": ticker,
             "price": price,
@@ -387,7 +416,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
     if not engine:
         raise HTTPException(status_code=500, detail="Database non connectée")
 
-    asset = request.asset.upper()
+    asset = normalize_ticker(request.asset)
     asset_type = request.asset_type.upper()
 
     with engine.begin() as conn:
