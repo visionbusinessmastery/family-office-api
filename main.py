@@ -595,8 +595,33 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 def root():
     return {"status": "API active", "version": "10.1"}
 
+# ==================================================
+# FIX DATA BASE A ENLEVER PAR LA SUITE
+# ==================================================
 
+@app.get("/fix-db")
+def fix_db():
+    if not engine:
+        return {"error": "no db"}
 
+    with engine.begin() as conn:
+
+        # 🔥 supprimer doublons
+        conn.execute(text("""
+        DELETE FROM portfolios a
+        USING portfolios b
+        WHERE a.ctid < b.ctid
+        AND a.user_email = b.user_email
+        AND a.asset = b.asset;
+        """))
+
+        # 🔥 ajouter contrainte UNIQUE
+        conn.execute(text("""
+        ALTER TABLE portfolios
+        ADD CONSTRAINT unique_user_asset UNIQUE (user_email, asset);
+        """))
+
+    return {"status": "database fixed"}
 
 
 
