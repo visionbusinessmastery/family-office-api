@@ -136,6 +136,15 @@ if DATABASE_URL:
             )
             """))
 
+       # 🔥 Nettoyage des doublons au démarrage
+            conn.execute(text("""
+            DELETE FROM portfolios a
+                USING portfolios b
+                WHERE a.ctid < b.ctid
+                AND a.user_email = b.user_email
+                AND a.asset = b.asset;
+            """))
+    
     except Exception as e:
         print("DB INIT ERROR:", e)
 
