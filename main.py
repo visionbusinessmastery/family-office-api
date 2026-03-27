@@ -418,8 +418,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
     asset = normalize_ticker(request.asset)
     asset_type = request.asset_type.upper()
-    ticker = normalize_ticker(asset["asset"])
-    data = get_stock_data(ticker)
+    
 
     with engine.begin() as conn:
 
@@ -499,66 +498,53 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
             WHERE user_email=:email
         """), {"email": current_user})
 
-        portfolio = [
-            {
-                asset = r[0]
-                quantity = r[2]
-                buy_price = r[3]
+        rows = result.fetchall()
 
-                ticker = normalize_ticker(asset)
-                data = get_stock_data(ticker)
-
-                # 🔥 LA PARTIE QUE TU DEMANDES → ICI
-                if not data or not data.get("price"):
-                    current_price = None
-                    value = 0
-                    performance = 0
-                    status = "invalid"
-                else:
-                    current_price = data["price"]
-                    value = quantity * current_price
-                    performance = ((current_price - buy_price) / buy_price) * 100
-                    status = "ok"
-            } for r in result.fetchall()
-        ]
-
-    enriched_portfolio = []
+    portfolio = []
     total_value = 0
     total_cost = 0
 
-    for asset in portfolio:
+    for r in rows:
+        asset = r[0]
+        asset_type = r[1]
+        quantity = r[2]
+        buy_price = r[3]
 
-        stock_data = get_stock_data(asset["asset"])
+        ticker = normalize_ticker(asset)
+        data = get_stock_data(ticker)
 
-        current_price = stock_data.get("price") if stock_data else None
-
-        if current_price:
-            value = asset["quantity"] * current_price
-            cost = asset["quantity"] * asset["buy_price"]
-            performance = ((current_price - asset["buy_price"]) / asset["buy_price"]) * 100
-        else:
+        # 🔥 TON BLOC (BON ENDROIT)
+        if not data or not data.get("price"):
+            current_price = None
             value = 0
-            cost = asset["quantity"] * asset["buy_price"]
             performance = 0
+            status = "invalid"
+        else:
+            current_price = data["price"]
+            value = quantity * current_price
+            performance = ((current_price - buy_price) / buy_price) * 100
+            status = "ok"
+
+        cost = quantity * buy_price
 
         total_value += value
         total_cost += cost
 
-        enriched_portfolio.append({
+        portfolio.append({
             "asset": asset,
-            "type": r[1],
+            "type": asset_type,
             "quantity": quantity,
             "buy_price": buy_price,
             "current_price": current_price,
-            "value": value,
+            "value": round(value, 2),
             "performance": round(performance, 2),
-            "status": status   # 👈 IMPORTANT
+            "status": status
         })
 
     total_performance = ((total_value - total_cost) / total_cost * 100) if total_cost > 0 else 0
 
     return {
-        "portfolio": enriched_portfolio,
+        "portfolio": portfolio,
         "summary": {
             "total_value": round(total_value, 2),
             "total_cost": round(total_cost, 2),
