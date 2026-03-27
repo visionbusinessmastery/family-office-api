@@ -409,8 +409,7 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=400, detail="Données indisponibles")
 
     return data
-        print("TICKER:", ticker)
-        print("DATA:", data)
+        
 
 # ==================================================
 # PORTFOLIO
