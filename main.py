@@ -418,6 +418,8 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
     asset = normalize_ticker(request.asset)
     asset_type = request.asset_type.upper()
+    ticker = normalize_ticker(asset["asset"])
+    data = get_stock_data(ticker)
 
     with engine.begin() as conn:
 
@@ -499,10 +501,24 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
 
         portfolio = [
             {
-                "asset": r[0],
-                "type": r[1],
-                "quantity": float(r[2]),
-                "buy_price": float(r[3])
+                asset = r[0]
+                quantity = r[2]
+                buy_price = r[3]
+
+                ticker = normalize_ticker(asset)
+                data = get_stock_data(ticker)
+
+                # 🔥 LA PARTIE QUE TU DEMANDES → ICI
+                if not data or not data.get("price"):
+                    current_price = None
+                    value = 0
+                    performance = 0
+                    status = "invalid"
+                else:
+                    current_price = data["price"]
+                    value = quantity * current_price
+                    performance = ((current_price - buy_price) / buy_price) * 100
+                    status = "ok"
             } for r in result.fetchall()
         ]
 
@@ -529,13 +545,14 @@ def get_portfolio(current_user: str = Depends(get_current_user)):
         total_cost += cost
 
         enriched_portfolio.append({
-            "asset": asset["asset"],
-            "type": asset["type"],
-            "quantity": asset["quantity"],
-            "buy_price": asset["buy_price"],
+            "asset": asset,
+            "type": r[1],
+            "quantity": quantity,
+            "buy_price": buy_price,
             "current_price": current_price,
-            "value": round(value, 2),
-            "performance": round(performance, 2)
+            "value": value,
+            "performance": round(performance, 2),
+            "status": status   # 👈 IMPORTANT
         })
 
     total_performance = ((total_value - total_cost) / total_cost * 100) if total_cost > 0 else 0
