@@ -389,8 +389,12 @@ def get_stock_data(ticker: str):
         }
 
     except Exception as e:
-        print("Stock error:", e)
-        return None
+    print("Stock error:", e)
+    return {
+        "ticker": ticker,
+        "price": None,
+        "error": str(e)
+    }
 
 # ==================================================
 # STOCK ROUTE
@@ -405,6 +409,8 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=400, detail="Données indisponibles")
 
     return data
+        print("TICKER:", ticker)
+        print("DATA:", data)
 
 # ==================================================
 # PORTFOLIO
@@ -418,6 +424,8 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
     asset = normalize_ticker(request.asset)
     asset_type = request.asset_type.upper()
+
+    data = get_stock_data(asset)  # ✅ DIRECT
     
 
     with engine.begin() as conn:
