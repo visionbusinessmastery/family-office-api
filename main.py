@@ -366,34 +366,34 @@ def get_stock_data(ticker: str):
     # 3. FINAL FALLBACK YFINANCE
     # =========================
     try:
-    stock = yf.Ticker(ticker)
-    info = stock.info
+       stock = yf.Ticker(ticker)
+       info = stock.info
 
-    price = info.get("currentPrice") or info.get("regularMarketPrice")
+       price = info.get("currentPrice") or info.get("regularMarketPrice")
 
-    if not price:
+       if not price:
+           return {
+               "ticker": ticker,
+               "price": None,
+               "error": "price unavailable"
+           }
+
+       return {
+           "ticker": ticker,
+           "price": price,
+           "market_cap": info.get("marketCap"),
+           "pe": info.get("trailingPE"),
+           "sector": info.get("sector"),
+           "source": "yfinance"
+       }
+
+    except Exception as e:
+        print("Stock error:", e)
         return {
             "ticker": ticker,
             "price": None,
-            "error": "price unavailable"
-        }
-
-    return {
-        "ticker": ticker,
-        "price": price,
-        "market_cap": info.get("marketCap"),
-        "pe": info.get("trailingPE"),
-        "sector": info.get("sector"),
-        "source": "yfinance"
-    }
-
-except Exception as e:
-    print("Stock error:", e)
-    return {
-        "ticker": ticker,
-        "price": None,
-        "error": str(e)
-    }
+            "error": str(e)
+       }
 
 # ==================================================
 # STOCK ROUTE
