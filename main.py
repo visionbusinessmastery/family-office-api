@@ -394,7 +394,7 @@ def get_stock_data(ticker: str):
             "ticker": ticker,
             "price": None,
             "error": str(e)
-        }
+}
 
 # ==================================================
 # STOCK ROUTE
