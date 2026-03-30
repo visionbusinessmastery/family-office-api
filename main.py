@@ -388,13 +388,13 @@ def get_stock_data(ticker: str):
             "source": "yfinance"
         }
 
-        except Exception as e:
-        print("Stock error:", e)
-        return {
-            "ticker": ticker,
-            "price": None,
-            "error": str(e)
-        }
+    except Exception as e:
+    print("Stock error:", e)
+    return {
+        "ticker": ticker,
+        "price": None,
+        "error": str(e)
+    }
 
 # ==================================================
 # STOCK ROUTE
