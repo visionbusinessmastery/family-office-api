@@ -722,7 +722,13 @@ Tu évites :
 - les réponses vagues
 - les disclaimers inutiles
 """
-
+    # ✅ CONTEXTE UTILISATEUR (déclaré ici)
+    user_context = f"""
+Profil utilisateur :
+- Email : {user}
+- Objectif : liberté financière
+"""
+    
     user_prompt = f"""
 Question :
 {data.question}
@@ -743,14 +749,10 @@ Objectif :
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             temperature=0.7,  # 🔥 important pour qualité
-            user_context = f"""
-            Profil utilisateur :
-            - Email : {user}
-            - Objectif : liberté financière
-            """
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_context + user_prompt}
+                {"role": "user", "content": user_context},
+                {"role": "user", "content": user_prompt}
             ]
         )
 
