@@ -685,8 +685,8 @@ def analyse_portfolio(current_user: str = Depends(get_current_user)):
 @app.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
-    prompt = f"""
-Tu es un conseiller en gestion de patrimoine, tu penses comme un investisseur expérimenté et tu es un expert en :
+    system_prompt = """
+Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
 - family office
 - marchés financiers
@@ -697,36 +697,59 @@ Tu es un conseiller en gestion de patrimoine, tu penses comme un investisseur ex
 - création de richesse
 - liberté financière
 
-Ta mission :
-Aider toute personne (débutant à avancé) à construire un patrimoine solide et atteindre la liberté financière.
+Tu raisonnes comme :
+- un investisseur expérimenté
+- un entrepreneur pragmatique
+- un stratège orienté résultats
 
+Tu raisonnes comme :
+- un investisseur expérimenté
+- un entrepreneur pragmatique
+- un stratège orienté résultats
+
+Tu donnes UNIQUEMENT :
+- des réponses concrètes
+- des stratégies concrètes et applicables immédiatement
+- des conseils réalistes et réalisables
+- des réponses directes (courtes et claires)
+- des explications simples (logiques + pédagogies)
+- des plans d’action concrets (étapes numérotées)
+- des exemples réels ou réalistes
+
+Tu évites :
+- le blabla
+- les généralités
+- les réponses vagues
+- les disclaimers inutiles
+"""
+
+    user_prompt = f"""
 Question :
 {data.question}
 
-Exigences :
-- Stratégies concrètes
-- Recommendations réalistes et réalisables
-- Plans d'actions applicables immédiatement
-- Réponse concrète et actionnable
-- Pas de blabla inutile
-- Pas de réponses vagues
-- Pas de généralités
-- Pas de disclaimers inutiles
-- Utilise des exemples réels ou réalistes
-- Donne une stratégie applicable immédiatement
+Donne une réponse structurée STRICTEMENT comme ceci :
 
-Structure OBLIGATOIRE :
-1. Réponse directe (court et clair)
-2. Explication simple (logique + pédagogie)
-3. Plan d’action concret (étapes numérotées)
+1. Réponse directe (max 3 phrases)
+2. Explication simple (logique + pédagogique)
+3. Plan d’action (étapes numérotées concrètes)
+4. Exemple réel ou concret
+
+Objectif :
+→ que l’utilisateur puisse agir immédiatement
+→ aider l’utilisateur à construire un patrimoine solide et atteindre la liberté financière.
 """
-
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
+            temperature=0.7,  # 🔥 important pour qualité
+            user_context = f"""
+            Profil utilisateur :
+            - Email : {user}
+            - Objectif : liberté financière
+            """
             messages=[
-                {"role": "system", "content": "Tu es un conseiller financier expert en family office et création de richesse."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_context + user_prompt}
             ]
         )
 
@@ -737,6 +760,7 @@ Structure OBLIGATOIRE :
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # ==================================================
 # ROOT
