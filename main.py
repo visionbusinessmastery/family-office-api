@@ -738,6 +738,7 @@ Objectif :
 → que l’utilisateur puisse agir immédiatement
 → aider l’utilisateur à construire un patrimoine solide et atteindre la liberté financière.
 """
+    
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
