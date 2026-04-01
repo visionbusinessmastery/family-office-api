@@ -843,16 +843,16 @@ Tu évites :
 """
     # ✅ CONTEXTE UTILISATEUR (déclaré ici)
     user_context = f"""
-PROFIL UTILISATEUR :
-{profile_data}
+    PROFIL UTILISATEUR :
+    {profile_data}
 
-PORTEFEUILLE :
-- Valeur totale : {total_value}
-- Diversification : {diversification}
-- Répartition : {asset_distribution}
+    PORTEFEUILLE :
+    - Valeur totale : {total_value}
+    - Diversification : {diversification}
+    - Répartition : {asset_distribution}
 
-OBJECTIF :
-Optimiser patrimoine + réduire risque + accélérer liberté financière
+    OBJECTIF :
+    Optimiser patrimoine + réduire risque + accélérer liberté financière
     
     user_prompt = f"""
 Question :
