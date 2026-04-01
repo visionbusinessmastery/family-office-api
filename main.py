@@ -116,6 +116,26 @@ class ProfileRequest(BaseModel):
 
     risk_profile: str
 
+class UserProfileRequest(BaseModel):
+    genre: Optional[str] = None
+    age: Optional[int] = None
+
+    situation_pro: Optional[str] = None
+    revenus_mensuels: Optional[float] = 0
+    revenus_annuels: Optional[float] = 0
+
+    situation_familiale: Optional[str] = None
+    enfants: Optional[bool] = False
+    nb_enfants: Optional[int] = 0
+
+    logement: Optional[str] = None
+    valeur_bien: Optional[float] = 0
+    prix_achat: Optional[float] = 0
+
+    dettes: Optional[dict] = {}
+    epargne: Optional[dict] = {}
+    investissements: Optional[dict] = {}
+
 # ==================================================
 # DATABASE
 # ==================================================
@@ -162,28 +182,25 @@ if DATABASE_URL:
                 id SERIAL PRIMARY KEY,
                 user_email TEXT UNIQUE,
 
-                gender TEXT,
+                genre TEXT,
                 age INTEGER,
 
-                employment_status TEXT,
-                monthly_income FLOAT,
+                situation_pro TEXT,
+                revenus_mensuels FLOAT,
+                revenus_annuels FLOAT,
 
-                marital_status TEXT,
-                children_count INTEGER,
+                situation_familiale TEXT,
+                enfants BOOLEAN,
+                nb_enfants INTEGER,
 
-                housing_status TEXT,
-                real_estate_value FLOAT,
-                real_estate_purchase_price FLOAT,
+                logement TEXT,
+                valeur_bien FLOAT,
+                prix_achat FLOAT,
 
-                total_debt FLOAT,
+                dettes JSON,
+                epargne JSON,
+                investissements JSON,
 
-                savings FLOAT,
-                investments FLOAT,
-                crypto FLOAT,
-
-                risk_profile TEXT,
-
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """))
@@ -304,61 +321,63 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
 
-@app.post("/profile")
-def save_profile(data: ProfileRequest, user: str = Depends(get_current_user)):
+@app.post("/profile/save")
+def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO user_profiles (
-                user_email, gender, age, employment_status, monthly_income,
-                marital_status, children_count, housing_status,
-                real_estate_value, real_estate_purchase_price,
-                total_debt, savings, investments, crypto, risk_profile
-            )
-            VALUES (
-                :email, :gender, :age, :employment_status, :monthly_income,
-                :marital_status, :children_count, :housing_status,
-                :real_estate_value, :real_estate_purchase_price,
-                :total_debt, :savings, :investments, :crypto, :risk_profile
-            )
-            ON CONFLICT (user_email)
-            DO UPDATE SET
-                gender=:gender,
-                age=:age,
-                employment_status=:employment_status,
-                monthly_income=:monthly_income,
-                marital_status=:marital_status,
-                children_count=:children_count,
-                housing_status=:housing_status,
-                real_estate_value=:real_estate_value,
-                real_estate_purchase_price=:real_estate_purchase_price,
-                total_debt=:total_debt,
-                savings=:savings,
-                investments=:investments,
-                crypto=:crypto,
-                risk_profile=:risk_profile,
-                updated_at = CURRENT_TIMESTAMP
+        INSERT INTO user_profiles (
+            user_email, genre, age, situation_pro,
+            revenus_mensuels, revenus_annuels,
+            situation_familiale, enfants, nb_enfants,
+            logement, valeur_bien, prix_achat,
+            dettes, epargne, investissements
+        )
+        VALUES (
+            :email, :genre, :age, :situation_pro,
+            :revenus_mensuels, :revenus_annuels,
+            :situation_familiale, :enfants, :nb_enfants,
+            :logement, :valeur_bien, :prix_achat,
+            :dettes, :epargne, :investissements
+        )
+        ON CONFLICT (user_email)
+        DO UPDATE SET
+            genre = EXCLUDED.genre,
+            age = EXCLUDED.age,
+            situation_pro = EXCLUDED.situation_pro,
+            revenus_mensuels = EXCLUDED.revenus_mensuels,
+            revenus_annuels = EXCLUDED.revenus_annuels,
+            situation_familiale = EXCLUDED.situation_familiale,
+            enfants = EXCLUDED.enfants,
+            nb_enfants = EXCLUDED.nb_enfants,
+            logement = EXCLUDED.logement,
+            valeur_bien = EXCLUDED.valeur_bien,
+            prix_achat = EXCLUDED.prix_achat,
+            dettes = EXCLUDED.dettes,
+            epargne = EXCLUDED.epargne,
+            investissements = EXCLUDED.investissements,
+            updated_at = CURRENT_TIMESTAMP
         """), {
             "email": user,
             **data.dict()
         })
 
     return {"status": "profil sauvegardé"}
-
+    
 @app.get("/profile")
 def get_profile(user: str = Depends(get_current_user)):
 
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT * FROM user_profiles WHERE user_email=:email
+        SELECT * FROM user_profiles WHERE user_email=:email
         """), {"email": user})
 
-        row = result.fetchone()
+        profile = result.fetchone()
 
-    if not row:
+    if not profile:
         return {"profile": None}
 
-    return {"profile": dict(row._mapping)}   
+    return dict(profile._mapping)   
 
 
 # ==================================================
@@ -807,6 +826,27 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
     diversification = 0
     asset_distribution = {}
 
+    # GET PORTFOLIO DATA
+    portfolio_data = []
+    total_value = 0
+
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolios
+            WHERE user_email=:email
+        """), {"email": user})
+
+        for r in result.fetchall():
+            value = r[2] * r[3]
+            total_value += value
+
+        portfolio_data.append({
+            "asset": r[0],
+            "type": r[1],
+            "value": value
+        })
+        
     system_prompt = """
 Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
@@ -842,6 +882,8 @@ Tu evites :
     user_context = f"""
 PROFIL UTILISATEUR :
 {profile_data}
+PORTEFEUILLE DETAILLE :
+{portfolio_data}
 
 PORTEFEUILLE :
 - Valeur totale : {total_value}
