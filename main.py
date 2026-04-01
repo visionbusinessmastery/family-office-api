@@ -802,9 +802,9 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
     profile = result.fetchone()
 
-profile_data = dict(profile._mapping) if profile else {}
+    profile_data = dict(profile._mapping) if profile else {}
     
-system_prompt = """
+    system_prompt = """
 Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
 - family office
