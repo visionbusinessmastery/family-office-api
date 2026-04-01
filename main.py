@@ -790,7 +790,6 @@ def analyse_portfolio(current_user: str = Depends(get_current_user)):
 # ==================================================
 # IA
 # ==================================================
-
 @app.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
@@ -798,12 +797,16 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
     with engine.connect() as conn:
         result = conn.execute(text("""
         SELECT * FROM user_profiles WHERE user_email=:email
-    """), {"email": current_user})
+    """), {"email": user})
 
     profile = result.fetchone()
-
     profile_data = dict(profile._mapping) if profile else {}
-    
+
+    # ⚠️ fallback valeurs (évite crash)
+    total_value = 0
+    diversification = 0
+    asset_distribution = {}
+
     system_prompt = """
 Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
@@ -821,59 +824,54 @@ Tu raisonnes comme :
 - un entrepreneur pragmatique
 - un stratège orienté résultats
 
-Tu raisonnes comme :
-- un investisseur expérimenté
-- un entrepreneur pragmatique
-- un stratège orienté résultats
-
 Tu donnes UNIQUEMENT :
 - des réponses concrètes
 - des stratégies concrètes et applicables immédiatement
 - des conseils réalistes et réalisables
 - des réponses directes (courtes et claires)
 - des explications simples (logiques + pédagogies)
-- des plans d’action concrets (étapes numérotées)
-- des exemples réels ou réalistes
+- des plans d'action concrets (etapes numerotees)
+- des exemples reels ou realistes
 
-Tu évites :
+Tu evites :
 - le blabla
-- les généralités
-- les réponses vagues
-- les disclaimers inutiles
+- les generalites
+- les reponses vagues
 """
-    # ✅ CONTEXTE UTILISATEUR (déclaré ici)
+
     user_context = f"""
-    PROFIL UTILISATEUR :
-    {profile_data}
+PROFIL UTILISATEUR :
+{profile_data}
 
-    PORTEFEUILLE :
-    - Valeur totale : {total_value}
-    - Diversification : {diversification}
-    - Répartition : {asset_distribution}
+PORTEFEUILLE :
+- Valeur totale : {total_value}
+- Diversification : {diversification}
+- Repartition : {asset_distribution}
 
-    OBJECTIF :
-    Optimiser patrimoine + réduire risque + accélérer liberté financière
-    
+OBJECTIF :
+Optimiser patrimoine + reduire risque + accelerer liberte financiere
+"""
+
     user_prompt = f"""
 Question :
 {data.question}
 
-Donne une réponse structurée STRICTEMENT comme ceci :
+Donne une reponse structuree STRICTEMENT comme ceci :
 
-1. Réponse directe (max 3 phrases)
-2. Explication simple (logique + pédagogique)
-3. Plan d’action (étapes numérotées concrètes)
-4. Exemple réel ou concret
+1. Reponse directe (max 3 phrases)
+2. Explication simple (logique + pedagogique)
+3. Plan d'action (etapes numerotees concretes)
+4. Exemple reel ou concret
 
 Objectif :
-→ que l’utilisateur puisse agir immédiatement
-→ aider l’utilisateur à construire un patrimoine solide et atteindre la liberté financière.
+→ que l’utilisateur puisse agir immediatement
+→ aider l’utilisateur a construire un patrimoine solide et atteindre la liberte financiere.
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            temperature=0.7,  # 🔥 important pour qualité
+            temperature=0.7,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_context},
@@ -888,7 +886,7 @@ Objectif :
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+        
 
 # ==================================================
 # ROOT
