@@ -94,6 +94,27 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
 
+class ProfileRequest(BaseModel):
+    gender: str
+    age: int
+
+    employment_status: str
+    monthly_income: float
+
+    marital_status: str
+    children_count: int
+
+    housing_status: str
+    real_estate_value: float = 0
+    real_estate_purchase_price: float = 0
+
+    total_debt: float = 0
+
+    savings: float = 0
+    investments: float = 0
+    crypto: float = 0
+
+    risk_profile: str
 
 # ==================================================
 # DATABASE
@@ -136,6 +157,37 @@ if DATABASE_URL:
             )
             """))
 
+            conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                id SERIAL PRIMARY KEY,
+                user_email TEXT UNIQUE,
+
+                gender TEXT,
+                age INTEGER,
+
+                employment_status TEXT,
+                monthly_income FLOAT,
+
+                marital_status TEXT,
+                children_count INTEGER,
+
+                housing_status TEXT,
+                real_estate_value FLOAT,
+                real_estate_purchase_price FLOAT,
+
+                total_debt FLOAT,
+
+                savings FLOAT,
+                investments FLOAT,
+                crypto FLOAT,
+
+                risk_profile TEXT,
+
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """))
+            
        # 🔥 Nettoyage des doublons au démarrage
             conn.execute(text("""
             DELETE FROM portfolios a
@@ -251,6 +303,63 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @app.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
+
+@app.post("/profile")
+def save_profile(data: ProfileRequest, user: str = Depends(get_current_user)):
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO user_profiles (
+                user_email, gender, age, employment_status, monthly_income,
+                marital_status, children_count, housing_status,
+                real_estate_value, real_estate_purchase_price,
+                total_debt, savings, investments, crypto, risk_profile
+            )
+            VALUES (
+                :email, :gender, :age, :employment_status, :monthly_income,
+                :marital_status, :children_count, :housing_status,
+                :real_estate_value, :real_estate_purchase_price,
+                :total_debt, :savings, :investments, :crypto, :risk_profile
+            )
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                gender=:gender,
+                age=:age,
+                employment_status=:employment_status,
+                monthly_income=:monthly_income,
+                marital_status=:marital_status,
+                children_count=:children_count,
+                housing_status=:housing_status,
+                real_estate_value=:real_estate_value,
+                real_estate_purchase_price=:real_estate_purchase_price,
+                total_debt=:total_debt,
+                savings=:savings,
+                investments=:investments,
+                crypto=:crypto,
+                risk_profile=:risk_profile,
+                updated_at = CURRENT_TIMESTAMP
+        """), {
+            "email": user,
+            **data.dict()
+        })
+
+    return {"status": "profil sauvegardé"}
+
+@app.get("/profile")
+def get_profile(user: str = Depends(get_current_user)):
+
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT * FROM user_profiles WHERE user_email=:email
+        """), {"email": user})
+
+        row = result.fetchone()
+
+    if not row:
+        return {"profile": None}
+
+    return {"profile": dict(row._mapping)}   
+
 
 # ==================================================
 # STOCK DATA
@@ -685,6 +794,16 @@ def analyse_portfolio(current_user: str = Depends(get_current_user)):
 @app.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
+    # GET PROFILE
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+        SELECT * FROM user_profiles WHERE user_email=:email
+    """), {"email": current_user})
+
+    profile = result.fetchone()
+
+profile_data = dict(profile._mapping) if profile else {}
+    
     system_prompt = """
 Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
@@ -724,10 +843,16 @@ Tu évites :
 """
     # ✅ CONTEXTE UTILISATEUR (déclaré ici)
     user_context = f"""
-Profil utilisateur :
-- Email : {user}
-- Objectif : liberté financière
-"""
+PROFIL UTILISATEUR :
+{profile_data}
+
+PORTEFEUILLE :
+- Valeur totale : {total_value}
+- Diversification : {diversification}
+- Répartition : {asset_distribution}
+
+OBJECTIF :
+Optimiser patrimoine + réduire risque + accélérer liberté financière
     
     user_prompt = f"""
 Question :
