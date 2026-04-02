@@ -249,6 +249,8 @@ def get_cached(url):
 # ==================================================
 ODOO_URL = "https://vision-business-mastery.odoo.com/"
 ODOO_DB = "family_office_db_g7jy"
+ODOO_USERNAME = "visionbusinessmastery@gmail.com"
+ODOO_PASSWORD = "*/VisionBusinessodooMastery972/*"
 
 def authenticate_odoo(email, password):
     url = f"{ODOO_URL}/web/session/authenticate"
@@ -274,6 +276,12 @@ def authenticate_odoo(email, password):
     except Exception:
         return None
         
+db_user = db.query(User).filter(User.email == form_data.username).first()
+
+if not db_user:
+    new_user = User(email=form_data.username)
+    db.add(new_user)
+    db.commit()
 
 # ==================================================
 # AUTH
@@ -310,35 +318,30 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # ==================================================
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+def login_with_odoo(form_data: OAuth2PasswordRequestForm = Depends()):
 
-    email = form_data.username
-    password = form_data.password
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "call",
+        "params": {
+            "db": ODOO_DB,
+            "login": form_data.username,
+            "password": form_data.password
+        }
+    }
 
-    # 🔥 AUTH ODOO
-    uid = authenticate_odoo(email, password)
+    res = requests.post(f"{ODOO_URL}/web/session/authenticate", json=payload)
+    result = res.json()
 
-    if not uid:
-        raise HTTPException(status_code=401, detail="Identifiants invalides")
+    if "error" in result:
+        raise HTTPException(status_code=401, detail="Login Odoo invalide")
 
-    # 🔥 OPTIONNEL : créer user local si pas existant
-    with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT * FROM users WHERE email=:email
-        """), {"email": email})
+    user = result["result"]["uid"]
 
-        user = result.fetchone()
+    # 🔥 créer token JWT
+    access_token = create_access_token(data={"sub": form_data.username})
 
-        if not user:
-            conn.execute(text("""
-                INSERT INTO users (email)
-                VALUES (:email)
-            """), {"email": email})
-
-    # 🔥 TON JWT (inchangé)
-    token = create_access_token({"sub": email})
-
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/me")
