@@ -28,6 +28,8 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY")
+ODOO_URL = os.getenv("ODOO_URL")
+ODOO_DB = os.getenv("ODOO_DB")
 
 router = APIRouter()
 
@@ -243,6 +245,37 @@ def get_cached(url):
         return None
 
 # ==================================================
+# ODOO
+# ==================================================
+ODOO_URL = "https://vision-business-mastery.odoo.com/"
+ODOO_DB = "family_office_db_g7jy"
+
+def authenticate_odoo(email, password):
+    url = f"{ODOO_URL}/web/session/authenticate"
+
+    payload = {
+        "jsonrpc": "2.0",
+        "params": {
+            "db": ODOO_DB,
+            "login": email,
+            "password": password
+        }
+    }
+
+    try:
+        res = requests.post(url, json=payload)
+        data = res.json()
+
+        if "error" in data:
+            return None
+
+        return data["result"]["uid"]
+
+    except Exception:
+        return None
+        
+
+# ==================================================
 # AUTH
 # ==================================================
 
@@ -276,43 +309,34 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # AUTH ROUTES
 # ==================================================
 
-@app.post("/register")
-def register(user: UserRegister):
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database non connectée")
-
-    email = user.email.lower()
-    hashed_password = hash_password(user.password)
-
-    with engine.begin() as conn:
-        result = conn.execute(text("SELECT email FROM users WHERE email=:email"), {"email": email})
-
-        if result.fetchone():
-            raise HTTPException(status_code=400, detail="Utilisateur déjà existant")
-
-        conn.execute(text("""
-            INSERT INTO users (email, password)
-            VALUES (:email, :password)
-        """), {"email": email, "password": hashed_password})
-
-    return {"status": "Utilisateur créé"}
-
-
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database non connectée")
 
-    email = form_data.username.lower()
+    email = form_data.username
+    password = form_data.password
 
+    # 🔥 AUTH ODOO
+    uid = authenticate_odoo(email, password)
+
+    if not uid:
+        raise HTTPException(status_code=401, detail="Identifiants invalides")
+
+    # 🔥 OPTIONNEL : créer user local si pas existant
     with engine.connect() as conn:
-        result = conn.execute(text("SELECT password FROM users WHERE email=:email"), {"email": email})
-        row = result.fetchone()
+        result = conn.execute(text("""
+            SELECT * FROM users WHERE email=:email
+        """), {"email": email})
 
-        if not row or not verify_password(form_data.password, row[0]):
-            raise HTTPException(status_code=400, detail="Identifiants invalides")
+        user = result.fetchone()
 
-    token = create_token({"sub": email})
+        if not user:
+            conn.execute(text("""
+                INSERT INTO users (email)
+                VALUES (:email)
+            """), {"email": email})
+
+    # 🔥 TON JWT (inchangé)
+    token = create_access_token({"sub": email})
 
     return {"access_token": token, "token_type": "bearer"}
 
