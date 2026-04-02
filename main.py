@@ -256,6 +256,13 @@ ODOO_DB = "family_office_db_g7jy"
 ODOO_USERNAME = "visionbusinessmastery@gmail.com"
 ODOO_PASSWORD = "*/VisionBusinessodooMastery972/*"
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 def authenticate_odoo(email, password):
     url = f"{ODOO_URL}/web/session/authenticate"
 
@@ -286,17 +293,6 @@ if not db_user:
     new_user = User(email=form_data.username)
     db.add(new_user)
     db.commit()
-
-# ==================================================
-# ODOO DB
-# ==================================================
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # ==================================================
 # AUTH
@@ -333,7 +329,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # ==================================================
 
 @app.post("/login")
-def login_with_odoo(form_data: OAuth2PasswordRequestForm = Depends()):
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    db_user = db.query(User)...  # ❌:
 
     payload = {
         "jsonrpc": "2.0",
