@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from pydantic import BaseModel
 from sqlalchemy import text
+from database import SessionLocal
 
 # ==================================================
 # CONFIG
@@ -219,6 +220,9 @@ if DATABASE_URL:
     except Exception as e:
         print("DB INIT ERROR:", e)
 
+
+
+
 # ==================================================
 # CACHE
 # ==================================================
@@ -282,6 +286,17 @@ if not db_user:
     new_user = User(email=form_data.username)
     db.add(new_user)
     db.commit()
+
+# ==================================================
+# ODOO DB
+# ==================================================
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # ==================================================
 # AUTH
