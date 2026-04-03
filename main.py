@@ -287,12 +287,14 @@ def authenticate_odoo(email, password):
     except Exception:
         return None
         
-db_user = db.query(User).filter(User.email == form_data.username).first()
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == form_data.username).first()
+    
+    if not db_user:
+        raise HTTPException(status_code=400, detail="User not found")
 
-if not db_user:
-    new_user = User(email=form_data.username)
-    db.add(new_user)
-    db.commit()
+    return {"message": "OK"}
 
 # ==================================================
 # AUTH
