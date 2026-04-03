@@ -330,7 +330,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    db_user = db.query(User)...  # ❌
+    db_user = db.query(User) 
 
     payload = {
         "jsonrpc": "2.0",
