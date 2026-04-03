@@ -287,14 +287,7 @@ def authenticate_odoo(email, password):
     except Exception:
         return None
         
-@app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == form_data.username).first()
-    
-    if not db_user:
-        raise HTTPException(status_code=400, detail="User not found")
 
-    return {"message": "OK"}
 
 # ==================================================
 # AUTH
@@ -331,12 +324,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # ==================================================
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    db_user = db.query(User) 
-
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
     payload = {
         "jsonrpc": "2.0",
-        "method": "call",
         "params": {
             "db": ODOO_DB,
             "login": form_data.username,
@@ -344,19 +336,26 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         }
     }
 
-    res = requests.post(f"{ODOO_URL}/web/session/authenticate", json=payload)
-    result = res.json()
+    try:
+        res = requests.post(f"{ODOO_URL}/web/session/authenticate", json=payload)
+        result = res.json()
 
-    if "error" in result:
-        raise HTTPException(status_code=401, detail="Login Odoo invalide")
+        if "error" in result:
+            raise HTTPException(status_code=401, detail="Login invalide")
 
-    user = result["result"]["uid"]
+        # ✅ utilisateur validé Odoo
+        email = form_data.username
 
-    # 🔥 créer token JWT
-    access_token = create_access_token(data={"sub": form_data.username})
+        # ✅ créer token JWT (CORRIGÉ)
+        access_token = create_token({"sub": email})
 
-    return {"access_token": access_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/me")
 def me(user: str = Depends(get_current_user)):
