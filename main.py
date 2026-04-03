@@ -404,21 +404,6 @@ def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)
 
     return {"status": "profil sauvegardé"}
     
-@app.get("/profile")
-def get_profile(user: str = Depends(get_current_user)):
-
-    with engine.connect() as conn:
-        result = conn.execute(text("""
-        SELECT * FROM user_profiles WHERE user_email=:email
-        """), {"email": user})
-
-        profile = result.fetchone()
-
-    if not profile:
-        return {"profile": None}
-
-    return dict(profile._mapping)   
-
 
 # ==================================================
 # STOCK DATA
