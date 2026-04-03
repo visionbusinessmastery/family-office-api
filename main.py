@@ -358,8 +358,8 @@ def login(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/me")
-def me(user: str = Depends(get_current_user)):
-    return {"user": user}
+def me(username: str = Depends(get_current_user)):
+    return {"username": user}
 
 @app.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
