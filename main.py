@@ -253,8 +253,8 @@ def get_cached(url):
 # ==================================================
 ODOO_URL = "https://vision-business-mastery.odoo.com/"
 ODOO_DB = "family_office_db_g7jy"
-ODOO_USERNAME = "visionbusinessmastery@gmail.com"
-ODOO_PASSWORD = "*/VisionBusinessodooMastery972/*"
+ODOO_USERNAME = os.getenv("ODOO_USERNAME")
+ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 
 def get_db():
     db = SessionLocal()
@@ -358,8 +358,8 @@ def login(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/me")
-def me(username: str = Depends(get_current_user)):
-    return {"username": user}
+def me(user: str = Depends(get_current_user)):
+    return {"user": user}
 
 @app.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
@@ -607,45 +607,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-
-    try:
-        asset = data["ticker"]
-
-        # 🔥 UPSERT (anti doublon intelligent)
-        db.execute(text("""
-            INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
-            VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
-            ON CONFLICT (user_email, asset)
-            DO UPDATE SET
-                quantity = portfolios.quantity + EXCLUDED.quantity,
-                buy_price = (
-                    (portfolios.quantity * portfolios.buy_price) +
-                    (EXCLUDED.quantity * EXCLUDED.buy_price)
-                ) / (portfolios.quantity + EXCLUDED.quantity)
-        """), {
-            "email": user,
-            "asset": asset,
-            "asset_type": data.asset_type,
-            "quantity": data.quantity,
-            "buy_price": data.buy_price
-        })
-
-        # 🧹 Nettoyage sécurité (double protection)
-        db.execute(text("""
-            DELETE FROM portfolios a
-            USING portfolios b
-            WHERE a.ctid < b.ctid
-            AND a.user_email = b.user_email
-            AND a.asset = b.asset;
-        """))
-
-        db.commit()
-
-        return {"status": "actif ajouté ou mis à jour"}
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+            
 
 @app.get("/portfolio")
 def get_portfolio(current_user: str = Depends(get_current_user)):
