@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
 from jose import jwt, JWTError
@@ -145,6 +145,22 @@ class OdooClient:
         self.uid = None
         self.login()
 
+class UserProfile(BaseModel):
+    genre: Optional[str] = None
+    age: Optional[int] = None
+    situation_pro: Optional[str] = None
+    revenus_mensuels: Optional[float] = None
+    revenus_annuels: Optional[float] = None
+    situation_familiale: Optional[str] = None
+    enfants: Optional[bool] = None
+    nb_enfants: Optional[int] = None
+    logement: Optional[str] = None
+    valeur_bien: Optional[float] = None
+    prix_achat: Optional[float] = None
+    dettes: Optional[Dict] = {}
+    epargne: Optional[Dict] = {}
+    investissements: Optional[Dict] = {}
+    
 class PortfolioAnalysis(BaseModel):
     total_value: float
     diversification_score: float
@@ -359,7 +375,7 @@ class OdooClient:
             
 # --- Endpoints ---
 @app.post("/register")
-def register_user(profile: UserProfile):
+def register_user(profile: dict):
     # 1️⃣ Vérifie si l’utilisateur existe déjà dans ton DB SaaS
     user_exists = False # À remplacer par ta logique DB
     if user_exists:
