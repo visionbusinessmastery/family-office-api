@@ -287,6 +287,29 @@ ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "password")
             raise Exception("Impossible de se connecter à Odoo")
         return self.uid
 
+class OdooClient:
+    def __init__(self):
+        self.url = f"{ODOO_URL}/jsonrpc"
+        self.uid = None
+        self.login()
+
+    def login(self):
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "call",
+            "params": {
+                "service": "common",
+                "method": "login",
+                "args": [ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD]
+            },
+            "id": 1
+        }
+        res = requests.post(self.url, json=payload).json()
+        self.uid = res.get("result")
+        if not self.uid:
+            raise Exception("Impossible de se connecter à Odoo")
+        return self.uid
+
     def create_contact(self, name, email):
         try:
             payload = {
@@ -352,7 +375,6 @@ ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "password")
         except Exception as e:
             print(f"Erreur création opportunité Odoo: {e}")
             return None
-
 
 # --- Endpoints ---
 @app.post("/register")
