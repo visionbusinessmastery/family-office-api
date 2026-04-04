@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from database import engine
 import yfinance as yf
+import os
 
 # ==================================================
 # CONFIG STOCK & PORTFOLIO
