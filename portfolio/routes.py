@@ -169,7 +169,7 @@ def get_stock_data(ticker: str):
 # ==================================================
 # STOCK ANALYZE
 # ==================================================
-@app.post("/stocks/analyse")
+@router.post("/stocks/analyse")
 def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
 
     data = get_stock_data(request.ticker)
@@ -227,7 +227,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 # ==================================================
 # PORTFOLIO USER ANALYSE
 # ==================================================
-@app.post("/portfolio/analyse/ai")
+@router.post("/portfolio/analyse/ai")
 def analyse_portfolio(current_user: str = Depends(get_current_user)):
 
     if not engine:
