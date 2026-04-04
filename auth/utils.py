@@ -54,8 +54,4 @@ def decode_token(token: str):
 # =========================
 def get_current_user(token: str = Depends(oauth2_scheme)):
     return decode_token(token)
-# =========================
-# CURRENT USER
-# =========================
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    return decode_token(token)
+
