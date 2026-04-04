@@ -11,6 +11,9 @@ router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 
+# ==================================================
+# REGISTER
+# ==================================================
 @router.post("/register")
 def register(email: str, password: str):
     with engine.begin() as conn:
@@ -27,6 +30,9 @@ def register(email: str, password: str):
 
     return {"status": "created"}
 
+# ==================================================
+# LOGIN
+# ==================================================
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     with engine.connect() as conn:
@@ -41,10 +47,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": token, "token_type": "bearer"}
     
 
+# ==================================================
+# GET ME
+# ==================================================
 @router.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
 
+# ==================================================
+# SAVE PROFILE
+# ==================================================
 @app.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
