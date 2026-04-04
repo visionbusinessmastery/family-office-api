@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
-from auth.utils import hash_password, verify_password, create_token
+from auth.utils import hash_password, verify_password, create_token, get_current_user
 from jose import jwt, JWTError
 import os
 
