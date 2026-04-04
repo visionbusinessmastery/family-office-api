@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from database import SessionLocal
 
+from config import ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD
+
 # ==================================================
 # CONFIG
 # ==================================================
@@ -139,6 +141,18 @@ class UserProfileRequest(BaseModel):
     epargne: Optional[dict] = {}
     investissements: Optional[dict] = {}
 
+class OdooClient:
+    def __init__(self):
+        self.url = f"{ODOO_URL}/jsonrpc"
+        self.uid = None
+        self.login()
+
+class PortfolioAnalysis(BaseModel):
+    total_value: float
+    diversification_score: float
+    ai_advice: str
+    premium: bool = False  # Si premium, créer opportunité CRM
+
 # ==================================================
 # DATABASE
 # ==================================================
@@ -251,19 +265,132 @@ def get_cached(url):
 # ==================================================
 # ODOO
 # ==================================================
-ODOO_URL = "https://vision-business-mastery.odoo.com/"
-ODOO_DB = os.getenv("ODOO_DB")
-ODOO_USERNAME = os.getenv("ODOO_USERNAME")
-ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
+ODOO_URL = os.getenv("ODOO_URL", "https://vision-business-mastery.odoo.com")
+ODOO_DB = os.getenv("ODOO_DB", "vision-business-mastery.odoo.com")
+ODOO_USERNAME = os.getenv("ODOO_USERNAME", "api_user_email")
+ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "password")
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        
+ def login(self):
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "call",
+            "params": {
+                "service": "common",
+                "method": "login",
+                "args": [ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD]
+            },
+            "id": 1
+        }
+        res = requests.post(self.url, json=payload).json()
+        self.uid = res.get("result")
+        if not self.uid:
+            raise Exception("Impossible de se connecter à Odoo")
+        return self.uid
 
+    def create_contact(self, name, email):
+        try:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [
+                        ODOO_DB, self.uid, ODOO_PASSWORD,
+                        'res.partner', 'create',
+                        [{"name": name, "email": email}]
+                    ]
+                },
+                "id": 2
+            }
+            res = requests.post(self.url, json=payload).json()
+            return res.get("result")
+        except Exception as e:
+            print(f"Erreur création contact Odoo: {e}")
+            return None
+
+    def update_contact(self, contact_id, update_fields: dict):
+        try:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [
+                        ODOO_DB, self.uid, ODOO_PASSWORD,
+                        'res.partner', 'write',
+                        [[contact_id], update_fields]
+                    ]
+                },
+                "id": 3
+            }
+            res = requests.post(self.url, json=payload).json()
+            return res.get("result")
+        except Exception as e:
+            print(f"Erreur update contact Odoo: {e}")
+            return None
+
+    def create_opportunity(self, contact_id, title, expected_revenue):
+        try:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [
+                        ODOO_DB, self.uid, ODOO_PASSWORD,
+                        'crm.lead', 'create',
+                        [{"name": title, "partner_id": contact_id, "planned_revenue": expected_revenue}]
+                    ]
+                },
+                "id": 4
+            }
+            res = requests.post(self.url, json=payload).json()
+            return res.get("result")
+        except Exception as e:
+            print(f"Erreur création opportunité Odoo: {e}")
+            return None
+
+
+# --- Endpoints ---
+@app.post("/register")
+def register_user(profile: UserProfile):
+    # 1️⃣ Vérifie si l’utilisateur existe déjà dans ton DB SaaS
+    user_exists = False # À remplacer par ta logique DB
+    if user_exists:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    # 2️⃣ Crée contact Odoo
+    odoo_contact_id = odoo.create_contact(profile.name, profile.email)
+    if not odoo_contact_id:
+        print("Erreur Odoo: contact non créé")
+
+    # 3️⃣ Retourne statut
+    return {"status": "ok", "odoo_contact_id": odoo_contact_id}
+
+@app.post("/profile/save")
+def save_profile(profile: UserProfile):
+    # 1️⃣ Update ton DB SaaS ici
+    contact_id = 1  # Récupère depuis DB le contact Odoo correspondant
+    update_fields = {"name": profile.name, "email": profile.email}
+    odoo.update_contact(contact_id, update_fields)
+    return {"status": "ok"}
+
+@app.post("/portfolio/analyse")
+def portfolio_analyse(analysis: PortfolioAnalysis):
+    # 1️⃣ Analyse portfeuille dans ton DB SaaS
+    print("Analyse :", analysis.ai_advice)
+
+    # 2️⃣ Si premium, créer opportunité CRM
+    if analysis.premium:
+        contact_id = 1  # récupère contact Odoo
+        opportunity_title = "Portefeuille Premium à analyser"
+        expected_revenue = analysis.total_value
+        odoo.create_opportunity(contact_id, opportunity_title, expected_revenue)
+
+    return {"status": "ok", "advice": analysis.ai_advice}
 
 # ==================================================
 # AUTH
