@@ -15,6 +15,7 @@ import time
 import yfinance as yf
 
 from fastapi import APIRouter, Depends, HTTPException
+from models import Base
 from sqlalchemy.orm import Session
 from database import get_db
 from pydantic import BaseModel
@@ -24,6 +25,7 @@ from database import SessionLocal
 # ==================================================
 # CONFIG
 # ==================================================
+Base.metadata.create_all(bind=engine)
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
@@ -176,6 +178,7 @@ engine = None
 if DATABASE_URL:
     try:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        SessionLocal = sessionmaker(bind=engine)
 
         with engine.begin() as conn:
 
