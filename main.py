@@ -9,18 +9,21 @@ from passlib.context import CryptContext
 from jose import jwt, JWTError
 from fastapi import APIRouter, Depends, HTTPException
 from openai import OpenAI
-import requests
-import os
-import time
-import yfinance as yf
 
 from fastapi import APIRouter, Depends, HTTPException
 from models import Base
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, engine, Base
 from pydantic import BaseModel
 from sqlalchemy import text
 from database import SessionLocal
+
+import requests
+import os
+import time
+import yfinance as yf
+import models
+
 
 # ==================================================
 # CONFIG
@@ -1052,6 +1055,9 @@ Objectif :
 # ROOT
 # ==================================================
 
+# Création des tables
+Base.metadata.create_all(bind=engine)
+    
 @app.get("/")
 def root():
     return {"status": "API active", "version": "10.1"}
