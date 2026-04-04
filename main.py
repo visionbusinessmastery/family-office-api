@@ -270,24 +270,6 @@ ODOO_DB = os.getenv("ODOO_DB", "vision-business-mastery.odoo.com")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME", "api_user_email")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "password")
 
- def login(self):
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "service": "common",
-                "method": "login",
-                "args": [ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD]
-            },
-            "id": 1
-        }
-        res = requests.post(self.url, json=payload).json()
-        self.uid = res.get("result")
-        if not self.uid:
-            raise Exception("Impossible de se connecter à Odoo")
-        return self.uid
-
-
 # --- Endpoints ---
 @app.post("/register")
 def register_user(profile: UserProfile):
