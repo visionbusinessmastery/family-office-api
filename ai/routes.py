@@ -20,7 +20,7 @@ def brain(question: str, user: str = Depends(get_current_user)):
 # ==================================================
 # IA BRAIN PRESONNAL ADVICES
 # ==================================================
-@app.post("/ia/brain")
+@router.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
     # GET PROFILE
