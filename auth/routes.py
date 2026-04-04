@@ -61,7 +61,7 @@ def me(user: str = Depends(get_current_user)):
 # ==================================================
 # SAVE PROFILE
 # ==================================================
-@app.post("/profile/save")
+@router.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
