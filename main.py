@@ -1055,6 +1055,10 @@ Objectif :
 
 # Création des tables
 Base.metadata.create_all(bind=engine)
+
+@app.head("/")
+def head_root():
+    return {"status": "ok"}
     
 @app.get("/")
 def root():
