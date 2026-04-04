@@ -21,8 +21,6 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from database import SessionLocal
 
-from config import ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD
-
 # ==================================================
 # CONFIG
 # ==================================================
@@ -265,10 +263,10 @@ def get_cached(url):
 # ==================================================
 # ODOO
 # ==================================================
-ODOO_URL = os.getenv("ODOO_URL", "https://vision-business-mastery.odoo.com")
-ODOO_DB = os.getenv("ODOO_DB", "vision-business-mastery.odoo.com")
-ODOO_USERNAME = os.getenv("ODOO_USERNAME", "api_user_email")
-ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "password")
+ODOO_URL = os.getenv("ODOO_URL")
+ODOO_DB = os.getenv("ODOO_DB")
+ODOO_USERNAME = os.getenv("ODOO_USERNAME")
+ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 
 class OdooClient:
     def __init__(self):
