@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from auth.routes import get_current_user
 from portfolio.service import get_user_portfolio
+from aut.schemas import StockRequest
 import os
 
 # ==================================================
