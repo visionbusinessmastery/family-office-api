@@ -27,7 +27,6 @@ import models
 # ==================================================
 # CONFIG
 # ==================================================
-Base.metadata.create_all(bind=engine)
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
