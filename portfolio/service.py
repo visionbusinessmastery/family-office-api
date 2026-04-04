@@ -10,6 +10,10 @@ def get_user_portfolio(email):
 
         return result.fetchall()
 
+# ==================================================
+# STOCK DATA
+# ==================================================
+
 COMPANY_TO_TICKER = {
     "nvidia": "NVDA",
     "tesla": "TSLA",
@@ -148,5 +152,20 @@ def get_stock_data(ticker: str):
             "price": None,
             "error": str(e)
        }
+
+# ==================================================
+# STOCK ROUTE
+# ==================================================
+
+@app.post("/stocks/analyse")
+def analyse_stock(request: StockRequest, current_user: str = Depends(get_current_user)):
+
+    data = get_stock_data(request.ticker)
+
+    if not data:
+        raise HTTPException(status_code=400, detail="Données indisponibles")
+
+    return data
+        
 
 
