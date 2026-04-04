@@ -11,7 +11,7 @@ odoo = OdooClient()
 # ==================================================
 # ODOO REGSITER
 # ==================================================
-@app.post("/odoo/register")
+@router.post("/odoo/register")
 def register_user(profile: dict):
     # 1️⃣ Vérifie si l’utilisateur existe déjà dans ton DB SaaS
     user_exists = False # À remplacer par ta logique DB
@@ -29,7 +29,7 @@ def register_user(profile: dict):
 # ==================================================
 # ODOO PROFLIE SAVE
 # ==================================================
-@app.post("/profile/save")
+@router.post("/profile/save")
 def save_profile(profile: UserProfile):
     # 1️⃣ Update ton DB SaaS ici
     contact_id = 1  # Récupère depuis DB le contact Odoo correspondant
@@ -40,7 +40,7 @@ def save_profile(profile: UserProfile):
 # ==================================================
 # ODOO USER PORTFOLIO ANALYZE CRM
 # ==================================================
-@app.post("/portfolio/analyse/crm")
+@router.post("/portfolio/analyse/crm")
 def portfolio_analyse(analysis: PortfolioAnalysis):
     # 1️⃣ Analyse portfeuille dans ton DB SaaS
     print("Analyse :", analysis.ai_advice)
