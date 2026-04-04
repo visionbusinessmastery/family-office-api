@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 import os
 
 # ==================================================
-# CONFIG AUTH PASSWORD
+# CONFIG
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -23,7 +23,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 def hash_password(password: str):
     return pwd_context.hash(password)
 
-
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
@@ -36,7 +35,6 @@ def create_token(data: dict):
     to_encode.update({"exp": expire})
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 def decode_token(token: str):
     try:
@@ -51,6 +49,11 @@ def decode_token(token: str):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
+# =========================
+# CURRENT USER
+# =========================
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    return decode_token(token)
 # =========================
 # CURRENT USER
 # =========================
