@@ -1,14 +1,5 @@
 from sqlalchemy import text
 from database import engine
-from pydantic import BaseModel, EmailStr, Field
-
-import models
-
-# ==================================================
-# CONFIG PORTFOLIO
-# ==================================================
-
-
 
 # ==================================================
 # GET USER PORTFOLIO
