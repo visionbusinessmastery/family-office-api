@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 import time
 import yfinance as yf
-import models
+
 
 # ==================================================
 # CONFIG STOCK
