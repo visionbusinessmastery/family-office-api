@@ -3,20 +3,19 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from auth.utils import get_current_user
 import os
 
 # ==================================================
 # CONFIG AUTH PASSWORD
 # ==================================================
 
-router = APIRouter()
-
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # =========================
 # PASSWORD
@@ -51,17 +50,9 @@ def decode_token(token: str):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
-        
 
+# =========================
+# CURRENT USER
+# =========================
 def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-
-        if email is None:
-            raise HTTPException(status_code=401, detail="Token invalide")
-
-        return email
-
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token invalide")
+    return decode_token(token)
