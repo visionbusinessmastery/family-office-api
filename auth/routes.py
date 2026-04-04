@@ -11,28 +11,6 @@ router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("sub")
-    except:
-        raise HTTPException(status_code=401, detail="Token invalide")
-
-@router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    with engine.connect() as conn:
-        user = conn.execute(text("""
-            SELECT email, password FROM users WHERE email=:email
-        """), {"email": form_data.username}).fetchone()
-
-    if not user or not verify_password(form_data.password, user[1]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = create_token({"sub": user[0]})
-    return {"access_token": token, "token_type": "bearer"}
-
 @router.post("/register")
 def register(email: str, password: str):
     with engine.begin() as conn:
@@ -49,6 +27,64 @@ def register(email: str, password: str):
 
     return {"status": "created"}
 
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    with engine.connect() as conn:
+        user = conn.execute(text("""
+            SELECT email, password FROM users WHERE email=:email
+        """), {"email": form_data.username}).fetchone()
+
+    if not user or not verify_password(form_data.password, user[1]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_token({"sub": user[0]})
+    return {"access_token": token, "token_type": "bearer"}
+    
+
 @router.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
+
+@app.post("/profile/save")
+def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+        INSERT INTO user_profiles (
+            user_email, genre, age, situation_pro,
+            revenus_mensuels, revenus_annuels,
+            situation_familiale, enfants, nb_enfants,
+            logement, valeur_bien, prix_achat,
+            dettes, epargne, investissements
+        )
+        VALUES (
+            :email, :genre, :age, :situation_pro,
+            :revenus_mensuels, :revenus_annuels,
+            :situation_familiale, :enfants, :nb_enfants,
+            :logement, :valeur_bien, :prix_achat,
+            :dettes, :epargne, :investissements
+        )
+        ON CONFLICT (user_email)
+        DO UPDATE SET
+            genre = EXCLUDED.genre,
+            age = EXCLUDED.age,
+            situation_pro = EXCLUDED.situation_pro,
+            revenus_mensuels = EXCLUDED.revenus_mensuels,
+            revenus_annuels = EXCLUDED.revenus_annuels,
+            situation_familiale = EXCLUDED.situation_familiale,
+            enfants = EXCLUDED.enfants,
+            nb_enfants = EXCLUDED.nb_enfants,
+            logement = EXCLUDED.logement,
+            valeur_bien = EXCLUDED.valeur_bien,
+            prix_achat = EXCLUDED.prix_achat,
+            dettes = EXCLUDED.dettes,
+            epargne = EXCLUDED.epargne,
+            investissements = EXCLUDED.investissements,
+            updated_at = CURRENT_TIMESTAMP
+        """), {
+            "email": user,
+            **data.dict()
+        })
+
+    return {"status": "profil sauvegardé"}
+
