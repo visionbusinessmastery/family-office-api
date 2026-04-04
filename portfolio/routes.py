@@ -184,7 +184,7 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
 # ==================================================
 # PORTFOLIO USER ADD
 # ==================================================
-@app.post("/portfolio/add")
+@router.post("/portfolio/add")
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
     if not engine:
