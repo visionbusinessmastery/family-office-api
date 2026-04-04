@@ -4,6 +4,7 @@ import os
 # ==================================================
 # CONFIG ODOO
 # ==================================================
+
 ODOO_URL = os.getenv("ODOO_URL")
 ODOO_DB = os.getenv("ODOO_DB")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME")
@@ -12,6 +13,7 @@ ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 # ==================================================
 # CLIENT BASE ODOO
 # ==================================================
+
 class OdooClient:
     def __init__(self):
         self.url = f"{ODOO_URL}/jsonrpc"
