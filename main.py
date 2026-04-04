@@ -252,7 +252,7 @@ def get_cached(url):
 # ODOO
 # ==================================================
 ODOO_URL = "https://vision-business-mastery.odoo.com/"
-ODOO_DB = "family_office_db_g7jy"
+ODOO_DB = os.getenv("ODOO_DB")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 
@@ -262,30 +262,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-def authenticate_odoo(email, password):
-    url = f"{ODOO_URL}/web/session/authenticate"
-
-    payload = {
-        "jsonrpc": "2.0",
-        "params": {
-            "db": ODOO_DB,
-            "login": email,
-            "password": password
-        }
-    }
-
-    try:
-        res = requests.post(url, json=payload)
-        data = res.json()
-
-        if "error" in data:
-            return None
-
-        return data["result"]["uid"]
-
-    except Exception:
-        return None
         
 
 
@@ -324,39 +300,45 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # ==================================================
 
 @app.post("/login")
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends()
-):
-    payload = {
-        "jsonrpc": "2.0",
-        "params": {
-            "db": ODOO_DB,
-            "login": form_data.username,
-            "password": form_data.password
-        }
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+
+    with engine.connect() as conn:
+        user = conn.execute(text("""
+            SELECT email, password FROM users WHERE email=:email
+        """), {"email": form_data.username}).fetchone()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if not verify_password(form_data.password, user[1]):
+        raise HTTPException(status_code=401, detail="Wrong password")
+
+    access_token = create_token({"sub": user[0]})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
-    try:
-        res = requests.post(f"{ODOO_URL}/web/session/authenticate", json=payload)
-        result = res.json()
+@app.post("/register")
+def register(user: UserRegister):
 
-        if "error" in result:
-            raise HTTPException(status_code=401, detail="Login invalide")
+    hashed_password = hash_password(user.password)
 
-        # ✅ utilisateur validé Odoo
-        email = form_data.username
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("""
+                INSERT INTO users (email, password)
+                VALUES (:email, :password)
+            """), {
+                "email": user.email,
+                "password": hashed_password
+            })
+        except:
+            raise HTTPException(status_code=400, detail="User already exists")
 
-        # ✅ créer token JWT (CORRIGÉ)
-        access_token = create_token({"sub": email})
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+    return {"status": "user created"}
+    
 @app.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
