@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Optional
+from typing import Optional, Optional, str
 
 # ==================================================
 # MODELS
