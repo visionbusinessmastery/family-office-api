@@ -12,7 +12,7 @@ from openai import OpenAI
 
 from fastapi import APIRouter, Depends, HTTPException
 from models import Base
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from database import get_db, engine, Base
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -23,7 +23,6 @@ import os
 import time
 import yfinance as yf
 import models
-
 
 # ==================================================
 # CONFIG
