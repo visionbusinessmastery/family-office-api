@@ -6,6 +6,10 @@ from auth.utils import hash_password, verify_password, create_token
 from jose import jwt, JWTError
 import os
 
+# ==================================================
+# CONFIG AUTH
+# ==================================================
+
 router = APIRouter()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
