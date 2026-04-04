@@ -20,3 +20,11 @@ def create_token(data: dict):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+ if email is None:
+            raise HTTPException(status_code=401, detail="Token invalide")
+
+        return email
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide")
