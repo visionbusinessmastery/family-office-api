@@ -3,11 +3,14 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from auth.utils import get_current_user
 import os
 
 # ==================================================
 # CONFIG AUTH PASSWORD
 # ==================================================
+
+router = APIRouter()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
