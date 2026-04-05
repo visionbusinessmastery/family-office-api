@@ -1,5 +1,7 @@
 from sqlalchemy import text
 from database import engine
+from database import Base
+from sqlalchemy import Column, Integer, String, Float
 import yfinance as yf
 import os
 
