@@ -1,3 +1,5 @@
+from database import get_db
+from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
