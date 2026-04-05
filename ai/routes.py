@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from auth.routes import get_current_user
+from auth.utils import get_current_user
 from ai.service import generate_advice
 
 # ==================================================
