@@ -16,7 +16,7 @@ class Asset(BaseModel):
     quantity: float
     buy_price: float 
 
-class Portfolio(Base):
+class Portfolio(BaseModel):
     __tablename__ = "portfolio"
 
     id = Column(Integer, primary_key=True)
