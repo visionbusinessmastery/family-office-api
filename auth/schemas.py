@@ -19,12 +19,6 @@ class ProfileRequest(BaseModel):
 class BrainRequest(BaseModel):
     question: str
 
-class PortfolioRequest(BaseModel):
-    asset: str
-    asset_type: str
-    quantity: float
-    buy_price: float
-
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
