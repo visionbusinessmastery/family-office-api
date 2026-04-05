@@ -44,7 +44,7 @@ def register(email: str, password: str):
 # ==================================================
 # LOGIN
 # ==================================================
-@router.post("/auth/login")
+@router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     with engine.connect() as conn:
         user = conn.execute(text("""
