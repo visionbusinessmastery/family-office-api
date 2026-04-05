@@ -23,8 +23,6 @@ ODOO_DB = os.getenv("ODOO_DB")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 
-odoo = OdooClient()
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
@@ -65,6 +63,7 @@ class OdooClient:
             "id": 2
         }
         return requests.post(self.url, json=payload).json().get("result")
+
 
 # ==================================================
 # CREATE LEAD ODOO
@@ -121,4 +120,10 @@ def create_lead(data: LeadRequest):
         except Exception as e:
             print(f"Erreur création opportunité Odoo: {e}")
             return None
-            
+
+
+# ✅ ICI seulement
+odoo = OdooClient()
+
+
+
