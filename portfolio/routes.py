@@ -4,7 +4,6 @@ from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
 from .schemas import PortfolioRequest
 from .schemas import Portfolio
-from .schemas import PortfolioCreate
 import yfinance as yf
 import os
 
