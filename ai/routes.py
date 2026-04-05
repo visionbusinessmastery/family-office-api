@@ -1,26 +1,14 @@
-from database import get_db, engine
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict
+from sqlalchemy import text
+from database import engine
 from auth.utils import get_current_user
-from ai.service import generate_advice
-from .schemas import BrainRequest
-from portfolio.schemas import Portfolio
 from openai import OpenAI
+from .schemas import BrainRequest
 import os
-
-
-# ==================================================
-# CONFIG AI BRAIN
-# ==================================================
 
 router = APIRouter()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
 
 @router.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
@@ -33,7 +21,8 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
             SELECT * FROM user_profiles WHERE user_email=:email
         """), {"email": user})
 
-    profile = result.fetchone()
+        profile = result.fetchone()
+
     profile_data = dict(profile._mapping) if profile else {}
 
     # ======================
@@ -45,89 +34,46 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT asset, asset_type, quantity, buy_price
-            FROM portfolio
+            FROM portfolios
             WHERE user_email=:email
         """), {"email": user})
 
         rows = result.fetchall()
 
-        for r in rows:
-            value = r[2] * r[3]
-            total_value += value
+    for r in rows:
+        value = r[2] * r[3]
+        total_value += value
 
-            portfolio_data.append({
-                "asset": r[0],
-                "type": r[1],
-                "value": value
-            })
+        portfolio_data.append({
+            "asset": r[0],
+            "type": r[1],
+            "value": value
+        })
 
-    diversification = 0
+    diversification = len(set([p["type"] for p in portfolio_data]))
     asset_distribution = {}
 
+    for p in portfolio_data:
+        t = p["type"]
+        asset_distribution[t] = asset_distribution.get(t, 0) + p["value"]
+
     # ======================
-    # PROMPTS
+    # PROMPT
     # ======================
-    system_prompt = """
-Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
-- gestion de patrimoine
-- family office
-- marchés financiers
-- bourse & trading
-- crypto & DeFi
-- private equity & financement
-- business (online & offline)
-- création de richesse
-- liberté financière
-
-Tu raisonnes comme :
-- un investisseur expérimenté
-- un entrepreneur pragmatique
-- un stratège orienté résultats
-
-Tu donnes UNIQUEMENT :
-- des réponses concrètes
-- des stratégies concrètes et applicables immédiatement
-- des conseils réalistes et réalisables
-- des réponses directes (courtes et claires)
-- des explications simples (logiques + pédagogies)
-- des plans d'action concrets (etapes numerotees)
-- des exemples reels ou realistes
-
-Tu evites :
-- le blabla
-- les generalites
-- les reponses vagues
-"""
-
-    user_context = f"""
-PROFIL UTILISATEUR :
-{profile_data}
-PORTEFEUILLE DETAILLE :
-{portfolio_data}
-
-PORTEFEUILLE :
-- Valeur totale : {total_value}
-- Diversification : {diversification}
-- Repartition : {asset_distribution}
-
-OBJECTIF :
-Optimiser patrimoine + reduire risque + accelerer liberte financiere
-"""
+    system_prompt = """Tu es un expert en gestion de patrimoine et family office. Réponses concrètes uniquement."""
 
     user_prompt = f"""
-Question :
-{data.question}
+Profil: {profile_data}
+Portfolio: {portfolio_data}
+Total: {total_value}
 
-Donne une reponse structuree STRICTEMENT comme ceci :
+Question: {data.question}
 
-1. Reponse directe (max 3 phrases)
-2. Explication simple (logique + pedagogique)
-3. Plan d'action (etapes numerotees concretes)
-4. Exemple reel ou concret
-
-Objectif :
-→ que l’utilisateur puisse agir immediatement
-→ aider l’utilisateur a construire un patrimoine solide et atteindre la liberte financiere.
+Réponds en:
+1. Réponse directe
+2. Explication
+3. Plan d’action
+4. Exemple
 """
 
     try:
@@ -136,22 +82,6 @@ Objectif :
             temperature=0.7,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_context},
-                {"role": "user", "content": user_prompt}
-            ]
-        )
-
-
-    # ======================
-    # OPENAI
-    # ======================
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.7,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_context},
                 {"role": "user", "content": user_prompt}
             ]
         )
@@ -163,5 +93,4 @@ Objectif :
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
