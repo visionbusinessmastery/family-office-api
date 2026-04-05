@@ -16,9 +16,6 @@ class ProfileRequest(BaseModel):
     risque: str
     experience: str
 
-class BrainRequest(BaseModel):
-    question: str
-
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
