@@ -23,6 +23,8 @@ ODOO_DB = os.getenv("ODOO_DB")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
 
+odoo = OdooClient()
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
