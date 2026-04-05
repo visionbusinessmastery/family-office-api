@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends
+from database import get_db, engine
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from sqlalchemy import Column, Integer, String, Float
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict
 from .schemas import LeadRequest
 from database import Base
-from sqlalchemy import Column, Integer, String, Float
+
+from openai import OpenAI
+
 import requests
 import os
 
@@ -17,6 +22,8 @@ ODOO_URL = os.getenv("ODOO_URL")
 ODOO_DB = os.getenv("ODOO_DB")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD")
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
 # CLIENT BASE ODOO
