@@ -201,7 +201,7 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
 
     return data
 
-def analyse_stock(ticker):
+def analyse_stock_simple(ticker):
     try:
         stock = yf.Ticker(ticker)
         data = stock.history(period="1d")
