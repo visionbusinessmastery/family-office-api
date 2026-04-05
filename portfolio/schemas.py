@@ -14,6 +14,15 @@ class Asset(BaseModel):
     quantity: float
     buy_price: float 
 
+class Portfolio(Base):
+    __tablename__ = "portfolio"
+
+    id = Column(Integer, primary_key=True)
+    asset = Column(String)
+    asset_type = Column(String)
+    quantity = Column(Integer)
+    buy_price = Column(Float)
+    
 class PortfolioRequest(BaseModel):
     asset: str
     asset_type: str
