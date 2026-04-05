@@ -20,56 +20,53 @@ router = APIRouter()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ==================================================
-# AI BRAIN ANALYZE
-# ==================================================
-@router.post("/brain")
-def brain(question: str, user: str = Depends(get_current_user)):
-    prompt = f"User: {user} Question: {question}"
-    answer = generate_advice(prompt)
-    return {"answer": answer}
 
-# ==================================================
-# IA BRAIN PRESONNAL ADVICES
-# ==================================================
+
 @router.post("/ia/brain")
 def brain(data: BrainRequest, user: str = Depends(get_current_user)):
 
-    # GET PROFILE
+    # ======================
+    # PROFILE
+    # ======================
     with engine.connect() as conn:
         result = conn.execute(text("""
-        SELECT * FROM user_profiles WHERE user_email=:email
-    """), {"email": user})
+            SELECT * FROM user_profiles WHERE user_email=:email
+        """), {"email": user})
 
     profile = result.fetchone()
     profile_data = dict(profile._mapping) if profile else {}
 
-    # ⚠️ fallback valeurs (évite crash)
-    total_value = 0
-    diversification = 0
-    asset_distribution = {}
-
-    # GET PORTFOLIO DATA
+    # ======================
+    # PORTFOLIO
+    # ======================
     portfolio_data = []
     total_value = 0
 
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT asset, asset_type, quantity, buy_price
-            FROM portfolios
+            FROM portfolio
             WHERE user_email=:email
         """), {"email": user})
 
-        for r in result.fetchall():
+        rows = result.fetchall()
+
+        for r in rows:
             value = r[2] * r[3]
             total_value += value
 
-        portfolio_data.append({
-            "asset": r[0],
-            "type": r[1],
-            "value": value
-        })
-        
+            portfolio_data.append({
+                "asset": r[0],
+                "type": r[1],
+                "value": value
+            })
+
+    diversification = 0
+    asset_distribution = {}
+
+    # ======================
+    # PROMPTS
+    # ======================
     system_prompt = """
 Tu es un conseiller en gestion de patrimoine et en family office et tu es un expert en :
 - gestion de patrimoine
@@ -144,6 +141,21 @@ Objectif :
             ]
         )
 
+
+    # ======================
+    # OPENAI
+    # ======================
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_context},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+
         return {
             "question": data.question,
             "answer": response.choices[0].message.content
@@ -151,4 +163,5 @@ Objectif :
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
