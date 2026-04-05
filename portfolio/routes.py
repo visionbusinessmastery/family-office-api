@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
 from openai import OpenAI
 
-from auth.routes import get_current_user
+from auth.utils import get_current_user
 from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
 from .schemas import Asset
