@@ -3,6 +3,8 @@ from auth.routes import get_current_user
 from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
 from .schemas import PortfolioRequest
+from .schemas import Portfolio
+import yfinance as yf
 import os
 
 # ==================================================
@@ -181,11 +183,41 @@ def analyse_stock(request: StockRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=400, detail="Données indisponibles")
 
     return data
-    
+
+def analyse_stock(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        data = stock.history(period="1d")
+
+        if data.empty:
+            return {"error": "Invalid ticker"}
+
+        price = data["Close"].iloc[-1]
+        return {"price": float(price)}
+
+    except Exception as e:
+        return {"error": str(e)}
+
 # ==================================================
 # PORTFOLIO USER ADD
 # ==================================================
 @router.post("/portfolio/add")
+def add_asset(asset: Asset, db: Session = Depends(get_db)):
+    try:
+        new_asset = Portfolio(
+            asset=asset.asset,
+            asset_type=asset.asset_type,
+            quantity=asset.quantity,
+            buy_price=asset.buy_price
+        )
+        db.add(new_asset)
+        db.commit()
+        db.refresh(new_asset)
+        return {"message": "Asset ajouté"}
+    except Exception as e:
+        print(e)
+        return {"error": str(e)}
+
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
     if not engine:
