@@ -11,7 +11,6 @@ from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
 from .schemas import Asset
 from .schemas import PortfolioRequest
-from .schemas import Portfolio
 
 import yfinance as yf
 import os
@@ -221,14 +220,22 @@ def analyse_stock_simple(ticker):
 @router.post("/portfolio/add")
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database non connectée")
-
     asset = normalize_ticker(request.asset)
     asset_type = request.asset_type.upper()
 
-    data = get_stock_data(asset)  # ✅ DIRECT
-    
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
+            VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
+        """), {
+            "email": current_user,
+            "asset": asset,
+            "asset_type": asset_type,
+            "quantity": request.quantity,
+            "buy_price": request.buy_price
+        })
+
+    return {"status": "actif ajouté"}
 
     with engine.begin() as conn:
 
