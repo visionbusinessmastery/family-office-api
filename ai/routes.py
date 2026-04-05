@@ -1,18 +1,24 @@
-from database import get_db
+from database import get_db, engine
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
 from auth.utils import get_current_user
 from ai.service import generate_advice
 from .schemas import BrainRequest
+from portfolio.schemas import Portfolio
+from openai import OpenAI
 import os
+
 
 # ==================================================
 # CONFIG AI BRAIN
 # ==================================================
 
 router = APIRouter()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
 # AI BRAIN ANALYZE
