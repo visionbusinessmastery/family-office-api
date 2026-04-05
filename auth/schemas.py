@@ -1,48 +1,13 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
-from database import Base
-from sqlalchemy import Column, Integer, String, Float
 
 # ==================================================
 # MODELS
 # ==================================================
 
-class ProfileRequest(BaseModel):
-    email: Optional[str] = None
-    revenus: float
-    charges: float
-    epargne: float
-    immobilier: float
-    investissements: float
-    crypto: float
-    risque: str
-    experience: str
-
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
-
-class ProfileRequest(BaseModel):
-    gender: str
-    age: int
-
-    employment_status: str
-    monthly_income: float
-
-    marital_status: str
-    children_count: int
-
-    housing_status: str
-    real_estate_value: float = 0
-    real_estate_purchase_price: float = 0
-
-    total_debt: float = 0
-
-    savings: float = 0
-    investments: float = 0
-    crypto: float = 0
-
-    risk_profile: str
 
 class UserProfileRequest(BaseModel):
     genre: Optional[str] = None
