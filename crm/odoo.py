@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
 from .schemas import LeadRequest
+from database import Base
+from sqlalchemy import Column, Integer, String, Float
 import requests
 import os
 
