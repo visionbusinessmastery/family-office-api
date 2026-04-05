@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from database import Base, engine
 from auth.routes import router as auth_router
 from portfolio.routes import router as portfolio_router
 from ai.routes import router as ai_router
@@ -22,6 +22,10 @@ app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+    
 @app.get("/")
 def root():
     return {"status": "API running"}
