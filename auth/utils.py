@@ -3,6 +3,8 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from database import Base
+from sqlalchemy import Column, Integer, String, Float
 import os
 
 # ==================================================
