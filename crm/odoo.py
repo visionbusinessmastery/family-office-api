@@ -1,3 +1,7 @@
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Dict
+from .schemas import LeadRequest
 import requests
 import os
 
@@ -55,14 +59,14 @@ class OdooClient:
 # CREATE LEAD ODOO
 # ==================================================
 @router.post("/lead")
-def create_lead(name: str, email: str):
-    contact_id = odoo.create_contact(name, email)
-    return {"contact_id": contact_id}
-
-        except Exception as e:
-            print(f"Erreur création contact Odoo: {e}")
-            return None
-
+def create_lead(data: LeadRequest):
+    try:
+        contact_id = odoo.create_contact(data.name, data.email)
+        return {"contact_id": contact_id}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erreur Odoo")
+        
     def update_contact(self, contact_id, update_fields: dict):
         try:
             payload = {
