@@ -1,3 +1,5 @@
+from database import get_db
+from sqlalchemy.orm import Session
 from fastapi import APIRouter
 from crm.odoo import OdooClient
 from .schemas import UserProfile
