@@ -20,7 +20,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # ==================================================
 # REGISTER
@@ -44,7 +44,7 @@ def register(email: str, password: str):
 # ==================================================
 # LOGIN
 # ==================================================
-@router.post("/login")
+@router.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     with engine.connect() as conn:
         user = conn.execute(text("""
