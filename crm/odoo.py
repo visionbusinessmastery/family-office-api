@@ -59,7 +59,7 @@ def create_lead(name: str, email: str):
     contact_id = odoo.create_contact(name, email)
     return {"contact_id": contact_id}
 
-    except Exception as e:
+        except Exception as e:
             print(f"Erreur création contact Odoo: {e}")
             return None
 
