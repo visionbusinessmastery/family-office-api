@@ -29,9 +29,14 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # GET PORTFOLIO
 # ==================================================
 @router.get("/")
-def get_portfolio(user: str = Depends(get_current_user)):
-    data = get_user_portfolio(user)
-    return {"portfolio": [dict(r._mapping) for r in data]}      
+def get_user_portfolio(email):
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolio WHERE user_email=:email
+        """), {"email": email})
+
+        return result.fetchall() 
     
 # ==================================================
 # STOCK DATA
@@ -214,22 +219,6 @@ def analyse_stock(ticker):
 # PORTFOLIO USER ADD
 # ==================================================
 @router.post("/portfolio/add")
-def add_asset(asset: Asset, db: Session = Depends(get_db)):
-    try:
-        new_asset = Portfolio(
-            asset=asset.asset,
-            asset_type=asset.asset_type,
-            quantity=asset.quantity,
-            buy_price=asset.buy_price
-        )
-        db.add(new_asset)
-        db.commit()
-        db.refresh(new_asset)
-        return {"message": "Asset ajouté"}
-    except Exception as e:
-        print(e)
-        return {"error": str(e)}
-
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
     if not engine:
