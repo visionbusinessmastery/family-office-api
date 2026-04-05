@@ -1,13 +1,18 @@
-from database import get_db
+from database import get_db, engine
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Dict
 from openai import OpenAI
+
 from auth.routes import get_current_user
 from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
 from .schemas import Asset
 from .schemas import PortfolioRequest
 from .schemas import Portfolio
+
 import yfinance as yf
 import os
 
@@ -16,6 +21,7 @@ import os
 # ==================================================
 
 router = APIRouter()
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
