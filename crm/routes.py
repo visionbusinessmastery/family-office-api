@@ -1,9 +1,14 @@
-from database import get_db
+from database import get_db, engine
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Dict
+
 from crm.odoo import OdooClient
 from .schemas import UserProfile
 from portfolio.schemas import PortfolioAnalysis
+
 import os
 
 # ==================================================
