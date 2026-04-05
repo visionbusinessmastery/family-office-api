@@ -1,3 +1,4 @@
+from openai import OpenAI
 from sqlalchemy import text
 from database import engine
 from database import Base
@@ -11,6 +12,8 @@ import os
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
 # GET USER PORTFOLIO
