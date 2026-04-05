@@ -1,6 +1,7 @@
 from database import get_db
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
+from openai import OpenAI
 from auth.routes import get_current_user
 from portfolio.service import get_user_portfolio
 from .schemas import StockRequest
@@ -15,6 +16,8 @@ import os
 # ==================================================
 
 router = APIRouter()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ==================================================
 # GET PORTFOLIO
