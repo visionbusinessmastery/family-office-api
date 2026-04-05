@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from crm.odoo import OdooClient
 from .schemas import UserProfile
+from portfolio.schemas import PortfolioAnalysis
 import os
 
 # ==================================================
