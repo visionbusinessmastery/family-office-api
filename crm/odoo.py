@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
 from .schemas import LeadRequest
-from portfolio.schemas import PortfolioAnalysis
 import requests
 import os
 
