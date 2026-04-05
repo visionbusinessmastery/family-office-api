@@ -1,17 +1,8 @@
 from openai import OpenAI
-from database import Base
-from sqlalchemy import Column, Integer, String, Float
 import os
-
-# ==================================================
-# CONFIG AI BRAIN
-# ==================================================
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ==================================================
-# AI BRAIN ADVICE
-# ==================================================
 def generate_advice(prompt: str):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
