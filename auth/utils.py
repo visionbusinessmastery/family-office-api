@@ -2,35 +2,24 @@ from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from database import Base
-from sqlalchemy import Column, Integer, String, Float
+from fastapi.security import OAuth2PasswordBearer
 import os
-
-# ==================================================
-# CONFIG
-# ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-# =========================
 # PASSWORD
-# =========================
 def hash_password(password: str):
     return pwd_context.hash(password)
 
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
-# =========================
 # TOKEN
-# =========================
 def create_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -43,7 +32,7 @@ def decode_token(token: str):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
 
-        if email is None:
+        if not email:
             raise HTTPException(status_code=401, detail="Token invalide")
 
         return email
@@ -51,9 +40,6 @@ def decode_token(token: str):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-# =========================
-# CURRENT USER
-# =========================
 def get_current_user(token: str = Depends(oauth2_scheme)):
     return decode_token(token)
 
