@@ -14,6 +14,12 @@ class Asset(BaseModel):
     quantity: float
     buy_price: float 
 
+class PortfolioRequest(BaseModel):
+    asset: str
+    asset_type: str
+    quantity: float
+    buy_price: float
+    
 class PortfolioAnalysis(BaseModel):
     total_value: float
     diversification_score: float
