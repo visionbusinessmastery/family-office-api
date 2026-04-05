@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Dict
 from auth.utils import get_current_user
 from ai.service import generate_advice
+import os
 
 # ==================================================
 # CONFIG AI BRAIN
