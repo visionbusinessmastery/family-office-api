@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict
-from .database import Base
+from database import Base
 
 # ==================================================
 # MODELS
