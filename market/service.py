@@ -22,6 +22,40 @@ def get_market_news(ticker):
     except:
         return []
 
+import requests
+
+
+def get_market_intelligence(query: str):
+    """
+    Fonction simple qui récupère des infos marché (version MVP)
+    """
+
+    sources = [
+        f"https://www.boursorama.com/recherche/?query={query}",
+        f"https://www.zonebourse.com/recherche/?q={query}",
+        f"https://www.investing.com/search/?q={query}"
+    ]
+
+    results = []
+
+    for url in sources:
+        try:
+            response = requests.get(url, timeout=5)
+            results.append({
+                "source": url,
+                "status": response.status_code
+            })
+        except Exception as e:
+            results.append({
+                "source": url,
+                "error": str(e)
+            })
+
+    return {
+        "query": query,
+        "results": results
+    }
+
 
 def enrich_portfolio_with_ai(portfolio):
 
