@@ -28,7 +28,7 @@ def get_user_portfolio(user_email):
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT asset, asset_type, quantity, buy_price
-            FROM portfolio
+            FROM portfolios
             WHERE user_email=:email
         """), {"email": user_email}).fetchall()
 
@@ -61,4 +61,3 @@ def get_user_portfolio(user_email):
         "total_value": total_value,
         "total_cost": total_cost
     }
-
