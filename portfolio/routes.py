@@ -69,7 +69,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
             """), {
                 "email": current_user,
                 "asset": request.asset.upper(),
-                "asset_type": request.asset_type.upper(),
+                "asset_type": request.asset_type.upper().replace(",", "").strip(),
                 "quantity": request.quantity,
                 "buy_price": request.buy_price
             })
