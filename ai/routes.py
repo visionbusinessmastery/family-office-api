@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from auth.utils import get_current_user
-from auth.schemas import UserRegister
 from .schemas import BrainRequest
 from .service import generate_advice
 from sqlalchemy import text
@@ -26,15 +25,15 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
         # ======================
         # PORTFOLIO
         # ======================
+        portfolio_data = get_user_portfolio(user_email)
+        total_value = 0
+        
         with engine.connect() as conn:
             rows = conn.execute(text("""
                 SELECT asset, asset_type, quantity, buy_price
                 FROM portfolio
                 WHERE user_email=:email
-            """), {"email": user}).fetchall()
-
-        portfolio_data = get_user_portfolio(user_email)
-        total_value = 0
+            """), {"email": user}).fetchall() 
 
         for r in rows:
             value = r[2] * r[3]
