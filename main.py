@@ -24,7 +24,7 @@ app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
-app.include_router(market_router, prefix="/market", tags=["Market Intelligence"])
+app.include_router(market_router, prefix="/market", tags=["Market"])
 
 @app.on_event("startup")
 def startup():
