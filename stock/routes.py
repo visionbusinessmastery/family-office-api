@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from auth.utils import get_current_user
 from .schemas import StockRequest
-from .service import get_stock_data
+from stock.service import get_stock_data
 
 router = APIRouter()
 
