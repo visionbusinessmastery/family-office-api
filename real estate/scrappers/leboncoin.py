@@ -1,5 +1,5 @@
 import requests
-from .scrapers.leboncoin import search_leboncoin
+import os
 from .analyzers.yield import calculate_yield
 from .analyzers.scoring import score_property
 
