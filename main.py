@@ -24,7 +24,7 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
-app.include_router(real_estate_router)
+app.include_router(real_estate_router, prefix="/real", tags=["Real"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 
