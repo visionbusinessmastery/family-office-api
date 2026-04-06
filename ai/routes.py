@@ -9,7 +9,7 @@ from portfolio.service import get_user_portfolio
 router = APIRouter()
 
 @router.post("/ia/brain")
-def brain(data: BrainRequest, user: str = Depends(get_current_user)):
+def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
 
     try:
         # ======================
@@ -18,7 +18,7 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
         with engine.connect() as conn:
             profile = conn.execute(text("""
                 SELECT * FROM user_profiles WHERE user_email=:email
-            """), {"email": user}).fetchone()
+            """), {"email": user_email}).fetchone()
 
         profile_data = dict(profile._mapping) if profile else {}
 
@@ -33,7 +33,7 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
                 SELECT asset, asset_type, quantity, buy_price
                 FROM portfolio
                 WHERE user_email=:email
-            """), {"email": user}).fetchall() 
+            """), {"email": user_email}).fetchall() 
 
         for r in rows:
             value = r[2] * r[3]
