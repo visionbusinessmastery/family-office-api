@@ -27,11 +27,11 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
         with engine.connect() as conn:
             rows = conn.execute(text("""
                 SELECT asset, asset_type, quantity, buy_price
-                FROM portfolio
+                FROM portfolios
                 WHERE user_email=:email
             """), {"email": user}).fetchall()
 
-        portfolio_data = []
+        portfolios_data = []
         total_value = 0
 
         for r in rows:
