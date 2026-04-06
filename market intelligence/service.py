@@ -5,6 +5,7 @@ from market_intelligence.service import get_market_news
 from market_intelligence.sentiment import analyze_sentiment
 from market_intelligence.trends import get_trends
 from market_intelligence.scoring import calculate_ai_score, get_signal, get_risk
+import requests
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -52,3 +53,36 @@ def enrich_portfolio_with_ai(portfolio):
         })
 
     return enriched
+
+def get_market_intelligence(query="stock market"):
+
+    insights = {
+        "sentiment": "neutre",
+        "trend": "stable",
+        "news": []
+    }
+
+    try:
+        # =========================
+        # GOOGLE NEWS (gratuit)
+        # =========================
+        url = f"https://news.google.com/rss/search?q={query}"
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            insights["news"].append("Actualités récupérées depuis Google News")
+
+    except:
+        pass
+
+    # =========================
+    # LOGIQUE SIMPLE SENTIMENT
+    # =========================
+    if "crash" in query.lower():
+        insights["sentiment"] = "bearish"
+        insights["trend"] = "downtrend"
+    elif "bull" in query.lower():
+        insights["sentiment"] = "bullish"
+        insights["trend"] = "uptrend"
+
+    return insights
