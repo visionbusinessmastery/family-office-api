@@ -24,13 +24,13 @@ def get_cached(url):
         return None
 
 
-def get_user_portfolio(email: str):
+def get_user_portfolio(user_email):
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT asset, asset_type, quantity, buy_price
             FROM portfolio
             WHERE user_email=:email
-        """), {"email": email}).fetchall()
+        """), {"email": user_email}).fetchall()
 
     portfolio = []
     total_value = 0
