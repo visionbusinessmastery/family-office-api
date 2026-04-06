@@ -1,4 +1,5 @@
-from pytrends.request import TrendReq
+import requests
+import os
 
 def get_trends(keyword):
 
