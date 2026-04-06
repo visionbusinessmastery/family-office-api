@@ -1,5 +1,4 @@
 import requests
-from market.config import FMP_API_KEY
 from openai import OpenAI
 from market.service import get_market_news
 from market.sentiment import analyze_sentiment
