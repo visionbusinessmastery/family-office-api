@@ -31,7 +31,7 @@ def brain(data: BrainRequest, user: str = Depends(get_current_user)):
                 WHERE user_email=:email
             """), {"email": user}).fetchall()
 
-        portfolio_data = []
+        portfolio_data = get_user_portfolio(user_email)
         total_value = 0
 
         for r in rows:
