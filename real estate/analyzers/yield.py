@@ -1,3 +1,6 @@
+import requests
+import os
+
 def calculate_yield(property):
 
     # estimation simple
