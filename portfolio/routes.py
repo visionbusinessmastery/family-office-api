@@ -9,8 +9,45 @@ router = APIRouter()
 
 # GET PORTFOLIO
 @router.get("/")
-def get_portfolio(current_user: str = Depends(get_current_user)):
-    return get_user_portfolio(current_user)
+def get_user_portfolio(email):
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolios
+            WHERE user_email=:email
+        """), {"email": email})
+
+        rows = result.fetchall()
+
+    portfolio = []
+    total_value = 0
+    total_cost = 0
+
+    for r in rows:
+        asset = r[0]
+        asset_type = r[1]
+        quantity = r[2]
+        buy_price = r[3]
+
+        value = quantity * buy_price
+        cost = quantity * buy_price
+
+        total_value += value
+        total_cost += cost
+
+        portfolio.append({
+            "asset": asset,
+            "type": asset_type,
+            "quantity": quantity,
+            "buy_price": buy_price,
+            "value": value
+        })
+
+    return {
+        "portfolio": portfolio,
+        "total_value": total_value,
+        "total_cost": total_cost
+    }
 
 
 # ADD ASSET (UPSERT PRO)
