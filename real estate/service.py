@@ -1,28 +1,8 @@
-from .scrapers.leboncoin import search_leboncoin
-from .analyzers.yield import calculate_yield
-from .analyzers.scoring import score_property
+def search_agorastore(city: str):
 
-def get_real_estate_intelligence(query):
-
-    listings = []
-
-    # 🔍 Scraping sources (MVP)
-    listings += search_leboncoin(query.city)
-
-    results = []
-
-    for property in listings:
-
-        yield_value = calculate_yield(property)
-
-        score = score_property(property, yield_value, query.strategy)
-
-        results.append({
-            "title": property["title"],
-            "price": property["price"],
-            "surface": property["surface"],
-            "yield": yield_value,
-            "score": score
-        })
-
-    return sorted(results, key=lambda x: x["score"], reverse=True)
+    return [{
+        "title": f"Enchère publique {city}",
+        "price": 70000,
+        "surface": 75,
+        "source": "agorastore"
+    }]
