@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from auth.utils import get_current_user
 from .schemas import MarketRequest
 from .service import get_market
