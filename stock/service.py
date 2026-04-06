@@ -1,10 +1,11 @@
 import requests
 import os
+import yfinance as yf
 from difflib import get_close_matches
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-# Base interne (rapide)
 COMPANY_TO_TICKER = {
     "nvidia": "NVDA",
     "tesla": "TSLA",
@@ -25,58 +26,88 @@ COMPANY_TO_TICKER = {
 def resolve_ticker(query: str):
     query = query.lower().strip()
 
-    # 1. match exact
     if query in COMPANY_TO_TICKER:
         return COMPANY_TO_TICKER[query]
 
-    # 2. fuzzy match (ex: tesl → tesla)
     match = get_close_matches(query, COMPANY_TO_TICKER.keys(), n=1, cutoff=0.6)
     if match:
         return COMPANY_TO_TICKER[match[0]]
 
-    # 3. FMP SEARCH API (ULTRA PUISSANT)
-    if FMP_API_KEY:
-        try:
-            url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=1&apikey={FMP_API_KEY}"
-            res = requests.get(url).json()
-
-            if res and len(res) > 0:
-                return res[0]["symbol"]
-
-        except:
-            pass
-
-    # 4. fallback → considérer ticker direct
     return query.upper()
 
 # =========================
-# GET STOCK DATA
+# GET STOCK DATA (MULTI SOURCE)
 # =========================
 def get_stock_data(query: str):
 
     ticker = resolve_ticker(query)
 
-    if not FMP_API_KEY:
-        return {"error": "FMP API key manquante"}
+    # =========================
+    # 1. FMP (BEST)
+    # =========================
+    if FMP_API_KEY:
+        try:
+            url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={FMP_API_KEY}"
+            data = requests.get(url).json()
 
+            if data and len(data) > 0:
+                stock = data[0]
+
+                if stock.get("price"):
+                    return {
+                        "name": stock.get("name"),
+                        "ticker": stock.get("symbol"),
+                        "price": stock.get("price"),
+                        "change_percent": stock.get("changesPercentage"),
+                        "market_cap": stock.get("marketCap"),
+                        "source": "FMP"
+                    }
+        except:
+            pass
+
+    # =========================
+    # 2. ALPHA VANTAGE
+    # =========================
+    if ALPHA_VANTAGE_API_KEY:
+        try:
+            url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+            data = requests.get(url).json()
+
+            quote = data.get("Global Quote", {})
+
+            price = quote.get("05. price")
+
+            if price:
+                return {
+                    "ticker": ticker,
+                    "price": float(price),
+                    "change_percent": quote.get("10. change percent"),
+                    "source": "Alpha Vantage"
+                }
+        except:
+            pass
+
+    # =========================
+    # 3. YAHOO FINANCE (ULTIMATE BACKUP)
+    # =========================
     try:
-        url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={FMP_API_KEY}"
-        data = requests.get(url).json()
+        stock = yf.Ticker(ticker)
+        info = stock.info
 
-        if not data:
-            return {"error": "Aucune donnée trouvée"}
+        price = info.get("currentPrice") or info.get("regularMarketPrice")
 
-        stock = data[0]
-
-        return {
-            "name": stock.get("name"),
-            "ticker": stock.get("symbol"),
-            "price": stock.get("price"),
-            "change_percent": stock.get("changesPercentage"),
-            "market_cap": stock.get("marketCap"),
-            "sector": stock.get("sector"),
-            "source": "FMP"
-        }
+        if price:
+            return {
+                "name": info.get("shortName"),
+                "ticker": ticker,
+                "price": price,
+                "market_cap": info.get("marketCap"),
+                "pe": info.get("trailingPE"),
+                "sector": info.get("sector"),
+                "source": "Yahoo Finance"
+            }
 
     except Exception as e:
         return {"error": str(e)}
+
+    return {"error": "Aucune donnée disponible"}
