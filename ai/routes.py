@@ -4,6 +4,7 @@ from .schemas import BrainRequest
 from .service import generate_advice
 from sqlalchemy import text
 from database import engine
+from portfolio.service import get_user_portfolio
 
 router = APIRouter()
 
