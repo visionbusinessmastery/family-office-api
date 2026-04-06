@@ -22,7 +22,7 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
             conn.execute(text("""
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
-                ON CONFLICT (user_email, asset)
+                ON CONFLICT unique_user_asset
                 DO UPDATE SET
                     quantity = portfolios.quantity + EXCLUDED.quantity,
                     buy_price = (
