@@ -1,6 +1,5 @@
 import requests
 import os
-from config import FMP_API_KEY
 from openai import OpenAI
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
