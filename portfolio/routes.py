@@ -43,16 +43,5 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ANALYSE PORTFOLIO
-@router.post("/portfolio/analyse/ai")
-def analyse_portfolio(current_user: str = Depends(get_current_user)):
-
-    data = get_user_portfolio(current_user)
-
-    if not data["portfolio"]:
-        raise HTTPException(status_code=404, detail="Portfolio vide")
-
-    return data
-
   
 
