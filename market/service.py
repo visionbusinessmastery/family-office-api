@@ -5,7 +5,6 @@ from market.service import get_market_news
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
-import requests
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
