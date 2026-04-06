@@ -1,4 +1,5 @@
 import requests
+import os
 
 def search_ventes_publiques(city: str):
 
