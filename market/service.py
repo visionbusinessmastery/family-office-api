@@ -1,6 +1,5 @@
 import requests
 from openai import OpenAI
-from market.service import get_market_news
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
@@ -20,8 +19,6 @@ def get_market_news(ticker):
         return data
     except:
         return []
-
-import requests
 
 
 def get_market_intelligence(query: str):
