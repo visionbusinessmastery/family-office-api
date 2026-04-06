@@ -20,15 +20,15 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
     try:
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO portfolio (user_email, asset, asset_type, quantity, buy_price)
+                INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
                 ON CONFLICT (user_email, asset)
                 DO UPDATE SET
-                    quantity = portfolio.quantity + EXCLUDED.quantity,
+                    quantity = portfolios.quantity + EXCLUDED.quantity,
                     buy_price = (
-                        (portfolio.quantity * portfolio.buy_price) +
+                        (portfolios.quantity * portfolios.buy_price) +
                         (EXCLUDED.quantity * EXCLUDED.buy_price)
-                    ) / (portfolio.quantity + EXCLUDED.quantity)
+                    ) / (portfolios.quantity + EXCLUDED.quantity)
             """), {
                 "email": current_user,
                 "asset": request.asset.upper(),
