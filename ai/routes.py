@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from auth.utils import get_current_user
+from auth.schemas import UserRegister
 from .schemas import BrainRequest
 from .service import generate_advice
 from sqlalchemy import text
