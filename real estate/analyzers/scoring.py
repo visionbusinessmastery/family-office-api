@@ -1,3 +1,6 @@
+import requests
+import os
+
 def score_property(property, yield_value, strategy):
 
     score = 0
