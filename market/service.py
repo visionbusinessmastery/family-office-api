@@ -7,6 +7,9 @@ from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
 import requests
 
+FMP_API_KEY = os.getenv("FMP_API_KEY")
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def get_market_news(ticker):
@@ -54,7 +57,7 @@ def enrich_portfolio_with_ai(portfolio):
 
     return enriched
 
-def get_market_intelligence(query="stock market"):
+def get_market(query="stock market"):
 
     insights = {
         "sentiment": "neutre",
