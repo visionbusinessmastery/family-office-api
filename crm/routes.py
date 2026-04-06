@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from .schemas import LeadRequest
 from .odoo import OdooClient
 
