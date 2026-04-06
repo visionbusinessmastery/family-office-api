@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from database import engine
+from stocks.service import get_stock_data
 import requests
 import time
 
@@ -39,10 +40,25 @@ def get_user_portfolio(user_email):
     for r in rows:
         asset, asset_type, quantity, buy_price = r
 
-        # ⚠️ simplifié (pas encore API stock)
-        current_price = buy_price
+         # =========================
+        # 🔥 PRIX LIVE
+        # =========================
+        stock_data = get_stock_data(asset)
+
+        current_price = stock_data.get("price") if stock_data else None
+
+        # fallback sécurité
+        if not current_price:
+            current_price = buy_price
+
+        # =========================
+        # CALCULS
+        # =========================
         value = quantity * current_price
         cost = quantity * buy_price
+        gain = value - cost
+
+        gain_percent = (gain / cost * 100) if cost > 0 else 0
 
         total_value += value
         total_cost += cost
@@ -53,11 +69,16 @@ def get_user_portfolio(user_email):
             "quantity": quantity,
             "buy_price": buy_price,
             "current_price": current_price,
-            "value": value
+            "value": value,
+            "gain": gain,
+            "gain_percent": round(gain_percent, 2),
+            "source": stock_data.get("source") if stock_data else "N/A"
         })
 
     return {
         "portfolio": portfolio,
-        "total_value": total_value,
-        "total_cost": total_cost
+        "total_value": round(total_value, 2),
+        "total_cost": round(total_cost, 2),
+        "total_gain": round(total_value - total_cost, 2),
+        "total_gain_percent": round(((total_value - total_cost) / total_cost * 100) if total_cost > 0 else 0, 2)
     }
