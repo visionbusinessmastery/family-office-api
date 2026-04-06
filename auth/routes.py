@@ -1,40 +1,17 @@
-from database import get_db, engine
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import text
+from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
-from jose import jwt, JWTError
-
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict
-from openai import OpenAI
-
 from .schemas import UserProfileRequest
-from passlib.context import CryptContext
-import os
-
-# ==================================================
-# CONFIG AUTH
-# ==================================================
 
 router = APIRouter()
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-# ==================================================
 # REGISTER
-# ==================================================
 @router.post("/register")
 def register(email: str, password: str):
-    with engine.begin() as conn:
-        try:
+    try:
+        with engine.begin() as conn:
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
@@ -42,16 +19,16 @@ def register(email: str, password: str):
                 "email": email,
                 "password": hash_password(password)
             })
-        except:
-            raise HTTPException(status_code=400, detail="User exists")
+    except:
+        raise HTTPException(status_code=400, detail="User exists")
 
     return {"status": "created"}
 
-# ==================================================
+
 # LOGIN
-# ==================================================
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
+
     with engine.connect() as conn:
         user = conn.execute(text("""
             SELECT email, password FROM users WHERE email=:email
@@ -62,53 +39,43 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     token = create_token({"sub": user[0]})
     return {"access_token": token, "token_type": "bearer"}
-    
 
-# ==================================================
-# GET ME
-# ==================================================
+
+# ME
 @router.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
 
-# ==================================================
-# SAVE PROFILE
-# ==================================================
+
+# SAVE PROFILE (ALIGNÉ AVEC TA DB ACTUELLE)
 @router.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
         conn.execute(text("""
         INSERT INTO user_profiles (
-            user_email, genre, age, situation_pro,
-            revenus_mensuels, revenus_annuels,
-            situation_familiale, enfants, nb_enfants,
-            logement, valeur_bien, prix_achat,
-            dettes, epargne, investissements
+            user_email, gender, age, employment_status,
+            monthly_income, marital_status, children_count,
+            housing_status, real_estate_value, real_estate_purchase_price,
+            total_debt, savings, investments, crypto, risk_profile
         )
         VALUES (
             :email, :genre, :age, :situation_pro,
-            :revenus_mensuels, :revenus_annuels,
-            :situation_familiale, :enfants, :nb_enfants,
+            :revenus_mensuels, :situation_familiale, :nb_enfants,
             :logement, :valeur_bien, :prix_achat,
-            :dettes, :epargne, :investissements
+            0, 0, 0, 0, 'medium'
         )
         ON CONFLICT (user_email)
         DO UPDATE SET
-            genre = EXCLUDED.genre,
+            gender = EXCLUDED.gender,
             age = EXCLUDED.age,
-            situation_pro = EXCLUDED.situation_pro,
-            revenus_mensuels = EXCLUDED.revenus_mensuels,
-            revenus_annuels = EXCLUDED.revenus_annuels,
-            situation_familiale = EXCLUDED.situation_familiale,
-            enfants = EXCLUDED.enfants,
-            nb_enfants = EXCLUDED.nb_enfants,
-            logement = EXCLUDED.logement,
-            valeur_bien = EXCLUDED.valeur_bien,
-            prix_achat = EXCLUDED.prix_achat,
-            dettes = EXCLUDED.dettes,
-            epargne = EXCLUDED.epargne,
-            investissements = EXCLUDED.investissements,
+            employment_status = EXCLUDED.employment_status,
+            monthly_income = EXCLUDED.monthly_income,
+            marital_status = EXCLUDED.marital_status,
+            children_count = EXCLUDED.children_count,
+            housing_status = EXCLUDED.housing_status,
+            real_estate_value = EXCLUDED.real_estate_value,
+            real_estate_purchase_price = EXCLUDED.real_estate_purchase_price,
             updated_at = CURRENT_TIMESTAMP
         """), {
             "email": user,
@@ -116,4 +83,3 @@ def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)
         })
 
     return {"status": "profil sauvegardé"}
-
