@@ -4,6 +4,7 @@ from openai import OpenAI
 from market_intelligence.service import get_market_news
 from market_intelligence.sentiment import analyze_sentiment
 from market_intelligence.trends import get_trends
+from market_intelligence.scoring import calculate_ai_score, get_signal, get_risk
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -28,13 +29,26 @@ def enrich_portfolio_with_ai(portfolio):
         ticker = asset["asset"]
 
         news = get_market_news(ticker)
-        sentiment = analyze_sentiment(news)
+        sentiment_raw = analyze_sentiment(news)
+
+        # ⚠️ ici simplification (tu peux parser plus tard)
+        sentiment_score = 60  # temporaire
+
         trend_score = get_trends(ticker)
+
+        price_change = 2  # temporaire (à connecter FMP)
+
+        score = calculate_ai_score(
+            sentiment_score,
+            trend_score,
+            price_change
+        )
 
         enriched.append({
             **asset,
-            "sentiment": sentiment,
-            "trend_score": trend_score
+            "ai_score": score,
+            "signal": get_signal(score),
+            "risk": get_risk(score)
         })
 
     return enriched
