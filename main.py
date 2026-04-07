@@ -5,7 +5,6 @@ from auth.routes import router as auth_router
 from stocks.routes import router as stocks_router
 from portfolio.routes import router as portfolio_router
 from market.routes import router as market_router
-from real.routes import router as real_router
 from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
@@ -24,7 +23,6 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
-app.include_router(real_router, prefix="/real", tags=["Real"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 
