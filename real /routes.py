@@ -4,6 +4,6 @@ from .service import get_real_estate_intelligence
 
 router = APIRouter()
 
-@router.post("/real")
-def real(query: RealQuery):
-    return get_real(query)
+@router.post("/")
+def real(query: RealEstateQuery):
+    return get_real_estate_intelligence(query)
