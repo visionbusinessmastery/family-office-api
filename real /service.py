@@ -4,9 +4,9 @@ from .scrappers.ventes_publiques import search_ventes_publiques
 from .scrappers.imodom import search_imodom
 from .scrappers.agorastore import search_agorastore
 
-from .analyzers.yield import calculate_yield
-from .analyzers.scoring import score_property
-from .analyzers.ai_analysis import analyze_property_ai
+from ..analyzers.yield import calculate_yield
+from ..analyzers.scoring import score_property
+from ..analyzers.ai_analysis import analyze_property_ai
 
 
 def get_real_estate_intelligence(query):
