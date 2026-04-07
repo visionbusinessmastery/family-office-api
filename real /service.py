@@ -1,8 +1,8 @@
-from .scrapers.leboncoin import search_leboncoin
-from .scrapers.seloger import search_seloger
-from .scrapers.ventes_publiques import search_ventes_publiques
-from .scrapers.imodom import search_imodom
-from .scrapers.agorastore import search_agorastore
+from .scrappers.leboncoin import search_leboncoin
+from .scrappers.seloger import search_seloger
+from .scrappers.ventes_publiques import search_ventes_publiques
+from .scrappers.imodom import search_imodom
+from .scrappers.agorastore import search_agorastore
 
 from .analyzers.yield import calculate_yield
 from .analyzers.scoring import score_property
