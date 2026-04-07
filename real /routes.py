@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 from .schemas import RealEstateQuery
 from .service import get_real_estate_intelligence
 
-router = APIRouter()
+router = APIRouter(prefix="/real-estate", tags=["Real Estate"])
 
-@router.post("/real")
-def real(query: Real(Query):
-    return get_real(query)
+@router.post("/")
+def real(query: RealEstateQuery):
+    return get_real_estate_intelligence(query)
