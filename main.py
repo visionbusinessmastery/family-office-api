@@ -5,7 +5,7 @@ from auth.routes import router as auth_router
 from stocks.routes import router as stocks_router
 from portfolio.routes import router as portfolio_router
 from market.routes import router as market_router
-from real.routes import router as real_router
+from real_estate.routes import router as real_router
 from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
