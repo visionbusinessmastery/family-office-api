@@ -1,4 +1,4 @@
-def calculate_yield(prop):
+def calculate_yield(prop: dict):
 
     rent_estimated = prop["surface"] * 10
     annual_rent = rent_estimated * 12
