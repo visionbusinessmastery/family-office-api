@@ -1,4 +1,4 @@
-from .scrapers.leboncoin import search_leboncoin
+from .scrappers.leboncoin import search_leboncoin
 from .analyzers.yield_calc import calculate_yield
 from .analyzers.scoring import score_property
 
