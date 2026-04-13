@@ -1,3 +1,4 @@
+from core.utils import safe_execute
 from fastapi import APIRouter, Depends, HTTPException
 from auth.utils import get_current_user
 from .schemas import StockRequest, PortfolioRequest
