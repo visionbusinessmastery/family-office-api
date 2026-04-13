@@ -1,3 +1,4 @@
+from core.utils import safe_execute
 from fastapi import APIRouter
 from .schemas import CrowdfundingQuery
 from .service import get_crowdfunding_intelligence
