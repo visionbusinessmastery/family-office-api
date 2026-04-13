@@ -7,6 +7,7 @@ from portfolio.routes import router as portfolio_router
 from market.routes import router as market_router
 from real_estate.routes import router as real_router
 from business.routes import router as business_router
+from crypto.routes import router as crypto_router
 from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
@@ -27,6 +28,7 @@ app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(real_router, prefix="/real", tags=["Real"])
 app.include_router(business_router, prefix="/business", tags=["Business"])
+app.include_router(crypto_router, prefix="/crypto", tags=["Crypto"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 
