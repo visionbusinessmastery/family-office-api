@@ -69,3 +69,18 @@ def get_risk(score):
         return "MEDIUM"
     else:
         return "HIGH"
+
+def global_score(return_rate, risk, duration):
+    score = 0
+
+    score += return_rate * 2
+
+    if risk == "low":
+        score += 20
+    elif risk == "medium":
+        score += 10
+
+    if duration < 24:
+        score += 10
+
+    return min(score, 100)
