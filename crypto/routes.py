@@ -1,3 +1,4 @@
+from core.utils import safe_execute
 from fastapi import APIRouter
 from .schemas import CryptoQuery
 from .service import get_crypto_intelligence
