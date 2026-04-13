@@ -1,5 +1,5 @@
 from core.utils import safe_execute
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from .schemas import BusinessQuery
 from .service import get_business_intelligence
 
