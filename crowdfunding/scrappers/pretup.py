@@ -5,5 +5,5 @@ def search_pretup():
         "expected_return": 9.5,
         "risk": "medium",
         "duration": 18,
-        "source": "wiseed"
+        "source": "pretup"
     }]
