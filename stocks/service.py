@@ -111,3 +111,25 @@ def get_stock_data(query: str):
         return {"error": str(e)}
 
     return {"error": "Aucune donnée disponible"}
+
+
+def get_stock_intelligence(symbol: str = "AAPL"):
+    try:
+        stock = yf.Ticker(symbol)
+
+        info = stock.info
+
+        return {
+            "symbol": symbol,
+            "price": info.get("currentPrice"),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "sector": info.get("sector"),
+            "recommendation": "buy" if info.get("trailingPE", 0) < 20 else "hold"
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e),
+            "symbol": symbol
+        }
