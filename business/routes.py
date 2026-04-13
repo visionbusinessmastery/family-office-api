@@ -1,0 +1,9 @@
+from fastapi import APIRouter
+from .schemas import BusinessQuery
+from .service import get_business_intelligence
+
+router = APIRouter()
+
+@router.post("/business")
+def business(query: BusinessQuery):
+    return get_business_intelligence(query)
