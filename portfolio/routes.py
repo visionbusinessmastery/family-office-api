@@ -77,8 +77,6 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
         return {"status": "asset ajouté ou mis à jour"}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
   
