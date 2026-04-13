@@ -70,3 +70,22 @@ def get_business_intelligence(query):
             })
 
     return results
+
+def generate_business_ideas(sector, budget):
+    ideas = []
+
+    if sector == "informatique":
+        ideas.append({
+            "idea": "Agence marketing digital",
+            "budget_required": 5000,
+            "roi": "high"
+        })
+
+    if budget > 20000:
+        ideas.append({
+            "idea": "SaaS niche",
+            "budget_required": 20000,
+            "roi": "very high"
+        })
+
+    return ideas
