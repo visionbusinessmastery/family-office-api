@@ -1,3 +1,4 @@
+from core.utils import safe_execute
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
