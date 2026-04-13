@@ -11,44 +11,42 @@ router = APIRouter()
 # GET PORTFOLIO
 @router.get("/")
 def get_user_portfolio(email):
-    with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT asset, asset_type, quantity, buy_price
-            FROM portfolios
-            WHERE user_email=:email
-        """), {"email": email})
 
-        rows = result.fetchall()
+    def _get():
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT asset, asset_type, quantity, buy_price
+                FROM portfolios
+                WHERE user_email=:email
+            """), {"email": email})
 
-    portfolio = []
-    total_value = 0
-    total_cost = 0
+            rows = result.fetchall()
 
-    for r in rows:
-        asset = r[0]
-        asset_type = r[1]
-        quantity = r[2]
-        buy_price = r[3]
+        portfolio = []
+        total_value = 0
+        total_cost = 0
 
-        value = quantity * buy_price
-        cost = quantity * buy_price
+        for r in rows:
+            value = r[2] * r[3]
 
-        total_value += value
-        total_cost += cost
+            total_value += value
+            total_cost += value
 
-        portfolio.append({
-            "asset": asset,
-            "type": asset_type,
-            "quantity": quantity,
-            "buy_price": buy_price,
-            "value": value
-        })
+            portfolio.append({
+                "asset": r[0],
+                "type": r[1],
+                "quantity": r[2],
+                "buy_price": r[3],
+                "value": value
+            })
 
-    return {
-        "portfolio": portfolio,
-        "total_value": total_value,
-        "total_cost": total_cost
-    }
+        return {
+            "portfolio": portfolio,
+            "total_value": total_value,
+            "total_cost": total_cost
+        }
+
+    return safe_execute(_get, module_name="PORTFOLIO")
 
 
 # ADD ASSET (UPSERT PRO)
