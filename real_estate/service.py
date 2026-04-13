@@ -9,6 +9,7 @@ from .analyzers.scoring import score_property
 from .analyzers.ai_analysis import analyze_property_ai
 from .analyzers.market_estimator import estimate_price_m2
 from .analyzers.deal_detector import detect_deal
+from .analyzers.market_estimator import estimate_price_m2
 
 
 def get_real_estate_intelligence(query):
