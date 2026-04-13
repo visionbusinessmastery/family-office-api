@@ -1,6 +1,6 @@
 import logging
 from core.utils import safe_execute
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from .schemas import RealEstateQuery
 from .service import get_real_estate_intelligence
 
