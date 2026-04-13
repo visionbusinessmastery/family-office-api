@@ -1,4 +1,6 @@
+import time
 import requests
+from functools import lru_cache
 import os
 import yfinance as yf
 from difflib import get_close_matches
@@ -133,3 +135,19 @@ def get_stock_intelligence(symbol: str = "AAPL"):
             "error": str(e),
             "symbol": symbol
         }
+        
+
+@lru_cache(maxsize=100)
+def search_stock_cached(query: str):
+    url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=5&apikey={API_KEY}"
+    
+    for attempt in range(3):
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            return response.json()
+        
+        elif response.status_code == 429:
+            time.sleep(2)  # wait before retry
+        
+    return []
