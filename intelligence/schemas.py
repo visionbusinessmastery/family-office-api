@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-class GlobalQuery(BaseModel):
+class GlobalRequest(BaseModel):
     budget: float
-    risk: str  # low, medium, high
-    strategy: str  # growth, income, balanced
+    risk: str
+    strategy: str
