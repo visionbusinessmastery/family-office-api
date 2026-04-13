@@ -55,7 +55,7 @@ def get_user_portfolio(email):
 @router.post("/portfolio/add")
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
-    try:
+    def _add():
         with engine.begin() as conn:
             conn.execute(text("""
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
@@ -77,7 +77,6 @@ def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current
 
         return {"status": "asset ajouté ou mis à jour"}
 
-
-
+    return safe_execute(_add, module_name="PORTFOLIO")
   
 
