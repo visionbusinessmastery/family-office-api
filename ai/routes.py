@@ -70,5 +70,3 @@ def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
             "answer": answer
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
