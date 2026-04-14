@@ -1,3 +1,4 @@
+from core.limiter import limiter
 from core.utils import safe_execute
 from fastapi import APIRouter
 from .schemas import RealRequest
