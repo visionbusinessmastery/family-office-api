@@ -8,9 +8,7 @@ from database import engine
 
 router = APIRouter()
 
-@router.post("/ia/brain")
-@limiter.limit("5/minute")        
-@limiter_ip.limit("30/minute")     
+@router.post("/ia/brain")    
 def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
 
     def _brain():
