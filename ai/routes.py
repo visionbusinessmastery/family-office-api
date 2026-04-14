@@ -1,18 +1,18 @@
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from auth.utils import get_current_user
 from .schemas import BrainRequest
 from .service import generate_advice
 from sqlalchemy import text
 from database import engine
-from portfolio.service import get_user_portfolio
 
 router = APIRouter()
 
 @router.post("/ia/brain")
 def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
 
-    try:
+    def _brain():
+
         # ======================
         # PROFILE
         # ======================
@@ -26,15 +26,15 @@ def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
         # ======================
         # PORTFOLIO
         # ======================
-        portfolio_data = get_user_portfolio(user_email)
+        portfolio_data = []
         total_value = 0
-        
+
         with engine.connect() as conn:
             rows = conn.execute(text("""
                 SELECT asset, asset_type, quantity, buy_price
-                FROM portfolio
+                FROM portfolios
                 WHERE user_email=:email
-            """), {"email": user_email}).fetchall() 
+            """), {"email": user_email}).fetchall()
 
         for r in rows:
             value = r[2] * r[3]
@@ -69,4 +69,6 @@ def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
             "question": data.question,
             "answer": answer
         }
+
+    return safe_execute(_brain, module_name="AI_BRAIN")
 
