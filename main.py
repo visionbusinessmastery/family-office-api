@@ -7,6 +7,10 @@ logging.basicConfig(
 
 from core.limiter import limiter
 
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address  # optionnel si fallback IP
+
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI
 from fastapi import Request
