@@ -1,3 +1,4 @@
+from core.limiter import limiter
 from fastapi import APIRouter
 from core.utils import safe_execute
 
