@@ -10,6 +10,7 @@ router = APIRouter()
 
 # GET PORTFOLIO
 @router.get("/")
+@limiter.limit("10/minute")
 def get_user_portfolio(email):
 
     def _get():
@@ -51,6 +52,7 @@ def get_user_portfolio(email):
 
 # ADD ASSET (UPSERT PRO)
 @router.post("/portfolio/add")
+@limiter.limit("10/minute")
 def add_asset(request: PortfolioRequest, current_user: str = Depends(get_current_user)):
 
     def _add():
