@@ -7,6 +7,7 @@ router = APIRouter()
 odoo = OdooClient()
 
 @router.post("/lead")
+@limiter.limit("10/minute")
 def create_lead(data: LeadRequest):
 
     def _create_lead():
