@@ -1,7 +1,7 @@
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 import os
 
@@ -46,6 +46,4 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 def get_user_key(request: Request):
     return request.headers.get("Authorization")
 
-def get_user_key(request: Request):
-    return request.state.user_email
 
