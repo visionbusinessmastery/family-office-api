@@ -8,6 +8,7 @@ from .service import get_market_intelligence
 router = APIRouter()
 
 @router.post("/market")
+@limiter.limit("20/minute")
 def market(request: MarketRequest, user: str = Depends(get_current_user)):
     
     data = get_market(request.query)
@@ -18,5 +19,6 @@ def market(request: MarketRequest, user: str = Depends(get_current_user)):
     }
 
 @router.get("/market-intelligence")
+@limiter.limit("20/minute")
 def market_intelligence(query: str):
     return get_market_intelligence(query)
