@@ -6,6 +6,7 @@ from .service import get_real_estate_intelligence
 router = APIRouter()
 
 @router.post("/")
+@limiter.limit("5/minute")
 def real(data: RealRequest):
 
     def _real():
