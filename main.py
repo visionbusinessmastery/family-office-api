@@ -27,7 +27,10 @@ from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
 app = FastAPI(title="Family Office AI", version="10.1")
+
 limiter = Limiter(key_func=get_remote_address)
+limiter_ip = Limiter(key_func=get_remote_address)
+
 app.state.limiter = limiter
 
 
