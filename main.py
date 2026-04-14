@@ -5,9 +5,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+from core.limiter import limiter
+
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI
 from fastapi import Request
@@ -28,11 +27,7 @@ from crm.routes import router as crm_router
 
 app = FastAPI(title="Family Office AI", version="10.1")
 
-limiter = Limiter(key_func=get_remote_address)
-limiter_ip = Limiter(key_func=get_remote_address)
-
 app.state.limiter = limiter
-
 
 app.add_middleware(
     CORSMiddleware,
