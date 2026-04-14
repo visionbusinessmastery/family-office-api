@@ -1,5 +1,5 @@
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 from .schemas import LeadRequest
 from .odoo import OdooClient
 
@@ -8,9 +8,11 @@ odoo = OdooClient()
 
 @router.post("/lead")
 def create_lead(data: LeadRequest):
-    try:
+
+    def _create_lead():
         contact_id = odoo.create_contact(data.name, data.email)
         return {"contact_id": contact_id}
 
+    return safe_execute(_create_lead, module_name="CRM")
 
 
