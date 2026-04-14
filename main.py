@@ -5,9 +5,14 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+
 from database import Base, engine
 from auth.routes import router as auth_router
 from stocks.routes import router as stocks_router
@@ -22,15 +27,28 @@ from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
 app = FastAPI(title="Family Office AI", version="10.1")
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://ton-frontend.com","http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "status": "error",
+            "message": "Trop de requêtes, ralentis"
+        },
+    )
+    
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
@@ -58,6 +76,7 @@ async def log_requests(request: Request, call_next):
     logging.info(f"{request.method} {request.url}")
     response = await call_next(request)
     return response
+    
 
 # ROUTERS
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
