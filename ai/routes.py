@@ -1,3 +1,4 @@
+from core.limiter import limiter
 from core.utils import safe_execute
 from fastapi import APIRouter, Depends
 from auth.utils import get_current_user
@@ -9,6 +10,7 @@ from database import engine
 router = APIRouter()
 
 @router.post("/ia/brain")    
+@limiter.limit("5/minute")
 def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
 
     def _brain():
