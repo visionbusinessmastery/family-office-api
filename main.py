@@ -6,6 +6,7 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
 from auth.routes import router as auth_router
@@ -30,6 +31,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+    
+# ✅ ROOT (optionnel mais conseillé)
+@app.get("/")
+def root():
+    return {"message": "API Family Office running"}
+
+# ✅ HEALTH CHECK (IMPORTANT)
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.get("/info")
+def info():
+    return {
+        "app": "Family Office AI",
+        "version": "10.1",
+        "status": "running"
+    }
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logging.info(f"{request.method} {request.url}")
+    response = await call_next(request)
+    return response
+
 # ROUTERS
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
@@ -42,16 +71,6 @@ app.include_router(crowdfunding_router, prefix="/crowdfunding", tags=["Crowdfund
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Global Intelligence"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
-
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
-    
-@app.get("/")
-def root():
-    return {"status": "API running"}
-
-
 
 
 
