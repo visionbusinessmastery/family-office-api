@@ -43,3 +43,6 @@ def decode_token(token: str):
 def get_current_user(token: str = Depends(oauth2_scheme)):
     return decode_token(token)
 
+def get_user_key(request: Request):
+    return request.headers.get("Authorization")
+
