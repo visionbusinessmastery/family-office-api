@@ -46,3 +46,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 def get_user_key(request: Request):
     return request.headers.get("Authorization")
 
+def get_user_key(request: Request):
+    return request.state.user_email
+
