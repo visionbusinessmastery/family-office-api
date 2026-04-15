@@ -1,5 +1,5 @@
 from core.limiter import limiter
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 from core.utils import safe_execute
 
 from .schemas import GlobalRequest   # ✅ corrigé
