@@ -1,6 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from auth.utils import get_current_user
 from .schemas import StockRequest, PortfolioRequest
 from portfolio.service import get_user_portfolio
@@ -12,7 +12,7 @@ router = APIRouter()
 # GET PORTFOLIO
 @router.get("/")
 @limiter.limit("10/minute")
-def get_user_portfolio(request: Request, email):
+def get_user_portfolio(request: Request, data: PortfolioRquest):
 
     def _get():
         with engine.connect() as conn:
