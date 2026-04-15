@@ -8,6 +8,7 @@ router = APIRouter()
 
 @router.post("/")
 @limiter.limit("5/minute")
+def real(request: Request, data: RegisterRequest):
 def real(data: RealRequest):
 
     def _real():
