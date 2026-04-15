@@ -9,8 +9,7 @@ router = APIRouter()
 
 @router.post("/global")
 @limiter.limit("5/minute")
-def global_intelligence(request: Request, data: RegisterRequest):
-def global_intelligence(data: GlobalRequest):   # ✅ corrigé
+def global_intelligence(request: Request, data: GlobalRequest):   
     return safe_execute(
         get_global_intelligence,
         data,
