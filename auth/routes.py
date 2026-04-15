@@ -1,19 +1,18 @@
 from core.limiter import limiter
 from core.utils import safe_execute
 from fastapi import APIRouter, Depends, HTTPException, Request
-from .schemas import RegisterRequest
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
-from .schemas import UserProfileRequest
+from .schemas import UserRegisterRequest, UserProfileRequest
 
 router = APIRouter()
 
 # REGISTER
 @router.post("/register")
 @limiter.limit("3/minute")
-def register(request: Request, data: RegisterRequest):
+def register(request: Request, data: UserRegisterRequest):
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -32,7 +31,7 @@ def register(request: Request, data: RegisterRequest):
 # LOGIN
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, data: RegisterRequest):
+def login(request: Request, data: UserRegisterRequest):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
