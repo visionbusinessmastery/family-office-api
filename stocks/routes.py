@@ -1,6 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from auth.utils import get_current_user
 from .schemas import StockRequest
 from .service import get_stock_data
