@@ -12,8 +12,7 @@ router = APIRouter()
 # GET PORTFOLIO
 @router.get("/")
 @limiter.limit("10/minute")
-def get_user_portfolio(request: Request, data: RegisterRequest):
-def get_user_portfolio(email):
+def get_user_portfolio(request: Request, email):
 
     def _get():
         with engine.connect() as conn:
