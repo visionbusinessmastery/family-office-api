@@ -54,7 +54,7 @@ def get_user_portfolio(request: Request, data: PortfolioRequest):
 # ADD ASSET (UPSERT PRO)
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
-def add_asset(request: Request, data: PortfolioRequest, current_user: str = Depends(get_current_user)):
+def add_asset(request: Request, data: PortfolioRequest):
 
     def _add():
         with engine.begin() as conn:
