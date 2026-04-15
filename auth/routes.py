@@ -5,14 +5,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
-from .schemas import UserRegisterRequest, UserProfileRequest
+from .schemas import UserRegister, UserProfileRequest
 
 router = APIRouter()
 
 # REGISTER
 @router.post("/register")
 @limiter.limit("3/minute")
-def register(request: Request, data: UserRegisterRequest):
+def register(request: Request, data: UserRegister):
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -31,7 +31,7 @@ def register(request: Request, data: UserRegisterRequest):
 # LOGIN
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, data: UserRegisterRequest):
+def login(request: Request, data: UserRegister):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
