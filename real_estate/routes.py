@@ -1,6 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 from .schemas import RealRequest
 from .service import get_real_estate_intelligence
 
