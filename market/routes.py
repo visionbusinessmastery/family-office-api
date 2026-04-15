@@ -1,6 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from auth.utils import get_current_user
 from .schemas import MarketRequest
 from .service import get_market
@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.post("/market")
 @limiter.limit("20/minute")
-def market(request: Request, request: MarketRequest, user: str = Depends(get_current_user)):
+def market(request: Request, data: MarketRequest):
     
     data = get_market(request.query)
 
