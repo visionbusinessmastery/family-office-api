@@ -11,8 +11,7 @@ router = APIRouter()
 
 @router.post("/ia/brain")    
 @limiter.limit("5/minute")
-def brain(request: Request, data: RegisterRequest):
-def brain(data: BrainRequest, user_email: str = Depends(get_current_user)):
+def brain(request: Request, data: BrainRequest, user_email: str = Depends(get_current_user)):
 
     def _brain():
 
