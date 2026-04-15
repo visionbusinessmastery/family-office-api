@@ -12,8 +12,7 @@ router = APIRouter()
 # REGISTER
 @router.post("/register")
 @limiter.limit("3/minute")
-def register(request: Request, data: RegisterRequest):
-def register(email: str, password: str):
+def register(request: Request,email: str, password: str):
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -32,8 +31,7 @@ def register(email: str, password: str):
 # LOGIN
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, data: RegisterRequest):
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
