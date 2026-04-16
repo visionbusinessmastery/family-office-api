@@ -14,4 +14,4 @@ def crypto(request: Request, data: CryptoQuery):
     
     return get_crypto_intelligence(data.query)
 
-    return safe_execute(_brain, module_name="CRYPTO")
+    return safe_execute(_crypto, module_name="CRYPTO")
