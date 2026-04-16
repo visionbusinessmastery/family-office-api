@@ -9,4 +9,4 @@ router = APIRouter()
 @router.post("/crypto")
 @limiter.limit("20/minute")
 def crypto(request: Request, data: CryptoQuery):
-    return get_crypto_intelligence(query)
+    return get_crypto_intelligence(data.query)
