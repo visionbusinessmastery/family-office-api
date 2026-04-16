@@ -14,4 +14,4 @@ def business(request: Request, data: BusinessQuery):
     
     return get_business_intelligence(data)
     
-    return safe_execute(_business, module_name="BUSINESS")
+return safe_execute(_business, module_name="BUSINESS")
