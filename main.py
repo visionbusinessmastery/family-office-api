@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.utils import decode_token
 from database import Base, engine
 from auth.routes import router as auth_router
 from stocks.routes import router as stocks_router
