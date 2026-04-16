@@ -21,7 +21,15 @@ def market(request: Request, data: MarketRequest):
         "market": result
     }
 
+    return safe_execute(_market, module_name="MARKET")
+
+
 @router.get("/market-intelligence")
 @limiter.limit("20/minute")
 def market_intelligence(request: Request, query: str):
+    
+    user_email = request.state.user_email
+    
     return get_market_intelligence(query)
+    
+    return safe_execute(_market_intelligence, module_name="MARKET_INTELLIGENCE")
