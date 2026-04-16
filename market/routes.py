@@ -17,8 +17,8 @@ def market(request: Request, data: MarketRequest):
     market_data = get_market(data.query)
 
     return {
-        "user": user,
-        "market": data
+        "user": request.state.user_email,
+        "market": result
     }
 
 @router.get("/market-intelligence")
