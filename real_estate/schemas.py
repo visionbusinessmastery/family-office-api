@@ -7,3 +7,4 @@ class RealEstateQuery(BaseModel):
 class RealRequest(BaseModel):
     city: str
     strategy: str
+    budget: float
