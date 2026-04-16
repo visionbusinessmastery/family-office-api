@@ -10,8 +10,9 @@ router = APIRouter()
 @router.post("/global")
 @limiter.limit("5/minute")
 def global_intelligence(request: Request, data: GlobalRequest):   
-    return safe_execute(
-        get_global_intelligence,
-        data,
-        "GLOBAL_INTELLIGENCE"
-    )
+
+    user_email = request.state.user_email
+    
+    return gobal_intelligence(data)
+    
+    return safe_execute(_global_intelligence, module_name="INTELLIGENCE")
