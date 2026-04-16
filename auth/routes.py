@@ -1,7 +1,5 @@
 from core.limiter import limiter
-from core.utils import safe_execute
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
@@ -9,27 +7,31 @@ from .schemas import UserRegister, UserProfileRequest
 
 router = APIRouter()
 
+# =========================
 # REGISTER
-@router.post("/login")
-@limiter.limit("3/minute")
-def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+# =========================
+@router.post("/register")
+@limiter.limit("2/minute")
+def register(request: Request, data: UserRegister):
 
-    with engine.connect() as conn:
-        user = conn.execute(text("""
-            SELECT email, password FROM users WHERE email=:email
-        """), {"email": form_data.username}).fetchone()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO users (email, password)
+                VALUES (:email, :password)
+            """), {
+                "email": data.email,
+                "password": hash_password(data.password)
+            })
+    except:
+        raise HTTPException(status_code=400, detail="User exists")
 
-    if not user or not verify_password(form_data.password, user[1]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"status": "created"}
 
-    token = create_token({"sub": user[0]})
 
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
-
-# LOGIN
+# =========================
+# LOGIN (JSON → RECOMMANDÉ)
+# =========================
 @router.post("/login")
 @limiter.limit("3/minute")
 def login(request: Request, data: UserRegister):
@@ -43,16 +45,24 @@ def login(request: Request, data: UserRegister):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token({"sub": user[0]})
-    return {"access_token": token, "token_type": "bearer"}
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
 
 
+# =========================
 # ME
+# =========================
 @router.get("/me")
 def me(user: str = Depends(get_current_user)):
     return {"user": user}
 
 
-# SAVE PROFILE (ALIGNÉ AVEC TA DB ACTUELLE)
+# =========================
+# SAVE PROFILE
+# =========================
 @router.post("/profile/save")
 def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
