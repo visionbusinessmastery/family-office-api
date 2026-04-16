@@ -35,14 +35,14 @@ def register(request: Request, data: UserRegister):
 # =========================
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, data: UserRegister):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
             SELECT email, password FROM users WHERE email=:email
-        """), {"email": data.email}).fetchone()
+        """), {"email": form_data.username}).fetchone()
 
-    if not user or not verify_password(data.password, user[1]):
+    if not user or not verify_password(form_data.password, user[1]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token({"sub": user[0]})
