@@ -14,4 +14,4 @@ def crowdfunding(request: Request, data: CrowdfundingQuery):
     
     return get_crowdfunding_intelligence(data.query)
 
-    return safe_execute(_brain, module_name="CROWDFUNDING")
+    return safe_execute(_crowdfunding, module_name="CROWDFUNDING")
