@@ -1,5 +1,6 @@
 from core.limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
