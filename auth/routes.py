@@ -19,8 +19,8 @@ def register(request: Request, data: UserRegister):
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
             """), {
-                "email": email,
-                "password": hash_password(password)
+                "email": data.email,
+                "password": hash_password(data.password)
             })
     except:
         raise HTTPException(status_code=400, detail="User exists")
@@ -36,9 +36,9 @@ def login(request: Request, data: UserRegister):
     with engine.connect() as conn:
         user = conn.execute(text("""
             SELECT email, password FROM users WHERE email=:email
-        """), {"email": form_data.username}).fetchone()
+        """), {"email": data.email}).fetchone()
 
-    if not user or not verify_password(form_data.password, user[1]):
+    if not user or not verify_password(data.password, user[1]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token({"sub": user[0]})
