@@ -9,4 +9,4 @@ router = APIRouter()
 @router.post("/business")
 @limiter.limit("5/minute")
 def business(request: Request, data: BusinessQuery):
-    return get_business_intelligence(query)
+    return get_business_intelligence(data.query)
