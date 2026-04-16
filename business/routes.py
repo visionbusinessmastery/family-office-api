@@ -10,8 +10,12 @@ router = APIRouter()
 @limiter.limit("5/minute")
 def business(request: Request, data: BusinessQuery):
 
-    user_email = request.state.user_email
-    
-    return get_business_intelligence(data)
-    
-return safe_execute(_business, module_name="BUSINESS")
+    def _business():
+        user_email = request.state.user_email
+
+        return get_business_intelligence({
+            "user_email": user_email,
+            **data.dict()
+        })
+
+    return safe_execute(_business, module_name="BUSINESS")
