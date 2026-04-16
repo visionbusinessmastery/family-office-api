@@ -13,6 +13,8 @@ router = APIRouter()
 @limiter.limit("5/minute")
 def brain(request: Request, data: BrainRequest):
 
+    user_email = request.state.user_email
+    
     def _brain():
 
         # ======================
