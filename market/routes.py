@@ -23,5 +23,5 @@ def market(request: Request, data: MarketRequest):
 
 @router.get("/market-intelligence")
 @limiter.limit("20/minute")
-def market_intelligence(query: str):
+def market_intelligence(request: Request, query: str):
     return get_market_intelligence(query)
