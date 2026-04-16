@@ -9,4 +9,8 @@ router = APIRouter()
 @router.post("/business")
 @limiter.limit("5/minute")
 def business(request: Request, data: BusinessQuery):
+
+    user_email = request.state.user_email
+    
     return get_business_intelligence(data)
+    return safe_execute(_brain, module_name="BUSINESS")
