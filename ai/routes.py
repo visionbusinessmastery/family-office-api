@@ -1,6 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from auth.utils import get_current_user
 from .schemas import BrainRequest
 from .service import generate_advice
