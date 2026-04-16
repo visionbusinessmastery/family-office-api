@@ -14,8 +14,6 @@ router = APIRouter()
 @limiter.limit("10/minute")
 def get_user_portfolio(request: Request):
 
-    user_email = request.state.user_email
-
     def _get():
         with engine.connect() as conn:
             result = conn.execute(text("""
@@ -53,8 +51,6 @@ def get_user_portfolio(request: Request):
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):
-
-    user_email = request.state.user_email
 
     def _add():
         with engine.begin() as conn:
