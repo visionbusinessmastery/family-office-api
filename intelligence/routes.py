@@ -15,4 +15,4 @@ def global_intelligence(request: Request, data: GlobalRequest):
     
     return gobal_intelligence(data)
     
-    return safe_execute(_global_intelligence, module_name="INTELLIGENCE")
+return safe_execute(_global_intelligence, module_name="INTELLIGENCE")
