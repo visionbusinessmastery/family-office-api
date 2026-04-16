@@ -35,7 +35,7 @@ def register(request: Request, data: UserRegister):
 # =========================
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, data: UserRegister):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
