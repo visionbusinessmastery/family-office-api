@@ -11,4 +11,4 @@ router = APIRouter()
 @limiter.limit("20/minute")
 def search_stocks(request: Request, data: StockRequest):
 
-    data = get_stock_data(request.query)
+    data = get_stock_data(data.query)
