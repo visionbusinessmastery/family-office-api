@@ -12,7 +12,9 @@ router = APIRouter()
 # GET PORTFOLIO
 @router.get("/")
 @limiter.limit("10/minute")
-def get_user_portfolio(request: Request, data: PortfolioRequest):
+def get_user_portfolio(request: Request):
+
+    user_email = request.state.user_email
 
     def _get():
         with engine.connect() as conn:
@@ -20,19 +22,16 @@ def get_user_portfolio(request: Request, data: PortfolioRequest):
                 SELECT asset, asset_type, quantity, buy_price
                 FROM portfolios
                 WHERE user_email=:email
-            """), {"email": email})
+            """), {"email": user_email})
 
             rows = result.fetchall()
 
         portfolio = []
         total_value = 0
-        total_cost = 0
 
         for r in rows:
             value = r[2] * r[3]
-
             total_value += value
-            total_cost += value
 
             portfolio.append({
                 "asset": r[0],
@@ -44,8 +43,7 @@ def get_user_portfolio(request: Request, data: PortfolioRequest):
 
         return {
             "portfolio": portfolio,
-            "total_value": total_value,
-            "total_cost": total_cost
+            "total_value": total_value
         }
 
     return safe_execute(_get, module_name="PORTFOLIO")
@@ -55,6 +53,8 @@ def get_user_portfolio(request: Request, data: PortfolioRequest):
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):
+
+    user_email = request.state.user_email
 
     def _add():
         with engine.begin() as conn:
@@ -69,11 +69,11 @@ def add_asset(request: Request, data: PortfolioRequest):
                         (EXCLUDED.quantity * EXCLUDED.buy_price)
                     ) / (portfolios.quantity + EXCLUDED.quantity)
             """), {
-                "email": current_user,
-                "asset": request.asset.upper(),
-                "asset_type": request.asset_type.upper().replace(",", "").strip(),
-                "quantity": request.quantity,
-                "buy_price": request.buy_price
+                "email": user_email,
+                "asset": data.asset.upper(),
+                "asset_type": data.asset_type.upper().strip(),
+                "quantity": data.quantity,
+                "buy_price": data.buy_price
             })
 
         return {"status": "asset ajouté ou mis à jour"}
