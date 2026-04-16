@@ -9,4 +9,9 @@ router = APIRouter()
 @router.post("/crypto")
 @limiter.limit("20/minute")
 def crypto(request: Request, data: CryptoQuery):
+
+    user_email = request.state.user_email
+    
     return get_crypto_intelligence(data.query)
+
+    return safe_execute(_brain, module_name="CRYPTO")
