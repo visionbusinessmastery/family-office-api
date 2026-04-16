@@ -11,8 +11,14 @@ router = APIRouter()
 @limiter.limit("5/minute")
 def global_intelligence(request: Request, data: GlobalRequest):   
 
-    user_email = request.state.user_email
+    def _global_intelligence():
+        user_email = request.state.user_email
+
+        return global_intelligence({
+            "user_email": user_email,
+            **data.dict()
+        })
     
-    return gobal_intelligence(data)
-    
-return safe_execute(_global_intelligence, module_name="INTELLIGENCE")
+    return safe_execute(_global_intelligence, module_name="GLOBAL_INTELLIGENCE")
+
+
