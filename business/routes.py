@@ -13,4 +13,5 @@ def business(request: Request, data: BusinessQuery):
     user_email = request.state.user_email
     
     return get_business_intelligence(data)
-    return safe_execute(_brain, module_name="BUSINESS")
+    
+    return safe_execute(_business, module_name="BUSINESS")
