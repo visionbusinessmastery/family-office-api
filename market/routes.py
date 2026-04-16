@@ -12,7 +12,9 @@ router = APIRouter()
 @limiter.limit("20/minute")
 def market(request: Request, data: MarketRequest):
     
-    data = get_market(request.query)
+    user_email = request.state.user_email
+   
+    market_data = get_market(data.query)
 
     return {
         "user": user,
