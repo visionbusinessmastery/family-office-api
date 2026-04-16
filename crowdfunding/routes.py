@@ -10,7 +10,7 @@ router = APIRouter()
 @limiter.limit("20/minute")
 def crowdfunding(request: Request, data: CrowdfundingQuery):
     
-    def _business():
+    def _crowdfunding():
         user_email = request.state.user_email
 
         return crowdfunding({
