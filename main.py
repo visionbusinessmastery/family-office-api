@@ -73,8 +73,18 @@ def info():
     }
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logging.info(f"{request.method} {request.url}")
+async def add_user_to_request(request: Request, call_next):
+    try:
+        token = request.headers.get("Authorization")
+        if token:
+            token = token.replace("Bearer ", "")
+            email = decode_token(token)
+            request.state.user_email = email
+        else:
+            request.state.user_email = "anonymous"
+    except:
+        request.state.user_email = "anonymous"
+
     response = await call_next(request)
     return response
     
