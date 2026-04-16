@@ -10,9 +10,13 @@ router = APIRouter()
 @limiter.limit("5/minute")
 def real(request: Request, data: RealRequest):
 
-    user_email = request.state.user_email
-    
     def _real():
-        return get_real_estate_intelligence(data)
+        user_email = request.state.user_email
+
+        return get_real_estate_intelligence({
+            "user_email": user_email,
+            **data.dict()
+        })
 
     return safe_execute(_real, module_name="REAL_ESTATE")
+    
