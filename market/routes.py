@@ -12,14 +12,19 @@ router = APIRouter()
 @limiter.limit("20/minute")
 def market(request: Request, data: MarketRequest):
     
-    user_email = request.state.user_email
-   
-    market_data = get_market(data.query)
+    def _market():
+        user_email = request.state.user_email
+        market_data = get_market(data.query)
 
-    return {
-        "user": request.state.user_email,
-        "market": result
-    }
+        return market({
+            "user_email": user_email,
+            **data.dict()
+        })
+
+        return {
+            "user": request.state.user_email,
+            "market": result
+        }
 
     return safe_execute(_market, module_name="MARKET")
 
@@ -28,8 +33,15 @@ def market(request: Request, data: MarketRequest):
 @limiter.limit("20/minute")
 def market_intelligence(request: Request, query: str):
     
-    user_email = request.state.user_email
+    def _market_intelligence():
+        user_email = request.state.user_email
+
+        return market_intelligence({
+            "user_email": user_email,
+            **data.dict()
+        })
     
-    return get_market_intelligence(query)
+        return get_market_intelligence(query)
     
     return safe_execute(_market_intelligence, module_name="MARKET_INTELLIGENCE")
+    
