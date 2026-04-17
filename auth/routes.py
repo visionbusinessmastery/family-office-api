@@ -3,10 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from database import engine
+
 from auth.utils import hash_password, verify_password, create_token, get_current_user
 from .schemas import UserRegister, UserProfileRequest
 
 router = APIRouter()
+
 
 # =========================
 # REGISTER
@@ -24,14 +26,15 @@ def register(request: Request, data: UserRegister):
                 "email": data.email,
                 "password": hash_password(data.password)
             })
-    except:
-        raise HTTPException(status_code=400, detail="User exists")
+
+    except Exception:
+        raise HTTPException(status_code=400, detail="User exists or DB error")
 
     return {"status": "created"}
 
 
 # =========================
-# LOGIN (JSON → RECOMMANDÉ)
+# LOGIN (OAUTH Swagger COMPATIBLE)
 # =========================
 @router.post("/login")
 @limiter.limit("3/minute")
@@ -62,10 +65,14 @@ def me(user: str = Depends(get_current_user)):
 
 
 # =========================
-# SAVE PROFILE
+# SAVE PROFILE (FIX CLEAN)
 # =========================
 @router.post("/profile/save")
-def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
+def save_profile(
+    request: Request,
+    data: UserProfileRequest,
+    user: str = Depends(get_current_user)
+):
 
     with engine.begin() as conn:
         conn.execute(text("""
