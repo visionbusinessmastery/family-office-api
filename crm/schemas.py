@@ -1,14 +1,16 @@
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict
+from pydantic import BaseModel, EmailStr
 
-# ==================================================
-# MODELS
-# ==================================================
-
+# =========================
+# LEAD
+# =========================
 class LeadRequest(BaseModel):
     name: str
-    email: str
+    email: EmailStr
 
+
+# =========================
+# CRM PROFILE
+# =========================
 class CRMProfile(BaseModel):
     name: str
     email: EmailStr
