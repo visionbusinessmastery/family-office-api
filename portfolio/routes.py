@@ -1,58 +1,37 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException, Request
-from auth.utils import get_current_user
-from .schemas import StockRequest, PortfolioRequest
+from fastapi import APIRouter, Request
+from .schemas import PortfolioRequest
 from portfolio.service import get_user_portfolio
 from sqlalchemy import text
 from database import engine
 
 router = APIRouter()
 
+# =========================
 # GET PORTFOLIO
+# =========================
 @router.get("/")
 @limiter.limit("10/minute")
-def get_user_portfolio(request: Request):
+def get_portfolio(request: Request):
 
     def _get():
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT asset, asset_type, quantity, buy_price
-                FROM portfolios
-                WHERE user_email=:email
-            """), {"email": user_email})
-
-            rows = result.fetchall()
-
-        portfolio = []
-        total_value = 0
-
-        for r in rows:
-            value = r[2] * r[3]
-            total_value += value
-
-            portfolio.append({
-                "asset": r[0],
-                "type": r[1],
-                "quantity": r[2],
-                "buy_price": r[3],
-                "value": value
-            })
-
-        return {
-            "portfolio": portfolio,
-            "total_value": total_value
-        }
+        user_email = request.state.user_email
+        return get_user_portfolio(user_email)
 
     return safe_execute(_get, module_name="PORTFOLIO")
 
 
-# ADD ASSET (UPSERT PRO)
+# =========================
+# ADD ASSET
+# =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):
 
     def _add():
+        user_email = request.state.user_email
+
         with engine.begin() as conn:
             conn.execute(text("""
                 INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
