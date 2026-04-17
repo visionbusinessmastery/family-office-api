@@ -6,9 +6,36 @@ from .analyzers.allocation import allocate_portfolio
 from .analyzers.ai_global import global_ai_analysis
 
 
+# 🔥 NORMALISATION DU RISQUE (AJOUT)
+def normalize_risk(risk: str):
+
+    if not risk:
+        return "modéré"
+
+    r = risk.lower().strip()
+
+    mapping = {
+        "faible": "faible",
+        "low": "faible",
+
+        "modéré": "modéré",
+        "modere": "modéré",
+        "medium": "modéré",
+
+        "élevé": "élevé",
+        "eleve": "élevé",
+        "high": "élevé"
+    }
+
+    return mapping.get(r, "modéré")
+
+
 def get_global_intelligence(query):
 
     try:
+        # 🔥 FIX ICI
+        risk = normalize_risk(query.risk)
+
         # 🔹 REAL ESTATE
         real_data = get_real_estate_intelligence(
             type("obj", (), {
@@ -35,11 +62,14 @@ def get_global_intelligence(query):
             })
         )
 
+        # 🔥 on passe le bon risk
+        query.risk = risk
+
         allocation = allocate_portfolio(query, real_data, crypto_data, stock_data)
 
         ai = global_ai_analysis({
             "budget": query.budget,
-            "risk": query.risk,
+            "risk": risk,
             "allocation": allocation
         })
 
