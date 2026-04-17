@@ -1,13 +1,15 @@
 def allocate_portfolio(query, real, crypto, stocks):
 
-    if query.risk == "low":
+    risk = (query.risk or "").lower()
+
+    if risk in ["faible", "low"]:
         return {
             "real_estate": 60,
             "stocks": 30,
             "crypto": 10
         }
 
-    elif query.risk == "medium":
+    elif risk in ["modéré", "medium"]:
         return {
             "real_estate": 40,
             "stocks": 40,
