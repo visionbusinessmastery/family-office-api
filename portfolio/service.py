@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from database import engine
-from stocks.service import get_stock_data
+from stocks.service import get_stock_data, resolve_ticker  # 🔥 ajout
 import requests
 import time
 
@@ -40,12 +40,20 @@ def get_user_portfolio(user_email):
     for r in rows:
         asset, asset_type, quantity, buy_price = r
 
-         # =========================
+        # =========================
+        # 🔥 NORMALISATION TICKER
+        # =========================
+        ticker = resolve_ticker(asset)
+
+        # =========================
         # 🔥 PRIX LIVE
         # =========================
-        stock_data = get_stock_data(asset)
+        stock_data = get_stock_data(ticker)
 
-        current_price = stock_data.get("price") if stock_data else None
+        current_price = None
+
+        if stock_data and isinstance(stock_data, dict):
+            current_price = stock_data.get("price")
 
         # fallback sécurité
         if not current_price:
@@ -65,6 +73,7 @@ def get_user_portfolio(user_email):
 
         portfolio.append({
             "asset": asset,
+            "ticker": ticker,  # 🔥 AJOUT IMPORTANT UX
             "type": asset_type,
             "quantity": quantity,
             "buy_price": buy_price,
@@ -72,7 +81,7 @@ def get_user_portfolio(user_email):
             "value": value,
             "gain": gain,
             "gain_percent": round(gain_percent, 2),
-            "source": stock_data.get("source") if stock_data else "N/A"
+            "source": stock_data.get("source") if stock_data and isinstance(stock_data, dict) else "N/A"
         })
 
     return {
