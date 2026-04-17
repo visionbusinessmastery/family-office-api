@@ -11,65 +11,68 @@ def get_business_intelligence(query):
 
     results = []
 
+    mode = query.mode.lower()  # ✅ sécurisation
+
     # 🔹 CREATE
-    if query.mode == "create":
+    if mode == "create":
 
         ideas = search_bpi(query.sector)
         trends = get_trends(query.sector)
 
         for idea in ideas:
 
-            score = score_opportunity(idea, query.mode)
-            ai = analyze_business_ai(idea, query.mode)
+            score = score_opportunity(idea, mode)
+            ai = analyze_business_ai(idea, mode)
 
             results.append({
                 "type": "creation",
-                "title": idea["title"],
+                "title": idea.get("title"),
                 "score": score,
                 "ai": ai,
                 "trend": trends
             })
 
     # 🔹 GROW
-    elif query.mode == "grow":
+    elif mode == "grow":
 
         financements = get_financements()
 
         for f in financements:
 
-            score = score_opportunity(f, query.mode)
-            ai = analyze_business_ai(f, query.mode)
+            score = score_opportunity(f, mode)
+            ai = analyze_business_ai(f, mode)
 
             results.append({
                 "type": "financement",
-                "name": f["name"],
-                "organisme": f["organisme"],
+                "name": f.get("name"),
+                "organisme": f.get("organisme"),
                 "score": score,
                 "ai": ai
             })
 
     # 🔹 BUY
-    elif query.mode == "buy":
+    elif mode == "buy":
 
         businesses = search_business_for_sale(query.sector)
 
         for b in businesses:
 
-            if b["price"] > query.budget:
+            if b.get("price", 0) > query.budget:
                 continue
 
-            score = score_opportunity(b, query.mode)
-            ai = analyze_business_ai(b, query.mode)
+            score = score_opportunity(b, mode)
+            ai = analyze_business_ai(b, mode)
 
             results.append({
                 "type": "acquisition",
-                "title": b["title"],
-                "price": b["price"],
+                "title": b.get("title"),
+                "price": b.get("price"),
                 "score": score,
                 "ai": ai
             })
 
     return results
+
 
 def generate_business_ideas(sector, budget):
     ideas = []
