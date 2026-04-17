@@ -4,56 +4,113 @@ from openai import OpenAI
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
+import xml.etree.ElementTree as ET  # 🔥 ajout
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
+# =========================
+# NEWS FMP (AMÉLIORÉ SAFE)
+# =========================
 def get_market_news(ticker):
+
+    if not FMP_API_KEY:
+        return []
 
     url = f"https://financialmodelingprep.com/api/v3/stock_news?tickers={ticker}&limit=5&apikey={FMP_API_KEY}"
     
     try:
-        res = requests.get(url)
+        res = requests.get(url, timeout=5)
+
+        if res.status_code != 200:
+            return []
+
         data = res.json()
-        return data
+
+        # 🔥 normalisation
+        return [
+            {
+                "title": item.get("title"),
+                "source": item.get("site"),
+                "url": item.get("url")
+            }
+            for item in data
+        ]
+
     except:
         return []
 
 
+# =========================
+# 🔥 GOOGLE NEWS RSS (NOUVEAU)
+# =========================
+def get_google_news(query):
+
+    url = f"https://news.google.com/rss/search?q={query}"
+
+    articles = []
+
+    try:
+        response = requests.get(url, timeout=5)
+
+        if response.status_code != 200:
+            return []
+
+        root = ET.fromstring(response.content)
+
+        for item in root.findall(".//item")[:5]:
+            articles.append({
+                "title": item.find("title").text if item.find("title") is not None else "",
+                "link": item.find("link").text if item.find("link") is not None else "",
+                "source": "Google News"
+            })
+
+    except:
+        return []
+
+    return articles
+
+
+# =========================
+# 🔥 MARKET INTELLIGENCE (FIX)
+# =========================
 def get_market_intelligence(query: str):
     """
-    Fonction simple qui récupère des infos marché (version MVP)
+    Version PRO sans scraping
     """
 
-    sources = [
-        f"https://www.boursorama.com/recherche/?query={query}",
-        f"https://www.zonebourse.com/recherche/?q={query}",
-        f"https://www.investing.com/search/?q={query}"
-    ]
+    # 1️⃣ NEWS FMP
+    news_fmp = get_market_news(query)
 
-    results = []
+    # 2️⃣ NEWS GOOGLE
+    news_google = get_google_news(query)
 
-    for url in sources:
-        try:
-            response = requests.get(url, timeout=5)
-            results.append({
-                "source": url,
-                "status": response.status_code
-            })
-        except Exception as e:
-            results.append({
-                "source": url,
-                "error": str(e)
-            })
+    # 🔥 fusion
+    news = news_fmp + news_google
+
+    # 3️⃣ SENTIMENT IA
+    sentiment = None
+
+    try:
+        if news:
+            sentiment = analyze_sentiment(news)
+    except:
+        sentiment = "Analyse indisponible"
 
     return {
         "query": query,
-        "results": results
+        "news_count": len(news),
+        "news": news[:5],  # limiter propre
+        "sentiment": sentiment
     }
 
 
+# =========================
+# ENRICH PORTFOLIO (inchangé)
+# =========================
 def enrich_portfolio_with_ai(portfolio):
 
     enriched = []
@@ -87,6 +144,10 @@ def enrich_portfolio_with_ai(portfolio):
 
     return enriched
 
+
+# =========================
+# MARKET SIMPLE (légèrement amélioré)
+# =========================
 def get_market(query="stock market"):
 
     insights = {
@@ -96,14 +157,10 @@ def get_market(query="stock market"):
     }
 
     try:
-        # =========================
-        # GOOGLE NEWS (gratuit)
-        # =========================
-        url = f"https://news.google.com/rss/search?q={query}"
-        response = requests.get(url)
+        news = get_google_news(query)
 
-        if response.status_code == 200:
-            insights["news"].append("Actualités récupérées depuis Google News")
+        if news:
+            insights["news"] = [n["title"] for n in news]
 
     except:
         pass
