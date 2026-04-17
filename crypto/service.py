@@ -7,26 +7,33 @@ from .analyzers.scoring import score_crypto
 
 def get_crypto_intelligence(query):
 
-    market = get_crypto_price(query.symbol)
-    trends = get_trending_crypto()
+    try:
+        market = get_crypto_price(query.symbol)
+        trends = get_trending_crypto()
 
-    trend = next(
-        (t["trend"] for t in trends if t["symbol"] == query.symbol.upper()),
-        "neutral"
-    )
+        trend = next(
+            (t["trend"] for t in trends if t["symbol"] == query.symbol.upper()),
+            "neutral"
+        )
 
-    score = score_crypto(trend, query.strategy)
+        score = score_crypto(trend, query.strategy)
 
-    ai = analyze_crypto_ai({
-        "symbol": query.symbol,
-        "price": market["price"],
-        "trend": trend
-    })
+        ai = analyze_crypto_ai({
+            "symbol": query.symbol,
+            "price": market.get("price", 0),
+            "trend": trend
+        })
 
-    return {
-        "symbol": query.symbol,
-        "price": market["price"],
-        "trend": trend,
-        "score": score,
-        "ai_analysis": ai
-    }
+        return {
+            "symbol": query.symbol,
+            "price": market.get("price", 0),
+            "trend": trend,
+            "score": score,
+            "ai_analysis": ai
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e),
+            "symbol": query.symbol
+        }
