@@ -20,22 +20,36 @@ COMPANY_TO_TICKER = {
     "facebook": "META",
     "netflix": "NFLX",
     "phunware": "PHUN",
+    "nike": "NKE",  # 🔥 AJOUT IMPORTANT
 }
 
 # =========================
-# SMART SEARCH
+# SMART SEARCH (AMÉLIORÉ)
 # =========================
 def resolve_ticker(query: str):
-    query = query.lower().strip()
+    query_clean = query.lower().strip()
 
-    if query in COMPANY_TO_TICKER:
-        return COMPANY_TO_TICKER[query]
+    # 1️⃣ mapping direct
+    if query_clean in COMPANY_TO_TICKER:
+        return COMPANY_TO_TICKER[query_clean]
 
-    match = get_close_matches(query, COMPANY_TO_TICKER.keys(), n=1, cutoff=0.6)
+    # 2️⃣ fuzzy match (tolérance fautes)
+    match = get_close_matches(query_clean, COMPANY_TO_TICKER.keys(), n=1, cutoff=0.6)
     if match:
         return COMPANY_TO_TICKER[match[0]]
 
+    # 3️⃣ 🔥 fallback FMP search (NOUVEAU)
+    try:
+        results = search_stock_cached(query_clean)
+
+        if results and len(results) > 0:
+            return results[0].get("symbol", query_clean.upper())
+    except:
+        pass
+
+    # 4️⃣ fallback final
     return query.upper()
+
 
 # =========================
 # GET STOCK DATA
@@ -107,12 +121,12 @@ def get_stock_data(query: str):
 
     return {"error": "Aucune donnée disponible"}
 
+
 # =========================
 # INTELLIGENCE
 # =========================
 def get_stock_intelligence(query):
 
-    # 🔥 accepte objet OU string
     symbol = query.symbol if hasattr(query, "symbol") else query
 
     try:
@@ -133,6 +147,7 @@ def get_stock_intelligence(query):
             "error": str(e),
             "symbol": symbol
         }
+
 
 # =========================
 # SEARCH (CACHE)
