@@ -1,7 +1,6 @@
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Depends, HTTPException, Request
-from auth.utils import get_current_user
+from fastapi import APIRouter, Request
 from .schemas import BrainRequest
 from .service import generate_advice
 from sqlalchemy import text
@@ -9,13 +8,12 @@ from database import engine
 
 router = APIRouter()
 
-@router.post("/ia/brain")    
+@router.post("/ia/brain")
 @limiter.limit("5/minute")
 def brain(request: Request, data: BrainRequest):
 
-    user_email = request.state.user_email
-    
     def _brain():
+        user_email = request.state.user_email
 
         # ======================
         # PROFILE
@@ -54,22 +52,23 @@ def brain(request: Request, data: BrainRequest):
         # PROMPT
         # ======================
         prompt = f"""
-        Profil: {profile_data}
-        Portfolio: {portfolio_data}
-        Total: {total_value}
+Profil: {profile_data}
+Portfolio: {portfolio_data}
+Total: {total_value}
 
-        Question: {data.question}
+Question: {data.question}
 
-        Réponds en:
-        1. Réponse directe
-        2. Explication
-        3. Plan d’action
-        4. Exemple
-        """
+Réponds en:
+1. Réponse directe
+2. Explication
+3. Plan d’action
+4. Exemple
+"""
 
         answer = generate_advice(prompt)
 
         return {
+            "user": user_email,
             "question": data.question,
             "answer": answer
         }
