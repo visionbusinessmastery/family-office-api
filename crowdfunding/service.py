@@ -10,29 +10,35 @@ from .analyzers.ai_analysis import analyze_project_ai
 
 def get_crowdfunding_intelligence(query):
 
-    projects = []
+    try:
+        projects = []
 
-    projects += search_wiseed()
-    projects += search_pretup()
-    projects += search_bricks()
-    projects += search_fundora()
+        projects += search_wiseed()
+        projects += search_pretup()
+        projects += search_bricks()
+        projects += search_fundora()
 
-    results = []
+        results = []
 
-    for project in projects:
+        for project in projects:
 
-        yield_value = calculate_yield(project)
-        score = score_project(project, query.risk_level)
-        ai = analyze_project_ai(project)
+            yield_value = calculate_yield(project)
+            score = score_project(project, query.risk_level)
+            ai = analyze_project_ai(project)
 
-        results.append({
-            "name": project["name"],
-            "return": yield_value,
-            "risk": project["risk"],
-            "duration": project["duration"],
-            "score": score,
-            "ai_analysis": ai,
-            "source": project["source"]
-        })
+            results.append({
+                "name": project.get("name"),
+                "return": yield_value,
+                "risk": project.get("risk"),
+                "duration": project.get("duration"),
+                "score": score,
+                "ai_analysis": ai,
+                "source": project.get("source")
+            })
 
-    return sorted(results, key=lambda x: x["score"], reverse=True)
+        return sorted(results, key=lambda x: x["score"], reverse=True)
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
