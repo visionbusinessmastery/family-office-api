@@ -38,15 +38,13 @@ def resolve_ticker(query: str):
     return query.upper()
 
 # =========================
-# GET STOCK DATA (MULTI SOURCE)
+# GET STOCK DATA
 # =========================
 def get_stock_data(query: str):
 
     ticker = resolve_ticker(query)
 
-    # =========================
-    # 1. FMP (BEST)
-    # =========================
+    # ===== FMP =====
     if FMP_API_KEY:
         try:
             url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={FMP_API_KEY}"
@@ -67,16 +65,13 @@ def get_stock_data(query: str):
         except:
             pass
 
-    # =========================
-    # 2. ALPHA VANTAGE
-    # =========================
+    # ===== ALPHA VANTAGE =====
     if ALPHA_VANTAGE_API_KEY:
         try:
             url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
             data = requests.get(url).json()
 
             quote = data.get("Global Quote", {})
-
             price = quote.get("05. price")
 
             if price:
@@ -89,9 +84,7 @@ def get_stock_data(query: str):
         except:
             pass
 
-    # =========================
-    # 3. YAHOO FINANCE (ULTIMATE BACKUP)
-    # =========================
+    # ===== YAHOO =====
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -114,11 +107,16 @@ def get_stock_data(query: str):
 
     return {"error": "Aucune donnée disponible"}
 
+# =========================
+# INTELLIGENCE
+# =========================
+def get_stock_intelligence(query):
 
-def get_stock_intelligence(symbol: str = "AAPL"):
+    # 🔥 accepte objet OU string
+    symbol = query.symbol if hasattr(query, "symbol") else query
+
     try:
         stock = yf.Ticker(symbol)
-
         info = stock.info
 
         return {
@@ -127,7 +125,7 @@ def get_stock_intelligence(symbol: str = "AAPL"):
             "market_cap": info.get("marketCap"),
             "pe_ratio": info.get("trailingPE"),
             "sector": info.get("sector"),
-            "recommendation": "buy" if info.get("trailingPE", 0) < 20 else "hold"
+            "recommendation": "buy" if (info.get("trailingPE") or 0) < 20 else "hold"
         }
 
     except Exception as e:
@@ -135,11 +133,17 @@ def get_stock_intelligence(symbol: str = "AAPL"):
             "error": str(e),
             "symbol": symbol
         }
-        
 
+# =========================
+# SEARCH (CACHE)
+# =========================
 @lru_cache(maxsize=100)
 def search_stock_cached(query: str):
-    url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=5&apikey={API_KEY}"
+
+    if not FMP_API_KEY:
+        return []
+
+    url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=5&apikey={FMP_API_KEY}"
     
     for attempt in range(3):
         response = requests.get(url)
@@ -148,6 +152,6 @@ def search_stock_cached(query: str):
             return response.json()
         
         elif response.status_code == 429:
-            time.sleep(2)  # wait before retry
+            time.sleep(2)
         
     return []
