@@ -1,6 +1,12 @@
+from portfolio.service import get_user_portfolio
+from market.service import get_market
+from sqlalchemy import text
+from database import engine
+from .engine import extract_budget, detect_risk, detect_goal, build_allocation
 from openai import OpenAI
 import os
-from .engine import extract_budget, detect_risk, detect_goal, build_allocation
+import json
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -43,3 +49,177 @@ def advisor_logic(message):
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def get_user_profile(user_email):
+
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT age, monthly_income, risk_profile
+                FROM user_profiles
+                WHERE user_email=:email
+            """), {"email": user_email}).fetchone()
+
+        if not row:
+            return {}
+
+        return {
+            "age": row[0],
+            "income": row[1],
+            "risk": row[2]
+        }
+
+    except:
+        return {}
+
+
+# =========================
+# PREMIUM ADVISOR
+# =========================
+def get_advisor_premium(user_email, message):
+
+    try:
+        portfolio = get_user_portfolio(user_email)
+        market = get_market("stock market")
+        profile = get_user_profile(user_email)
+
+        prompt = f"""
+        Tu es un conseiller financier élite.
+
+        PROFIL:
+        {profile}
+
+        PORTFOLIO:
+        {portfolio}
+
+        MARCHÉ:
+        {market}
+
+        DEMANDE:
+        {message}
+
+        Réponds STRICTEMENT en JSON :
+
+        {{
+          "allocation": {{
+            "stocks": 0,
+            "crypto": 0,
+            "real_estate": 0,
+            "cash": 0
+          }},
+          "rebalancing": [
+            "actions à faire sur le portefeuille"
+          ],
+          "opportunities": [
+            "opportunités immédiates à saisir"
+          ],
+          "business": [
+            "idées business adaptées"
+          ],
+          "real_estate": [
+            "stratégies immobilières"
+          ],
+          "marketing_content": "post prêt à publier"
+        }}
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        content = response.choices[0].message.content
+
+        try:
+            result = json.loads(content)
+        except:
+            result = {"raw": content}
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# =========================
+# AUTO ADVISOR ENGINE
+# =========================
+def get_advisor_auto(user_email):
+
+    try:
+        portfolio = get_user_portfolio(user_email)
+        market = get_market("stock market")
+        profile = get_user_profile(user_email)
+
+        prompt = f"""
+        Tu es un conseiller financier automatisé de niveau institutionnel.
+
+        PROFIL UTILISATEUR:
+        {profile}
+
+        PORTFOLIO ACTUEL:
+        {portfolio}
+
+        CONTEXTE MARCHÉ:
+        {market}
+
+        Analyse en profondeur et détecte :
+
+        - risques
+        - opportunités
+        - sur/sous-exposition
+        - incohérences
+        - actions immédiates
+
+        Réponds STRICTEMENT en JSON :
+
+        {{
+          "alerts": [
+            {{
+              "type": "risk | opportunity",
+              "asset": "",
+              "message": ""
+            }}
+          ],
+          "actions": [
+            "action concrète 1",
+            "action concrète 2"
+          ],
+          "rebalancing": {{
+            "stocks": 0,
+            "crypto": 0,
+            "real_estate": 0,
+            "cash": 0
+          }},
+          "portfolio_health": {{
+            "score": 0,
+            "comment": ""
+          }},
+          "opportunities": [
+            "opportunité 1",
+            "opportunité 2"
+          ]
+        }}
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        content = response.choices[0].message.content
+
+        try:
+            result = json.loads(content)
+        except:
+            result = {
+                "raw": content,
+                "error": "invalid_json"
+            }
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
