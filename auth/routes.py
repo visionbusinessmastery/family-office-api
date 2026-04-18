@@ -19,6 +19,19 @@ def register(request: Request, data: UserRegister):
 
     try:
         with engine.begin() as conn:
+
+            # 🔥 CHECK SI EMAIL EXISTE (AJOUT)
+            existing_user = conn.execute(text("""
+                SELECT email FROM users WHERE email=:email
+            """), {"email": data.email}).fetchone()
+
+            if existing_user:
+                raise HTTPException(
+                    status_code=400,
+                    detail="email déjà utilisé"
+                )
+
+            # 🔥 INSERT SI OK
             conn.execute(text("""
                 INSERT INTO users (email, password)
                 VALUES (:email, :password)
@@ -27,8 +40,14 @@ def register(request: Request, data: UserRegister):
                 "password": hash_password(data.password)
             })
 
+    except HTTPException:
+        raise
+
     except Exception:
-        raise HTTPException(status_code=400, detail="User exists or DB error")
+        raise HTTPException(
+            status_code=400,
+            detail="erreur lors de la création du compte"
+        )
 
     return {"status": "created"}
 
