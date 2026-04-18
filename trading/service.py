@@ -2,7 +2,7 @@ from portfolio.service import get_user_portfolio
 from market.service import get_market
 from market.scoring import calculate_ai_score
 import random
-
+import json
 
 # =========================
 # AUTO REBALANCING ENGINE
@@ -10,6 +10,7 @@ import random
 def generate_rebalancing(user_email):
 
     portfolio = get_user_portfolio(user_email)
+    data = json.loads(data)
 
     stocks = []
     crypto = []
