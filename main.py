@@ -26,6 +26,10 @@ from business.routes import router as business_router
 from crypto.routes import router as crypto_router
 from crowdfunding.routes import router as crowdfunding_router
 from intelligence.routes import router as intelligence_router
+from content.routes import router as content_router
+from advisor.routes import router as advisor_router
+from alerts.routes import router as alerts_router
+from trading.routes import router as trading_router
 from ai.routes import router as ai_router
 from crm.routes import router as crm_router
 
@@ -66,7 +70,16 @@ def root():
 # ✅ HEALTH CHECK (IMPORTANT)
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "modules": [
+            "advisor",
+            "alerts",
+            "trading",
+            "portfolio",
+            "market"
+        ]
+    }
 
 @app.get("/info")
 def info():
@@ -103,11 +116,12 @@ app.include_router(business_router, prefix="/business", tags=["Business"])
 app.include_router(crypto_router, prefix="/crypto", tags=["Crypto"])
 app.include_router(crowdfunding_router, prefix="/crowdfunding", tags=["Crowdfunding"])
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Global Intelligence"])
+app.include_router(advisor_router, prefix="/advisor", tags=["ADVISOR"])
+app.include_router(alerts_router, prefix="/alerts", tags=["ALERTS"])
+app.include_router(trading_router, prefix="/trading", tags=["TRADING"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
-
-
-
+app.include_router(content_router)
 
 
 
