@@ -16,7 +16,7 @@ def business_content(request: Request, data: ContentRequest):
     def _business():
         user_email = request.state.user_email
 
-        result = generate_business_content(
+        result = generate_business_content(request.json(
             data.budget,
             data.risk,
             data.goal
@@ -41,7 +41,7 @@ def real_estate_content(request: Request, data: ContentRequest):
     def _real_estate():
         user_email = request.state.user_email
 
-        result = generate_real_estate_content(
+        result = generate_real_estate_content(request.json(
             data.budget,
             data.risk,
             data.goal
@@ -66,7 +66,7 @@ def personalized_content(request: Request, data: PersonalizedContentRequest):
     def _personalized():
         user_email = request.state.user_email
 
-        result = generate_personalized_content(
+        result = generate_personalized_content(request.json(
             user_email,
             data.goal
         )
