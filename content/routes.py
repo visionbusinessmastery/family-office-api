@@ -16,7 +16,7 @@ def business_content(request: Request, data: ContentRequest):
     def _business():
         user_email = request.state.user_email
 
-        result = generate_business_content(request.json)(
+        result = generate_business_content(
             data.budget,
             data.risk,
             data.goal
@@ -41,7 +41,7 @@ def real_estate_content(request: Request, data: ContentRequest):
     def _real_estate():
         user_email = request.state.user_email
 
-        result = generate_real_estate_content(request.json)(
+        result = generate_real_estate_content(
             data.budget,
             data.risk,
             data.goal
@@ -55,7 +55,7 @@ def real_estate_content(request: Request, data: ContentRequest):
         }
 
     return safe_execute(_real_estate, module_name="CONTENT_REAL_ESTATE")
-
+    
 
 # =========================
 # PERSONALIZED CONTENT
@@ -66,7 +66,7 @@ def personalized_content(request: Request, data: PersonalizedContentRequest):
     def _personalized():
         user_email = request.state.user_email
 
-        result = generate_personalized_content(request.json)(
+        result = generate_personalized_content(
             user_email,
             data.goal
         )
