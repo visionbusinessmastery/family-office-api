@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Request
 from core.utils import safe_execute
-from .schemas import AdvisorRequest
-from .service import advisor_logic
-
 from core.limiter import limiter
+
+from .schemas import AdvisorRequest, AdvisorPremiumRequest
+from .service import advisor_logic, get_advisor_premium, get_advisor_auto
+
 from pydantic import BaseModel
-from .service import get_advisor_premium
-from .service import get_advisor_auto
+
 
 router = APIRouter()
 
