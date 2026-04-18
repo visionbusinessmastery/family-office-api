@@ -1,7 +1,9 @@
 import requests
+import json
 import os
 from market.service import get_market_news
 from portfolio.service import get_user_portfolio
+
 
 # =========================
 # SIMPLE ALERT ENGINE
@@ -9,6 +11,7 @@ from portfolio.service import get_user_portfolio
 def generate_alerts(user_email):
 
     portfolio = get_user_portfolio(user_email)
+    data = json.loads(data)
 
     alerts = []
 
