@@ -10,7 +10,12 @@ import json
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
+# =========================
+# SIMPLE ADVISOR (COMPAT LAYER)
+# =========================
+def get_advisor(message: str):
+    return advisor_logic(message)
+    
 def advisor_logic(message):
 
     budget = extract_budget(message)
