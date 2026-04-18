@@ -117,6 +117,17 @@ def generate_personalized_content(user_email, goal):
             "error": str(e)
         }
 
+
+# =========================
+# COMPAT LAYER (FIX IMPORT ERROR)
+# =========================
+
+def generate_business_content(user_email, goal="business"):
+    return generate_personalized_content(user_email, goal)
+
+
+def generate_real_estate_content(user_email, goal="real_estate"):
+    return generate_personalized_content(user_email, goal)
     except Exception as e:
         return str(e)
 
