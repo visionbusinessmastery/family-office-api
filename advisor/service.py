@@ -1,5 +1,6 @@
 from portfolio.service import get_user_portfolio
 from market.service import get_market
+from franchise.scanner import scan_franchise_opportunities
 from sqlalchemy import text
 from database import engine
 from .engine import extract_budget, detect_risk, detect_goal, build_allocation
@@ -24,6 +25,12 @@ def advisor_logic(message):
 
     allocation = build_allocation(budget, risk)
 
+    franchises = scan_franchise_opportunities(
+        budget,
+        risk,
+        "france"
+    )
+
     prompt = f"""
     Un utilisateur a {budget}€.
     Profil de risque: {risk}
@@ -31,6 +38,9 @@ def advisor_logic(message):
 
     Allocation:
     {allocation}
+
+    Opportunités de franchises:
+    {franchises} 
 
     Donne:
     - stratégie claire
@@ -49,6 +59,7 @@ def advisor_logic(message):
             "risk": risk,
             "goal": goal,
             "allocation": allocation,
+            "franchises": franchises,
             "advice": response.choices[0].message.content
         }
 
@@ -88,6 +99,11 @@ def get_advisor_premium(user_email, message):
         portfolio = get_user_portfolio(user_email)
         market = get_market("stock market")
         profile = get_user_profile(user_email)
+        franchises = scan_franchise_opportunities(
+            profile.get("income", 1000),
+            profile.get("risk", "medium"),
+            "france"
+        )
 
         prompt = f"""
         Tu es un conseiller financier élite.
@@ -100,6 +116,9 @@ def get_advisor_premium(user_email, message):
 
         MARCHÉ:
         {market}
+
+        FRANCHISES:
+        {franchises}
 
         DEMANDE:
         {message}
@@ -126,6 +145,11 @@ def get_advisor_premium(user_email, message):
             "stratégies immobilières"
           ],
           "marketing_content": "post prêt à publier"
+          ],
+          "franchise": [
+          "opportunités adaptées"
+          ]
+           
         }}
         """
 
@@ -156,6 +180,11 @@ def get_advisor_auto(user_email):
         portfolio = get_user_portfolio(user_email)
         market = get_market("stock market")
         profile = get_user_profile(user_email)
+        franchises = scan_franchise_opportunities(
+            profile.get("income", 1000),
+            profile.get("risk", "medium"),
+            "france"
+        )
 
         prompt = f"""
         Tu es un conseiller financier automatisé de niveau institutionnel.
@@ -168,6 +197,9 @@ def get_advisor_auto(user_email):
 
         CONTEXTE MARCHÉ:
         {market}
+
+        OPPORTUNITÉS FRANCHISE:
+        {franchises}
 
         Analyse en profondeur et détecte :
 
@@ -201,6 +233,14 @@ def get_advisor_auto(user_email):
             "score": 0,
             "comment": ""
           }},
+          "franchise_opportunities": [
+            {
+              "name": "",
+              "budget": "",
+              "roi": "",
+              "risk": ""
+            }
+          ],
           "opportunities": [
             "opportunité 1",
             "opportunité 2"
