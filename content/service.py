@@ -1,4 +1,4 @@
-from portfolio.service import get_user_portfolio
+from portfolio.service import get_user_portfolio 
 from market.service import get_market
 from advisor.service import get_advisor
 from sqlalchemy import text
@@ -6,11 +6,94 @@ from database import engine
 
 from openai import OpenAI
 import os
+import json
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # =========================
-# GET USER PROFILE
+# GENERIC AI CALL
+# =========================
+def call_ai(prompt):
+
+    response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    response_format={"type": "json_object"},
+    messages=[{"role": "user", "content": prompt}]
+    )
+  
+    content = response.choices[0].message.content
+
+    try:
+        return json.loads(content)
+    except:
+        return {"raw": content}
+
+
+# =========================
+# BUSINESS CONTENT
+# =========================
+def generate_business_content(budget, risk, goal):
+
+    prompt = f"""
+    Tu es un expert en business et entrepreneuriat.
+
+    Budget: {budget}
+    Niveau de risque: {risk}
+    Objectif: {goal}
+
+    Génère une réponse JSON :
+
+    {{
+      "analysis": "",
+      "business_ideas": [
+        {{
+          "idea": "",
+          "budget": "",
+          "roi": ""
+        }}
+      ],
+      "actions": [
+        "action 1",
+        "action 2"
+      ]
+    }}
+    """
+
+    return call_ai(prompt)
+
+
+# =========================
+# REAL ESTATE CONTENT
+# =========================
+def generate_real_estate_content(budget, risk, goal):
+
+    prompt = f"""
+    Tu es un expert en investissement immobilier.
+
+    Budget: {budget}
+    Niveau de risque: {risk}
+    Objectif: {goal}
+
+    Génère une réponse JSON :
+
+    {{
+      "analysis": "",
+      "strategies": [
+        {{
+          "strategy": "",
+          "budget": "",
+          "roi": ""
+        }}
+      ],
+      "actions": []
+    }}
+    """
+
+    return call_ai(prompt)
+
+
+# =========================
+# USER PROFILE
 # =========================
 def get_user_profile(user_email):
 
@@ -36,97 +119,39 @@ def get_user_profile(user_email):
 
 
 # =========================
-# PERSONALIZED CONTENT (UPGRADED)
+# PERSONALIZED CONTENT (PREMIUM)
 # =========================
 def generate_personalized_content(user_email, goal):
 
+    portfolio = get_user_portfolio(user_email)
+    market = get_market("stock market")
+    profile = get_user_profile(user_email)
+
     try:
-        # =========================
-        # 🔥 DATA SOURCES
-        # =========================
-        portfolio = get_user_portfolio(user_email)
-        market = get_market("stock market")
-        profile = get_user_profile(user_email)
+        advisor = get_advisor("optimise mon portefeuille")
+    except:
+        advisor = {"strategy": "diversification"}
 
-        # =========================
-        # 🛑 SAFE ADVISOR
-        # =========================
-        try:
-            advisor = get_advisor("optimise mon portefeuille")
-        except:
-            advisor = {"strategy": "diversification"}
+    prompt = f"""
+    Tu es un expert en finance globale.
 
-        # =========================
-        # 🧠 PROMPT STRUCTURÉ
-        # =========================
-        prompt = f"""
-        Tu es un expert en finance, business et investissement.
+    PROFIL: {profile}
+    PORTFOLIO: {portfolio}
+    CONSEIL: {advisor}
+    MARCHÉ: {market}
 
-        PROFIL UTILISATEUR:
-        {profile}
+    OBJECTIF: {goal}
 
-        PORTFOLIO:
-        {portfolio}
+    Réponds en JSON :
 
-        CONSEIL IA:
-        {advisor}
+    {{
+      "analysis": "",
+      "actions": [],
+      "portfolio_optimizations": [],
+      "business_ideas": [],
+      "real_estate": []
+    }}
+    """
 
-        CONTEXTE MARCHÉ:
-        {market}
-
-        OBJECTIF:
-        {goal}
-
-        Analyse et génère une réponse STRUCTURÉE.
-
-        Réponds STRICTEMENT en JSON avec :
-
-        {{
-          "analysis": "analyse claire du portefeuille et du profil",
-          "actions": [
-            "actions concrètes à court terme",
-            "optimisations à faire"
-          ],
-          "business_ideas": [
-            {{
-              "idea": "",
-              "budget": "",
-              "potential": ""
-            }}
-          ],
-          "real_estate_strategies": [
-            {{
-              "strategy": "",
-              "budget": "",
-              "roi": ""
-            }}
-          ],
-          "viral_post": "post Facebook engageant basé sur cette analyse"
-        }}
-        """
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        return response.choices[0].message.content
-
-    except Exception as e:
-        return {
-            "error": str(e)
-        }
-
-
-# =========================
-# COMPAT LAYER 
-# =========================
-
-def generate_business_content(user_email, goal="business"):
-    return generate_personalized_content(user_email, goal)
-
-
-def generate_real_estate_content(user_email, goal="real_estate"):
-    return generate_personalized_content(user_email, goal)
-
+    return call_ai(prompt)
 
