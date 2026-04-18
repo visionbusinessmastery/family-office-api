@@ -23,6 +23,7 @@ from portfolio.routes import router as portfolio_router
 from market.routes import router as market_router
 from real_estate.routes import router as real_router
 from business.routes import router as business_router
+from franchise.routes import router as franchise_router
 from crypto.routes import router as crypto_router
 from crowdfunding.routes import router as crowdfunding_router
 from intelligence.routes import router as intelligence_router
@@ -113,6 +114,7 @@ app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(real_router, prefix="/real", tags=["Real"])
 app.include_router(business_router, prefix="/business", tags=["Business"])
+app.include_router(franchise_router, prefix="/franchise", tags=["Franchise"])
 app.include_router(crypto_router, prefix="/crypto", tags=["Crypto"])
 app.include_router(crowdfunding_router, prefix="/crowdfunding", tags=["Crowdfunding"])
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Global Intelligence"])
@@ -122,6 +124,7 @@ app.include_router(trading_router, prefix="/trading", tags=["TRADING"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 app.include_router(content_router)
+
 
 
 
