@@ -25,7 +25,7 @@ def call_ai(prompt):
 
     try:
         return json.loads(content)
-    except:
+    except Exception:
         return {"raw": content}
 
 
@@ -114,7 +114,7 @@ def get_user_profile(user_email):
             "risk": row[2]
         }
 
-    except:
+    except Exception:
         return {}
 
 
@@ -129,7 +129,7 @@ def generate_personalized_content(user_email, goal):
 
     try:
         advisor = get_advisor("optimise mon portefeuille")
-    except:
+    except Exception:
         advisor = {"strategy": "diversification"}
 
     prompt = f"""
