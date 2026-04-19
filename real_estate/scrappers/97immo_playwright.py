@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from real_estate.config import ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
+from real_estate.config import ZONES, SCRAPER_LIMIT
   
 def scrape_97immo(zone: str, max_results: int = SCRAPER_LIMIT):
     results = []
