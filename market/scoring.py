@@ -1,4 +1,3 @@
-import requests
 import os
 from openai import OpenAI
 
@@ -32,7 +31,7 @@ def calculate_ai_score(sentiment_score, trend_score, price_change, pe_ratio=None
             score -= 15
         elif change < -2:
             score -= 8
-    except:
+    except Exception:
         pass
 
     # =========================
@@ -46,7 +45,7 @@ def calculate_ai_score(sentiment_score, trend_score, price_change, pe_ratio=None
                 score += 10
             elif pe > 40:
                 score -= 10
-        except:
+        except Exception:
             pass
 
     # clamp 0-100
