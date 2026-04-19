@@ -21,7 +21,7 @@ def get_cached(url):
         cache[url] = {"data": data, "time": time.time()}
         return data
 
-    except:
+    except Exception:
         return None
 
 
