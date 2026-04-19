@@ -1,6 +1,3 @@
-import requests
-import json
-import os
 from market.service import get_market_news
 from portfolio.service import get_user_portfolio
 
@@ -9,16 +6,15 @@ from portfolio.service import get_user_portfolio
 # SIMPLE ALERT ENGINE
 # =========================
 def generate_alerts(user_email):
-
     portfolio = get_user_portfolio(user_email)
-    data = json.loads(data)
+    portfolio = portfolio_data.get("portfolio", []) if isinstance(portfolio_data, dict) else []
 
     alerts = []
 
     for asset in portfolio:
 
         ticker = asset["asset"]
-        quantity = asset["quantity"]
+        
         gain_percent = asset["gain_percent"]
 
         # 🔥 ALERT 1 : forte perte
@@ -26,7 +22,7 @@ def generate_alerts(user_email):
             alerts.append({
                 "type": "CRITICAL",
                 "asset": ticker,
-                "message": f"{ticker} en forte baisse ({gain_percent}%)"
+                "message": f"{ticker} en forte baisse ({gain_percent}%)",
             })
 
         # 🔥 ALERT 2 : forte hausse
@@ -34,7 +30,7 @@ def generate_alerts(user_email):
             alerts.append({
                 "type": "OPPORTUNITY",
                 "asset": ticker,
-                "message": f"{ticker} forte performance (+{gain_percent}%)"
+                "message": f"{ticker} forte performance (+{gain_percent}%)",
             })
 
         # 🔥 ALERT 3 : news impact (simple)
@@ -44,10 +40,8 @@ def generate_alerts(user_email):
             alerts.append({
                 "type": "NEWS",
                 "asset": ticker,
-                "message": f"Actualité récente détectée sur {ticker}"
+                "message": f"Actualité récente détectée sur {ticker}",
             })
 
-    return {
-        "alerts": alerts,
-        "count": len(alerts)
-    }
+    return {"alerts": alerts, "count": len(alerts)}
+    
