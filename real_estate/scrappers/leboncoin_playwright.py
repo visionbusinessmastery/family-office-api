@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from core.config import SCRAPER_MATRIX
+from .core.config import SCRAPER_MATRIX
 
 def get_sources(zone: str):
     return SCRAPER_MATRIX.get(zone, [])
