@@ -72,3 +72,20 @@ def deal_finder(city, budget):
     return sorted(scored, key=lambda x: x["score"], reverse=True)
 
 
+def get_real_estate_intelligence(city, budget):
+
+    deals = get_real_estate_data(city, budget)
+
+    enriched = []
+
+    for d in deals:
+        try:
+            d["score"] = score_property(d["price"], budget)
+            d["deal_score"] = score_deal(d["price"], d["price"] * 1.2)
+            enriched.append(d)
+        except:
+            continue
+
+    return enriched
+
+
