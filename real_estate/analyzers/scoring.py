@@ -7,20 +7,26 @@ def score_property(property, yield_value, strategy):
     elif yield_value > 5:
         score += 20
 
-    price_m2 = property["price"] / property["surface"]
-    price_m2_market = estimate_price_m2(query.city)
-    price_m2_property = property["price"] / property["surface"]
-        
-    if price_m2 < 2000:
+    surface = property.get("surface") or 0
+    price = property.get("price") or 0
+    market_price_m2 = property.get("market_price_m2")
+
+    if surface <= 0:
+        return score
+
+    price_m2_property = price / surface
+
+    if price_m2_property < 2000:
         score += 30
 
-    if price_m2_property < price_m2_market:
-       score += 20
+    if market_price_m2 and price_m2_property < market_price_m2:
+        score += 20
 
-    if strategy == "flip" and price_m2 < 1500:
+    if strategy == "flip" and price_m2_property < 1500:
         score += 30
 
     return score
+
 
 def global_score(return_rate, risk, duration):
     score = 0
