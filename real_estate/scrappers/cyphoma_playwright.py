@@ -1,6 +1,6 @@
 from playwright.sync_api import sync_playwright
-from .config import DOM_TOM_ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
-from .config import SCRAPER_MATRIX
+from real_estate.config import DOM_TOM_ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
+from real_estate.config import SCRAPER_MATRIX
 
 def get_sources(zone: str):
     return SCRAPER_MATRIX.get(zone, [])
