@@ -31,7 +31,7 @@ def scrape_seloger(city, max_price):
                         "source": "seloger"
                     })
 
-             except Exception:
+            except Exception:
                 continue
 
         browser.close()
