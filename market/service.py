@@ -40,7 +40,7 @@ def get_market_news(ticker):
             for item in data
         ]
 
-    except:
+    except Exception:
         return []
 
 
@@ -68,7 +68,7 @@ def get_google_news(query):
                 "source": "Google News"
             })
 
-    except:
+    except Exception:
         return []
 
     return articles
@@ -97,7 +97,7 @@ def get_market_intelligence(query: str):
     try:
         if news:
             sentiment = analyze_sentiment(news)
-    except:
+    except Exception:
         sentiment = "Analyse indisponible"
 
     return {
@@ -120,7 +120,7 @@ def enrich_portfolio_with_ai(portfolio):
         ticker = asset["asset"]
 
         news = get_market_news(ticker)
-        sentiment_raw = analyze_sentiment(news)
+        analyze_sentiment(news)
 
         # ⚠️ ici simplification (tu peux parser plus tard)
         sentiment_score = 60  # temporaire
@@ -162,7 +162,7 @@ def get_market(query="stock market"):
         if news:
             insights["news"] = [n["title"] for n in news]
 
-    except:
+    except Exception:
         pass
 
     # =========================
