@@ -19,7 +19,6 @@ email-validator
 requests
 openai
 yfinance
+pytrends
 
 playwright
-
-
