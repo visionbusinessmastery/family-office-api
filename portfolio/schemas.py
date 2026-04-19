@@ -1,5 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, Dict
+from pydantic import BaseModel
 
 # =========================
 # REQUESTS
