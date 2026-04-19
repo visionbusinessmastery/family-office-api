@@ -86,7 +86,7 @@ def get_user_profile(user_email):
             "risk": row[2]
         }
 
-    except:
+    except Exception:
         return {}
 
 
@@ -257,7 +257,7 @@ def get_advisor_auto(user_email):
 
         try:
             result = json.loads(content)
-        except:
+        except Exception:
             result = {
                 "raw": content,
                 "error": "invalid_json"
