@@ -44,7 +44,7 @@ def resolve_ticker(query: str):
 
         if results and len(results) > 0:
             return results[0].get("symbol", query_clean.upper())
-    except:
+    except Exception:
         pass
 
     # 4️⃣ fallback final
@@ -76,7 +76,7 @@ def get_stock_data(query: str):
                         "market_cap": stock.get("marketCap"),
                         "source": "FMP"
                     }
-        except:
+        except Exception:
             pass
 
     # ===== ALPHA VANTAGE =====
@@ -95,7 +95,7 @@ def get_stock_data(query: str):
                     "change_percent": quote.get("10. change percent"),
                     "source": "Alpha Vantage"
                 }
-        except:
+        except Exception:
             pass
 
     # ===== YAHOO =====
