@@ -5,8 +5,6 @@ from core.limiter import limiter
 from .schemas import AdvisorRequest, AdvisorPremiumRequest
 from .service import advisor_logic, get_advisor_premium, get_advisor_auto
 
-from pydantic import BaseModel
-
 
 router = APIRouter()
 
