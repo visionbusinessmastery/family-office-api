@@ -1,9 +1,5 @@
 from playwright.sync_api import sync_playwright
 from real_estate.config import DOM_TOM_ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
-from real_estate.config import SCRAPER_MATRIX
-
-def get_sources(zone: str):
-    return SCRAPER_MATRIX.get(zone, [])
   
 def scrape_cyphoma(zone: str, max_results: int = SCRAPER_LIMIT):
     results = []
