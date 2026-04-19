@@ -1,8 +1,7 @@
-from .scrappers.leboncoin import search_leboncoin
-from .scrappers.seloger import search_seloger
-from .scrappers.ventes_publiques import search_ventes_publiques
-from .scrappers.agorastore import search_agorastore
-from .scrappers.imodom import search_imodom
+from real_estate.scrappers.leboncoin_playwright import scrape_leboncoin
+from real_estate.scrappers.seloger_playwright import scrape_seloger
+from real_estate.scrappers.cyphoma_playwright import scrape_cyphoma
+from real_estate.scrappers.immo97_playwright import scrape_97immo
 
 from .analyzers.yield_calc import calculate_yield
 from .analyzers.scoring import score_property
@@ -10,53 +9,66 @@ from .analyzers.ai_analysis import analyze_property_ai
 from .analyzers.market_estimator import estimate_price_m2
 from .analyzers.deal_detector import detect_deal
 
+def get_real_estate_data(zone, budget):
 
-def get_real_estate_intelligence(query):
+    sources = [
+        scrape_leboncoin,
+        scrape_seloger,
+        scrape_cyphoma,
+        scrape_97immo
+    ]
 
-    try:
-        listings = []
+    results = []
 
-        listings += search_leboncoin(query.city)
-        listings += search_seloger(query.city)
-        listings += search_ventes_publiques(query.city)
-        listings += search_agorastore(query.city)
-        listings += search_imodom(query.city)
+    for source in sources:
+        try:
+            data = source(zone, SCRAPER_LIMIT)
+            if data:
+                results.extend(data)
+        except Exception as e:
+            print(f"Error {source.__name__}: {e}")
 
-        results = []
+    # parse price
+    results = [
+        r for r in results
+        if parse_price(r["price"]) <= budget
+    ]
 
-        market_price_m2 = estimate_price_m2(query.city)
+    return sorted(results, key=lambda x: parse_price(x["price"]))[:20]
+    
 
-        for prop in listings:
+def score_property(price, budget):
+    return round((budget - price) / budget * 100)
 
-            price = prop.get("price", 0)
-            surface = prop.get("surface", 0)
+def score_deal(price, market_price):
 
-            if price > query.budget:
-                continue
+    discount = (market_price - price) / market_price
 
-            if surface < query.surface_min:
-                continue
+    score = 0
 
-            yield_value = calculate_yield(prop)
-            score = score_property(prop, yield_value, query.strategy)
+    if discount > 0.3:
+        score += 50
+    elif discount > 0.15:
+        score += 30
+    else:
+        score += 10
 
-            deal = detect_deal(prop, market_price_m2)
-            ai_analysis = analyze_property_ai(prop)
+    return min(score, 100)
 
-            results.append({
-                "title": prop.get("title"),
-                "price": price,
-                "surface": surface,
-                "yield": yield_value,
-                "score": score,
-                "deal": deal,
-                "ai": ai_analysis,
-                "source": prop.get("source")
-            })
+def deal_finder(city, budget):
 
-        return sorted(results, key=lambda x: x["score"], reverse=True)
+    deals = get_real_estate_opportunities(city, budget)
 
-    except Exception as e:
-        return {
-            "error": str(e)
-        }
+    scored = []
+
+    for d in deals:
+        market_price = d["price"] * 1.2  # approximation V1
+
+        d["score"] = score_deal(d["price"], market_price)
+
+        if d["score"] > 40:
+            scored.append(d)
+
+    return sorted(scored, key=lambda x: x["score"], reverse=True)
+
+
