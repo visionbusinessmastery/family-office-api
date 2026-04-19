@@ -1,7 +1,7 @@
 from real_estate.scrappers.leboncoin_playwright import scrape_leboncoin
 from real_estate.scrappers.seloger_playwright import scrape_seloger
 from real_estate.scrappers.cyphoma_playwright import scrape_cyphoma
-from real_estate.scrappers.97immo_playwright import scrape_97immo
+from real_estate.scrappers.immo97_playwright import scrape_97immo
 
 from .analyzers.yield_calc import calculate_yield
 from .analyzers.scoring import score_property
