@@ -17,7 +17,7 @@ def safe_user_key(request: Request):
         user = getattr(request.state, "user_email", None)
         if user:
             return user
-    except:
+    except Exception:
         pass
 
     return get_remote_address(request)
