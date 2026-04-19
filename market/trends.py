@@ -1,8 +1,6 @@
-import requests
-import os
+from pytrends.request import TrendReq
 
 def get_trends(keyword):
-
     pytrends = TrendReq()
     pytrends.build_payload([keyword])
 
