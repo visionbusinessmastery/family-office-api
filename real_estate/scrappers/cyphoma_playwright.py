@@ -1,13 +1,16 @@
 from playwright.sync_api import sync_playwright
-from real_estate.config import ZONES, SCRAPER_LIMIT
+
+from real_estate.config import SCRAPER_LIMIT, ZONES
   
 def scrape_cyphoma(zone: str, max_results: int = SCRAPER_LIMIT):
     results = []
 
-    if zone not in DOM_TOM_ZONES:
+    zone_map = ZONES.get("cyphoma", {})
+
+    if zone not in zone_map:
         return []
 
-    url = f"https://www.cyphoma.com/{DOM_TOM_ZONES[zone]}/immobilier"
+    url = f"https://www.cyphoma.com/{zone_map[zone]}/immobilier"
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -24,14 +27,16 @@ def scrape_cyphoma(zone: str, max_results: int = SCRAPER_LIMIT):
                 price = annonce.query_selector(".price").inner_text()
                 link = annonce.query_selector("a").get_attribute("href")
 
-                results.append({
-                    "title": title,
-                    "price": price,
-                    "link": f"https://www.cyphoma.com{link}",
-                    "source": "cyphoma",
-                    "zone": zone
-                })
-            except:
+                results.append(
+                    {
+                        "title": title,
+                        "price": price,
+                        "link": f"https://www.cyphoma.com{link}",
+                        "source": "cyphoma",
+                        "zone": zone,
+                    }
+                )
+            except Exception:
                 continue
 
         browser.close()
