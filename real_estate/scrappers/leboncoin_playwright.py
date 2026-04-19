@@ -33,7 +33,7 @@ def scrape_leboncoin(city, max_price):
 
             except Exception:
                 continue
-
+                
         browser.close()
 
     return results
