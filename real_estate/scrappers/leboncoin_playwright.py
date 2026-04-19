@@ -1,8 +1,5 @@
 from playwright.sync_api import sync_playwright
-from real_estate.config import SCRAPER_MATRIX
-
-def get_sources(zone: str):
-    return SCRAPER_MATRIX.get(zone, [])
+from real_estate.config import DOM_TOM_ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
     
 def scrape_leboncoin(city, max_price):
 
