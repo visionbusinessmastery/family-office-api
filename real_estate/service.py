@@ -9,7 +9,7 @@ from .analyzers.ai_analysis import analyze_property_ai
 from .analyzers.market_estimator import estimate_price_m2
 from .analyzers.deal_detector import detect_deal
 
-def get_real_estate_data(zone, budget):
+def get_real_estate(zone, budget):
 
     sources = [
         scrape_leboncoin,
