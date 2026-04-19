@@ -1,16 +1,11 @@
 from portfolio.service import get_user_portfolio
-from market.service import get_market
-from market.scoring import calculate_ai_score
-import random
-import json
 
 # =========================
 # AUTO REBALANCING ENGINE
 # =========================
 def generate_rebalancing(user_email):
-
-    portfolio = get_user_portfolio(user_email)
-    data = json.loads(data)
+    portfolio_data = get_user_portfolio(user_email)
+    portfolio = portfolio_data.get("portfolio", []) if isinstance(portfolio_data, dict) else []
 
     stocks = []
     crypto = []
@@ -26,8 +21,8 @@ def generate_rebalancing(user_email):
         else:
             stocks.append(asset)
 
-    stock_weight = sum([a["value"] for a in stocks]) / total_value * 100 if total_value else 0
-    crypto_weight = sum([a["value"] for a in crypto]) / total_value * 100 if total_value else 0
+    stock_weight = sum(a["value"] for a in stocks) / total_value * 100 if total_value else 0
+    crypto_weight = sum(a["value"] for a in crypto) / total_value * 100 if total_value else 0
 
     # =========================
     # TARGET ALLOCATION
@@ -35,7 +30,7 @@ def generate_rebalancing(user_email):
     target = {
         "stocks": 60,
         "crypto": 20,
-        "cash": 20
+        "cash": 20,
     }
 
     # =========================
@@ -44,7 +39,7 @@ def generate_rebalancing(user_email):
     adjustments = {
         "stocks": round(target["stocks"] - stock_weight, 2),
         "crypto": round(target["crypto"] - crypto_weight, 2),
-        "cash": round(target["cash"], 2)
+        "cash": round(target["cash"], 2),
     }
 
     # =========================
@@ -66,9 +61,9 @@ def generate_rebalancing(user_email):
     return {
         "current_allocation": {
             "stocks": round(stock_weight, 2),
-            "crypto": round(crypto_weight, 2)
+            "crypto": round(crypto_weight, 2),
         },
         "target_allocation": target,
         "adjustments": adjustments,
-        "actions": actions
+        "actions": actions,
     }
