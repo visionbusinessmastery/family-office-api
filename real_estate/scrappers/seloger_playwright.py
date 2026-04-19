@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from real_estate.config import DOM_TOM_ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
+from real_estate.config import ZONES, SCRAPER_LIMIT, SUPPORTED_REGIONS
     
 def scrape_seloger(city, max_price):
 
