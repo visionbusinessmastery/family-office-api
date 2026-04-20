@@ -37,14 +37,7 @@ def get_global_intelligence(query):
         risk = normalize_risk(query.risk)
 
         # 🔹 REAL ESTATE
-        real_data = get_real_estate_intelligence(
-            type("obj", (), {
-                "city": "paris",
-                "budget": query.budget,
-                "surface_min": 20,
-                "strategy": "rent"
-            })
-        )
+        real_data = get_real_estate_intelligence(query.city, query.budget)
 
         # 🔹 CRYPTO
         crypto_data = get_crypto_intelligence(
