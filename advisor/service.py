@@ -162,7 +162,7 @@ def get_advisor_premium(user_email, message):
 
         try:
             result = json.loads(content)
-        except:
+        except Exception:
             result = {"raw": content}
 
         return result
@@ -234,12 +234,12 @@ def get_advisor_auto(user_email):
             "comment": ""
           }},
           "franchise_opportunities": [
-            {
+            {{
               "name": "",
               "budget": "",
               "roi": "",
               "risk": ""
-            }
+            }}
           ],
           "opportunities": [
             "opportunité 1",
