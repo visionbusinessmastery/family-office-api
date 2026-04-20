@@ -11,15 +11,12 @@ logger = logging.getLogger(__name__)
 # SAFE EXECUTOR (PRODUCTION SAFE)
 # =========================
 def safe_execute(func, data=None, module_name=""):
-
     try:
         return func(data) if data else func()
 
     except HTTPException as e:
         # 👉 Laisse FastAPI gérer (401, 404, etc.)
         raise e
-
-    except Exception as e:
 
     except Exception:
         request_id = str(uuid4())
