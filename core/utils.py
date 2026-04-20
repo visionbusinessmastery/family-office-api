@@ -1,5 +1,10 @@
 import logging
+from uuid import uuid4
+
 from fastapi import HTTPException
+
+
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -16,7 +21,9 @@ def safe_execute(func, data=None, module_name=""):
 
     except Exception as e:
 
-        logging.exception(f"[{module_name}] ERROR")
+    except Exception:
+        request_id = str(uuid4())
+        logger.exception("[%s] ERROR request_id=%s", module_name, request_id)
 
         # 👉 IMPORTANT: on garde un code HTTP clair
         raise HTTPException(
@@ -24,6 +31,7 @@ def safe_execute(func, data=None, module_name=""):
             detail={
                 "module": module_name,
                 "message": "Internal Server Error",
-                "error": str(e)
-            }
+                "error": "unexpected_error",
+                "request_id": request_id,
+            },
         )
