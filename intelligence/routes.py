@@ -21,7 +21,8 @@ def global_intelligence(request: Request, data: GlobalRequest):
             "query": {
                 "budget": data.budget,
                 "risk": data.risk,
-                "strategy": data.strategy
+                "strategy": data.strategy,
+                "city": data.city
             },
             "result": result
         }
