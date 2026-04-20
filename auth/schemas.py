@@ -29,6 +29,6 @@ class UserProfileRequest(BaseModel):
     valeur_bien: Optional[float] = 0
     prix_achat: Optional[float] = 0
 
-    dettes: Optional[dict] = {}
-    epargne: Optional[dict] = {}
-    investissements: Optional[dict] = {}
+    dettes: float = 0
+    epargne: float = 0
+    investissements: float = 0
