@@ -9,6 +9,7 @@ from .service import advisor_logic, get_advisor_premium, get_advisor_auto
 router = APIRouter()
 
 @router.post("/advisor")
+@limiter.limit("10/minute")
 def advisor(request: Request, data: AdvisorRequest):
 
     def _advisor():
