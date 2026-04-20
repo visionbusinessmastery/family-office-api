@@ -76,20 +76,29 @@ def deal_finder(city, budget):
     return sorted(scored, key=lambda x: x["score"], reverse=True)
 
 
-def get_real_estate_intelligence(city, budget):
-    deals = get_real_estate(city, budget)
+def _extract_city_budget(city_or_query, budget):
+    if budget is not None:
+        return city_or_query, budget
+
+    if hasattr(city_or_query, "city") and hasattr(city_or_query, "budget"):
+        return city_or_query.city, city_or_query.budget
+
+    raise ValueError("city et budget sont requis")
+
+
+def get_real_estate_intelligence(city_or_query, budget=None):
+    city, final_budget = _extract_city_budget(city_or_query, budget)
+    deals = get_real_estate(city, final_budget)
 
     enriched = []
 
     for d in deals:
         try:
             price = parse_price(d.get("price"))
-            d["score"] = score_property(price, budget)
+            d["score"] = score_property(price, final_budget)
             d["deal_score"] = score_deal(price, price * 1.2)
             enriched.append(d)
         except Exception:
             continue
 
     return enriched
-
-
