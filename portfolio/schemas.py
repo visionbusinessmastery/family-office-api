@@ -1,27 +1,32 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # =========================
 # REQUESTS
 # =========================
 
+
 class StockRequest(BaseModel):
     ticker: str
+
 
 class Asset(BaseModel):
     asset: str
     asset_type: str
-    quantity: float
-    buy_price: float 
+    quantity: float = Field(gt=0)
+    buy_price: float = Field(gt=0)
+
 
 class PortfolioRequest(BaseModel):
     asset: str
     asset_type: str
-    quantity: float
-    buy_price: float
+    quantity: float = Field(gt=0)
+    buy_price: float = Field(gt=0)
+
 
 # =========================
 # RESPONSE / ANALYSIS
 # =========================
+
 
 class PortfolioAnalysis(BaseModel):
     total_value: float
