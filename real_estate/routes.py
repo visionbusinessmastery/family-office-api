@@ -13,7 +13,7 @@ def real(request: Request, data: RealRequest):
     def _real():
         user_email = request.state.user_email
 
-        result = get_real_estate_intelligence(data)
+        result = get_real_estate_intelligence(data.city, data.budget)
 
         return {
             "user": user_email,
