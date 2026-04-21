@@ -59,17 +59,33 @@ def register(request: Request, data: UserRegister):
 # =========================
 @router.post("/login")
 @limiter.limit("3/minute")
-def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
 
     with engine.connect() as conn:
-        user = conn.execute(text("""
-            SELECT email, password_hash FROM users WHERE email=:email
-        """), {"email": form_data.username}).fetchone()
-      
-    if not user or not verify_password(form_data.password, user[1]):
+        user = conn.execute(
+            text("""
+                SELECT email, password_hash
+                FROM users
+                WHERE email=:email
+            """),
+            {"email": form_data.username}
+        ).fetchone()
+
+    # 🔴 user check
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_token({"sub": user[0]})
+    email, password_hash = user
+
+    # 🔴 password check safe
+    if not password_hash or not verify_password(form_data.password, password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # 🔐 token
+    token = create_token({"sub": email})
 
     return {
         "access_token": token,
