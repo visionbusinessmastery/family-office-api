@@ -149,6 +149,8 @@ def save_profile(
 @router.get("/verify-email")
 def verify_email(token: str):
 
+    print("TOKEN RECEIVED:", token)  # 🔥 DEBUG FRONT → BACK
+
     with engine.begin() as conn:
 
         record = conn.execute(text("""
@@ -156,6 +158,8 @@ def verify_email(token: str):
             FROM email_verifications
             WHERE token = :token
         """), {"token": token}).fetchone()
+
+        print("DB RECORD:", record)  # 🔥 DEBUG DB
 
         if not record:
             raise HTTPException(400, "Invalid token")
@@ -168,18 +172,17 @@ def verify_email(token: str):
         if expires_at < datetime.utcnow():
             raise HTTPException(400, "Token expired")
 
-        # mark verified
         conn.execute(text("""
             UPDATE email_verifications
             SET verified = TRUE
             WHERE token = :token
         """), {"token": token})
 
-        # 🧠 create user si pas existant (PENDING PASSWORD)
         conn.execute(text("""
             INSERT INTO users (email, is_verified)
             VALUES (:email, TRUE)
-            ON CONFLICT (email) DO UPDATE SET is_verified = TRUE
+            ON CONFLICT (email)
+            DO UPDATE SET is_verified = TRUE
         """), {"email": email})
 
     return {
