@@ -25,7 +25,6 @@ router = APIRouter()
 # =========================
 # REGISTER
 # =========================
-
 @router.post("/register")
 @limiter.limit("2/minute")
 def register(request: Request, data: UserRegister):
@@ -47,28 +46,24 @@ def register(request: Request, data: UserRegister):
             "password": hash_password(data.password)
         })
 
-        # 🔐 TOKEN
-        token = generate_verification_token()
-        print("TOKEN GENERATED:", token)
+        # 🔥 UN SEUL SYSTEME DE TOKEN
+        token = str(uuid.uuid4())
 
-        # 💾 SAVE TOKEN
-        save_verification_token(data.email, token)
-        print("TOKEN SAVED FOR:", data.email)
+        conn.execute(text("""
+            INSERT INTO email_verifications (email, token, expires_at, verified)
+            VALUES (:email, :token, :expires_at, FALSE)
+            ON CONFLICT (email)
+            DO UPDATE SET
+                token = EXCLUDED.token,
+                expires_at = EXCLUDED.expires_at,
+                verified = FALSE
+        """), {
+            "email": data.email,
+            "token": token,
+            "expires_at": datetime.utcnow() + timedelta(minutes=30)
+        })
 
-        # 📧 EMAIL SENDING SAFE
-        try:
-            print("SENDING EMAIL TO:", data.email)
-
-            send_verification_email(data.email, token)
-
-            print("EMAIL SENT SUCCESS ✅")
-
-        except Exception as e:
-            print("EMAIL ERROR ❌:", str(e))
-            raise HTTPException(
-                status_code=500,
-                detail="Erreur envoi email"
-            )
+        send_verification_email(data.email, token)
 
     return {"status": "created"}
     
