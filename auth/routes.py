@@ -182,7 +182,7 @@ def set_password(data: SetPasswordRequest):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT email, password_hash
+            SELECT email, password
             FROM users
             WHERE email=:email
         """), {"email": data.email}).fetchone()
@@ -190,6 +190,7 @@ def set_password(data: SetPasswordRequest):
         if not user:
             raise HTTPException(404, "User not found")
 
+        # password déjà défini ?
         if user[1]:
             raise HTTPException(400, "Password already set")
 
@@ -197,8 +198,7 @@ def set_password(data: SetPasswordRequest):
 
         conn.execute(text("""
             UPDATE users
-            SET password_hash = :password,
-                is_active = TRUE,
+            SET password = :password,
                 updated_at = CURRENT_TIMESTAMP
             WHERE email = :email
         """), {
