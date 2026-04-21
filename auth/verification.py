@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta
 from sqlalchemy import text
 from database import engine
 
@@ -43,3 +44,28 @@ def verify_email_token(token: str):
         """), {"email": user[0]})
 
         return user[0]
+
+
+# =========================
+# EMAIL VERIFICATION
+# =========================
+def create_email_verification(email: str):
+    token = str(uuid.uuid4())
+    expires = datetime.utcnow() + timedelta(minutes=30)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO email_verifications (email, token, expires_at)
+            VALUES (:email, :token, :expires_at)
+            ON CONFLICT (email)
+            DO UPDATE SET
+                token = EXCLUDED.token,
+                expires_at = EXCLUDED.expires_at,
+                verified = FALSE
+        """), {
+            "email": email,
+            "token": token,
+            "expires_at": expires
+        })
+
+    return token
