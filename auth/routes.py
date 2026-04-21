@@ -2,15 +2,22 @@ from core.limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
+from datetime import datetime
+
 from database import engine
 
-from auth.utils import hash_password, verify_password, create_token, get_current_user
+from auth.utils import (
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user
+)
+
 from .schemas import UserRegister, UserProfileRequest, SetPasswordRequest
 
 from auth.email_service import send_verification_email
 from auth.verification import generate_verification_token, save_verification_token
 
-from auth.verification import verify_email_token
 
 router = APIRouter()
 
@@ -22,42 +29,27 @@ router = APIRouter()
 @limiter.limit("2/minute")
 def register(request: Request, data: UserRegister):
 
-    try:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
 
-            # 🔥 CHECK SI EMAIL EXISTE (AJOUT)
-            existing_user = conn.execute(text("""
-                SELECT email FROM users WHERE email=:email
-            """), {"email": data.email}).fetchone()
+        existing = conn.execute(text("""
+            SELECT email FROM users WHERE email=:email
+        """), {"email": data.email}).fetchone()
 
-            if existing_user:
-                raise HTTPException(
-                    status_code=400,
-                    detail="email déjà utilisé"
-                )
+        if existing:
+            raise HTTPException(400, "email déjà utilisé")
 
-            # 🔥 INSERT SI OK
-            conn.execute(text("""
-                INSERT INTO users (email, password)
-                VALUES (:email, :password)
-            """), {
-                "email": data.email,
-                "password": hash_password(data.password)
-            })
-            
-            # ⭐ AJOUT IMPORTANT
-            token = generate_verification_token()
-            save_verification_token(data.email, token)
-            send_verification_email(data.email, token)
+        # ⚠️ password_hash UNIQUEMENT (standard SaaS)
+        conn.execute(text("""
+            INSERT INTO users (email, password_hash, is_verified)
+            VALUES (:email, :password, FALSE)
+        """), {
+            "email": data.email,
+            "password": hash_password(data.password)
+        })
 
-    except HTTPException:
-        raise
-
-    except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail="erreur lors de la création du compte"
-        )
+        token = generate_verification_token()
+        save_verification_token(data.email, token)
+        send_verification_email(data.email, token)
 
     return {"status": "created"}
 
@@ -138,20 +130,11 @@ def save_profile(
 # =========================
 # VERFIY EMAIL
 # =========================
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import text
-from datetime import datetime
-from database import engine
-
-router = APIRouter()
-
-
 @router.get("/verify-email")
 def verify_email(token: str):
 
     with engine.begin() as conn:
 
-        # 1. récupérer email verification
         record = conn.execute(text("""
             SELECT email, expires_at, verified
             FROM email_verifications
@@ -159,40 +142,34 @@ def verify_email(token: str):
         """), {"token": token}).fetchone()
 
         if not record:
-            raise HTTPException(status_code=400, detail="Invalid token")
+            raise HTTPException(400, "Invalid token")
 
-        email = record[0]
-        expires_at = record[1]
-        already_verified = record[2]
+        email, expires_at, verified = record
 
-        # 2. déjà utilisé
-        if already_verified:
-            return {"status": "already_verified", "email": email}
+        if verified:
+            return {"status": "already_verified"}
 
-        # 3. expiration check
         if expires_at < datetime.utcnow():
-            raise HTTPException(status_code=400, detail="Token expired")
+            raise HTTPException(400, "Token expired")
 
-        # 4. mark email as verified
+        # mark verified
         conn.execute(text("""
             UPDATE email_verifications
             SET verified = TRUE
             WHERE token = :token
         """), {"token": token})
 
-        # 5. 🟢 CRÉATION USER AUTOMATIQUE (PENDING PASSWORD)
+        # 🧠 create user si pas existant (PENDING PASSWORD)
         conn.execute(text("""
-            INSERT INTO users (email, is_verified, password, created_at)
-            VALUES (:email, TRUE, NULL, CURRENT_TIMESTAMP)
-            ON CONFLICT (email)
-            DO UPDATE SET is_verified = TRUE
+            INSERT INTO users (email, is_verified)
+            VALUES (:email, TRUE)
+            ON CONFLICT (email) DO UPDATE SET is_verified = TRUE
         """), {"email": email})
 
-    # 6. response clean SaaS
     return {
         "status": "verified",
         "email": email,
-        "next_step": "create_password"
+        "next_step": "/create-password"
     }
     
 
@@ -204,27 +181,24 @@ def set_password(data: SetPasswordRequest):
 
     with engine.begin() as conn:
 
-        # 1. Vérifier si user existe
         user = conn.execute(text("""
-            SELECT email, password FROM users WHERE email=:email
+            SELECT email, password_hash
+            FROM users
+            WHERE email=:email
         """), {"email": data.email}).fetchone()
 
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(404, "User not found")
 
-        # 2. Anti double setup password
-        if user[1] is not None:
-            raise HTTPException(status_code=400, detail="Password already set")
+        if user[1]:
+            raise HTTPException(400, "Password already set")
 
-        # 3. Hash password
         hashed = hash_password(data.password)
 
-        # 4. Update user
         conn.execute(text("""
             UPDATE users
-            SET password = :password,
-                is_active = true,
-                is_verified = true,
+            SET password_hash = :password,
+                is_active = TRUE,
                 updated_at = CURRENT_TIMESTAMP
             WHERE email = :email
         """), {
@@ -232,7 +206,6 @@ def set_password(data: SetPasswordRequest):
             "password": hashed
         })
 
-    # 5. AUTO LOGIN TOKEN (SAAS FLOW)
     token = create_token({"sub": data.email})
 
     return {
