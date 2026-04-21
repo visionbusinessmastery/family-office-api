@@ -63,9 +63,9 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
 
     with engine.connect() as conn:
         user = conn.execute(text("""
-            SELECT email, password FROM users WHERE email=:email
+            SELECT email, password_hash FROM users WHERE email=:email
         """), {"email": form_data.username}).fetchone()
-
+      
     if not user or not verify_password(form_data.password, user[1]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -182,7 +182,7 @@ def set_password(data: SetPasswordRequest):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT email, password
+            SELECT email, password_hash
             FROM users
             WHERE email=:email
         """), {"email": data.email}).fetchone()
@@ -197,7 +197,9 @@ def set_password(data: SetPasswordRequest):
 
         conn.execute(text("""
             UPDATE users
-            SET password = :password
+            SET password_hash = :password,
+                is_active = TRUE,
+                updated_at = CURRENT_TIMESTAMP
             WHERE email = :email
         """), {
             "email": data.email,
