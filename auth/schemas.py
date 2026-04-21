@@ -32,3 +32,12 @@ class UserProfileRequest(BaseModel):
     dettes: float = 0
     epargne: float = 0
     investissements: float = 0
+
+
+
+# =========================
+# SET PASSWORD RECORD
+# =========================
+class SetPasswordRequest(BaseModel):
+    email: EmailStr
+    password: str
