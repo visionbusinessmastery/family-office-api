@@ -133,25 +133,68 @@ def save_profile(
             "email": user,
             **data.dict()
         })
+        
 
 # =========================
 # VERFIY EMAIL
 # =========================
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import text
+from datetime import datetime
+from database import engine
+
+router = APIRouter()
+
+
 @router.get("/verify-email")
 def verify_email(token: str):
 
-    email = verify_email_token(token)
+    with engine.begin() as conn:
 
-    if not email:
-        raise HTTPException(status_code=400, detail="Token invalide")
+        # 1. récupérer email verification
+        record = conn.execute(text("""
+            SELECT email, expires_at, verified
+            FROM email_verifications
+            WHERE token = :token
+        """), {"token": token}).fetchone()
 
+        if not record:
+            raise HTTPException(status_code=400, detail="Invalid token")
+
+        email = record[0]
+        expires_at = record[1]
+        already_verified = record[2]
+
+        # 2. déjà utilisé
+        if already_verified:
+            return {"status": "already_verified", "email": email}
+
+        # 3. expiration check
+        if expires_at < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Token expired")
+
+        # 4. mark email as verified
+        conn.execute(text("""
+            UPDATE email_verifications
+            SET verified = TRUE
+            WHERE token = :token
+        """), {"token": token})
+
+        # 5. 🟢 CRÉATION USER AUTOMATIQUE (PENDING PASSWORD)
+        conn.execute(text("""
+            INSERT INTO users (email, is_verified, password, created_at)
+            VALUES (:email, TRUE, NULL, CURRENT_TIMESTAMP)
+            ON CONFLICT (email)
+            DO UPDATE SET is_verified = TRUE
+        """), {"email": email})
+
+    # 6. response clean SaaS
     return {
-        "status": "email_verified",
-        "email": email
+        "status": "verified",
+        "email": email,
+        "next_step": "create_password"
     }
-
-    return {"status": "profil sauvegardé"}
-
+    
 
 # =========================
 # SET PASSWORD
