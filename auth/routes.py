@@ -161,15 +161,35 @@ def set_password(data: SetPasswordRequest):
 
     with engine.begin() as conn:
 
+        # 1. Vérifier si user existe
+        user = conn.execute(text("""
+            SELECT email, password FROM users WHERE email=:email
+        """), {"email": data.email}).fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 2. Anti double setup password
+        if user[1] is not None:
+            raise HTTPException(status_code=400, detail="Password already set")
+
+        # 3. Hash password
+        hashed = hash_password(data.password)
+
+        # 4. Update user
         conn.execute(text("""
             UPDATE users
-            SET password=:password
-            WHERE email=:email AND email_verified=true
+            SET password = :password,
+                is_active = true,
+                is_verified = true,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE email = :email
         """), {
             "email": data.email,
-            "password": hash_password(data.password)
+            "password": hashed
         })
 
+    # 5. AUTO LOGIN TOKEN (SAAS FLOW)
     token = create_token({"sub": data.email})
 
     return {
