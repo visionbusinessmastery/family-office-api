@@ -1,30 +1,77 @@
 import smtplib
-import os
 from email.mime.text import MIMEText
-
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
-
+from email.mime.multipart import MIMEMultipart
+import os
 
 
-# =========================
-# SEND EMAIL VERIFICATION
-# =========================
-def send_verification_email(email: str, token: str):
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
 
-    link = f"http://localhost:3000/verify-email?token={token}"
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-    msg = MIMEText(f"""
-    Clique ici pour vérifier ton email :
+FRONT_URL = os.getenv("FRONT_URL", "http://localhost:3000")
 
-    {link}
-    """)
 
-    msg["Subject"] = "Vérification de ton compte"
-    msg["From"] = EMAIL_USER
-    msg["To"] = email
+def send_verification_email(to_email: str, token: str):
+    if not EMAIL_SENDER or not EMAIL_PASSWORD:
+        raise Exception("EMAIL_SENDER ou EMAIL_PASSWORD manquant")
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    verify_link = f"{FRONT_URL}/verify-email?token={token}"
+
+    print("🔗 VERIFY LINK:", verify_link)
+
+    subject = "Active ton compte Vision Business Mastery"
+
+    # 👉 VERSION HTML (mieux que texte brut)
+    html_content = f"""
+    <html>
+        <body>
+            <h2>Bienvenue 👋</h2>
+            <p>Pour activer ton compte, clique ici :</p>
+            <a href="{verify_link}" style="
+                display:inline-block;
+                padding:12px 20px;
+                background:#1DA2CF;
+                color:white;
+                text-decoration:none;
+                border-radius:8px;
+            ">
+                Activer mon compte
+            </a>
+
+            <p style="margin-top:20px;">
+                Ou copie ce lien :
+                <br/>
+                {verify_link}
+            </p>
+        </body>
+    </html>
+    """
+
+    try:
+        print("📡 Connexion SMTP...")
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.send_message(msg)
+
+        print("🔐 Login SMTP...")
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = to_email
+
+        msg.attach(MIMEText(html_content, "html"))
+
+        print("📤 Envoi email à:", to_email)
+
+        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+        server.quit()
+
+        print("✅ EMAIL SENT SUCCESS")
+
+    except Exception as e:
+        print("❌ EMAIL ERROR:", str(e))
+        raise
