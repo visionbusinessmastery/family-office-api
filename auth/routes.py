@@ -7,6 +7,11 @@ from database import engine
 from auth.utils import hash_password, verify_password, create_token, get_current_user
 from .schemas import UserRegister, UserProfileRequest
 
+from auth.email_service import send_verification_email
+from auth.verification import generate_verification_token, save_verification_token
+
+from auth.verification import verify_email_token
+
 router = APIRouter()
 
 
@@ -39,6 +44,11 @@ def register(request: Request, data: UserRegister):
                 "email": data.email,
                 "password": hash_password(data.password)
             })
+            
+            # ⭐ AJOUT IMPORTANT
+            token = generate_verification_token()
+            save_verification_token(data.email, token)
+            send_verification_email(data.email, token)
 
     except HTTPException:
         raise
@@ -124,4 +134,45 @@ def save_profile(
             **data.dict()
         })
 
+# =========================
+# VERFIY EMAIL
+# =========================
+@router.get("/verify-email")
+def verify_email(token: str):
+
+    email = verify_email_token(token)
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Token invalide")
+
+    return {
+        "status": "email_verified",
+        "email": email
+    }
+
     return {"status": "profil sauvegardé"}
+
+
+# =========================
+# SET PASSWORD
+# =========================
+@router.post("/set-password")
+def set_password(data: SetPasswordRequest):
+
+    with engine.begin() as conn:
+
+        conn.execute(text("""
+            UPDATE users
+            SET password=:password
+            WHERE email=:email AND email_verified=true
+        """), {
+            "email": data.email,
+            "password": hash_password(data.password)
+        })
+
+    token = create_token({"sub": data.email})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
