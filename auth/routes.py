@@ -179,18 +179,19 @@ def verify_email(token: str):
 @router.post("/set-password")
 def set_password(data: SetPasswordRequest):
 
+    email = data.email.strip().lower()
+
     with engine.begin() as conn:
 
         user = conn.execute(text("""
             SELECT email, password
             FROM users
-            WHERE email=:email
-        """), {"email": data.email}).fetchone()
+            WHERE LOWER(email)=:email
+        """), {"email": email}).fetchone()
 
         if not user:
             raise HTTPException(404, "User not found")
 
-        # password déjà défini ?
         if user[1]:
             raise HTTPException(400, "Password already set")
 
@@ -200,13 +201,13 @@ def set_password(data: SetPasswordRequest):
             UPDATE users
             SET password = :password,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE email = :email
+            WHERE LOWER(email) = :email
         """), {
-            "email": data.email,
+            "email": email,
             "password": hashed
         })
 
-    token = create_token({"sub": data.email})
+    token = create_token({"sub": email})
 
     return {
         "access_token": token,
