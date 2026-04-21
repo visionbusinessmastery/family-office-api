@@ -25,6 +25,9 @@ router = APIRouter()
 # =========================
 # REGISTER
 # =========================
+# =========================
+# REGISTER (FIX EMAIL DEBUG)
+# =========================
 @router.post("/register")
 @limiter.limit("2/minute")
 def register(request: Request, data: UserRegister):
@@ -38,7 +41,6 @@ def register(request: Request, data: UserRegister):
         if existing:
             raise HTTPException(400, "email déjà utilisé")
 
-        # ⚠️ password_hash UNIQUEMENT (standard SaaS)
         conn.execute(text("""
             INSERT INTO users (email, password_hash, is_verified)
             VALUES (:email, :password, FALSE)
@@ -47,12 +49,31 @@ def register(request: Request, data: UserRegister):
             "password": hash_password(data.password)
         })
 
+        # 🔐 TOKEN
         token = generate_verification_token()
+        print("TOKEN GENERATED:", token)
+
+        # 💾 SAVE TOKEN
         save_verification_token(data.email, token)
-        send_verification_email(data.email, token)
+        print("TOKEN SAVED FOR:", data.email)
+
+        # 📧 EMAIL SENDING SAFE
+        try:
+            print("SENDING EMAIL TO:", data.email)
+
+            send_verification_email(data.email, token)
+
+            print("EMAIL SENT SUCCESS ✅")
+
+        except Exception as e:
+            print("EMAIL ERROR ❌:", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Erreur envoi email"
+            )
 
     return {"status": "created"}
-
+    
 
 # =========================
 # LOGIN (OAUTH Swagger COMPATIBLE)
