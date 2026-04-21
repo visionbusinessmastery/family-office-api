@@ -5,6 +5,10 @@ from stocks.service import get_stock_intelligence
 from .analyzers.allocation import allocate_portfolio
 from .analyzers.ai_global import global_ai_analysis
 
+from .analyzers.family_office_score import compute_family_office_score
+from sqlalchemy import text
+from database import engine
+
 
 # 🔥 NORMALISATION DU RISQUE (AJOUT)
 def normalize_risk(risk: str):
@@ -78,3 +82,44 @@ def get_global_intelligence(query):
         return {
             "error": str(e)
         }
+
+
+def get_family_office_score(user_email):
+
+    # =========================
+    # PROFILE
+    # =========================
+    with engine.connect() as conn:
+        profile_row = conn.execute(text("""
+            SELECT savings, investments, risk_profile
+            FROM user_profiles
+            WHERE user_email=:email
+        """), {"email": user_email}).fetchone()
+
+    profile = dict(profile_row._mapping) if profile_row else {}
+
+    # =========================
+    # PORTFOLIO
+    # =========================
+    portfolio = []
+
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT asset, asset_type, quantity, buy_price
+            FROM portfolios
+            WHERE user_email=:email
+        """), {"email": user_email}).fetchall()
+
+    for r in rows:
+        value = r[2] * r[3]
+
+        portfolio.append({
+            "asset": r[0],
+            "type": r[1],
+            "value": value
+        })
+
+    # =========================
+    # SCORE
+    # =========================
+    return compute_family_office_score(profile, portfolio)
