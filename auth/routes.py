@@ -25,9 +25,7 @@ router = APIRouter()
 # =========================
 # REGISTER
 # =========================
-# =========================
-# REGISTER (FIX EMAIL DEBUG)
-# =========================
+
 @router.post("/register")
 @limiter.limit("2/minute")
 def register(request: Request, data: UserRegister):
