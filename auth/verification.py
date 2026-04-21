@@ -25,7 +25,7 @@ def save_verification_token(email: str, token: str):
 # =========================
 # EMAIL TOKEN VERIFICATION
 # =========================
-  def verify_email_token(token: str):
+def verify_email_token(token: str):
     with engine.begin() as conn:
         user = conn.execute(text("""
             SELECT email FROM users
