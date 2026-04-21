@@ -5,7 +5,7 @@ from sqlalchemy import text
 from database import engine
 
 from auth.utils import hash_password, verify_password, create_token, get_current_user
-from .schemas import UserRegister, UserProfileRequest
+from .schemas import UserRegister, UserProfileRequest, SetPasswordRequest
 
 from auth.email_service import send_verification_email
 from auth.verification import generate_verification_token, save_verification_token
