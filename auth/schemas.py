@@ -5,12 +5,7 @@ from typing import Optional
 # =========================
 # REGISTER / LOGIN
 # =========================
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
-
-
-class UserLogin(BaseModel):
+class UserAuth(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
 
