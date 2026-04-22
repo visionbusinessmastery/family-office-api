@@ -27,45 +27,36 @@ router = APIRouter()
 @router.post("/register")
 def register(data: UserRegister):
 
-    hashed_password = hash_password(data.password)
-
     with engine.begin() as conn:
 
-        # create user
+        # 1. create user
         result = conn.execute(text("""
-            INSERT INTO users (email, password_hash, is_verified)
-            VALUES (:email, :password_hash, FALSE)
+            INSERT INTO users (email, is_verified, is_active)
+            VALUES (:email, FALSE, FALSE)
             RETURNING id
         """), {
-            "email": data.email,
-            "password_hash": hashed_password
+            "email": data.email
         })
 
         user_id = result.fetchone()[0]
 
-        # verification token
-        token = secrets.token_urlsafe(32)
+        # 2. generate token
+        token = generate_verification_token()
 
-        conn.execute(text("""
-            INSERT INTO email_verifications (user_id, email, token, is_used, expires_at)
-            VALUES (:user_id, :email, :token, FALSE, NOW() + INTERVAL '24 hours')
-        """), {
-            "user_id": user_id,
-            "email": data.email,
-            "token": token
-        })
+        # 3. save verification
+        save_verification_token(data.email, token)
 
     return {
         "message": "User created",
-        "user_id": user_id
+        "user_id": user_id,
+        "next_step": "verify-email"
     }
-
 
 # =========================
 # LOGIN
 # =========================
 @router.post("/login")
-def login(data: UserLogin):
+def login(data: UserRegister):
 
     with engine.begin() as conn:
 
@@ -76,17 +67,21 @@ def login(data: UserLogin):
         if not user:
             raise HTTPException(401, "User not found")
 
-        if not verify_password(data.password, user.password_hash):
-            raise HTTPException(401, "Wrong password")
-
         if not user.is_verified:
             raise HTTPException(403, "Email not verified")
 
-    return {
-        "access_token": create_token({"sub": data.email}),
-        "token_type": "bearer"
-    }
+        if not user.password_hash:
+            raise HTTPException(403, "Password not set")
 
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(401, "Wrong password")
+
+        token = create_token({"sub": user.email})
+
+        return {
+            "access_token": token,
+            "token_type": "bearer"
+        }
 
 # =========================
 # ME
@@ -141,14 +136,13 @@ def save_profile(
 
 # =========================
 # VERIFY EMAIL
-# =========================
-@router.get("/verify-email")
+# =========================@router.get("/verify-email")
 def verify_email(token: str):
 
     with engine.begin() as conn:
 
         record = conn.execute(text("""
-            SELECT email, expires_at, is_used
+            SELECT user_id, email, expires_at, is_used
             FROM email_verifications
             WHERE token = :token
         """), {"token": token}).fetchone()
@@ -156,27 +150,32 @@ def verify_email(token: str):
         if not record:
             raise HTTPException(400, "Invalid token")
 
-        email, expires_at, is_used = record
+        user_id, email, expires_at, is_used = record
 
         if is_used:
-            return {"status": "already_verified"}
+            return {"status": "already_used"}
 
         if expires_at < datetime.utcnow():
             raise HTTPException(400, "Token expired")
 
+        # mark used
         conn.execute(text("""
             UPDATE email_verifications
             SET is_used = TRUE
             WHERE token = :token
         """), {"token": token})
 
+        # activate user
         conn.execute(text("""
             UPDATE users
             SET is_verified = TRUE
-            WHERE email = :email
-        """), {"email": email})
+            WHERE id = :user_id
+        """), {"user_id": user_id})
 
-    return {"status": "verified"}
+    return {
+        "status": "verified",
+        "email": email
+    }
 
 
 # =========================
@@ -188,17 +187,21 @@ def set_password(data: SetPasswordRequest):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT * FROM users WHERE email = :email
+            SELECT id, password_hash FROM users WHERE email = :email
         """), {"email": data.email}).fetchone()
 
         if not user:
             raise HTTPException(404, "User not found")
 
+        if user.password_hash:
+            raise HTTPException(400, "Password already set")
+
         hashed = hash_password(data.password)
 
         conn.execute(text("""
             UPDATE users
-            SET password_hash = :password
+            SET password_hash = :password,
+                is_active = TRUE
             WHERE email = :email
         """), {
             "email": data.email,
@@ -206,3 +209,42 @@ def set_password(data: SetPasswordRequest):
         })
 
     return {"status": "password set"}
+
+
+
+# =========================
+# PROFILE SAVED
+# =========================
+@router.post("/profile/save")
+def save_profile(
+    data: UserProfileRequest,
+    user: str = Depends(get_current_user)
+):
+
+    with engine.begin() as conn:
+
+        conn.execute(text("""
+            INSERT INTO user_profiles (
+                user_email, gender, age, employment_status,
+                monthly_income, marital_status, children_count,
+                housing_status, real_estate_value, real_estate_purchase_price,
+                total_debt, savings, investments, crypto, risk_profile
+            )
+            VALUES (
+                :email, :genre, :age, :situation_pro,
+                :revenus_mensuels, :situation_familiale, :nb_enfants,
+                :logement, :valeur_bien, :prix_achat,
+                0, 0, 0, 0, 'medium'
+            )
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                gender = EXCLUDED.gender,
+                age = EXCLUDED.age,
+                employment_status = EXCLUDED.employment_status,
+                monthly_income = EXCLUDED.monthly_income
+        """), {
+            "email": user,
+            **data.dict()
+        })
+
+    return {"status": "profile saved"}
