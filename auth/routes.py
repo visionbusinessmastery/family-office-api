@@ -77,7 +77,7 @@ def login(data: UserAuth):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT id, email, password_hash, is_verified, profile_completed
+            SELECT id, email, password_hash, is_verified, profile_completed, plan
             FROM users
             WHERE email = :email
         """), {"email": data.email}).fetchone()
@@ -91,13 +91,13 @@ def login(data: UserAuth):
         if not user.is_verified:
             raise HTTPException(403, "Email not verified")
 
-        # ✅ TOKEN CLEAN
         token = create_token({"sub": user.email})
 
         return {
             "access_token": token,
             "token_type": "bearer",
-            "profile_completed": user.profile_completed
+            "profile_completed": user.profile_completed,
+            "plan": user.plan
         }
 
 
@@ -110,7 +110,7 @@ def me(user: str = Depends(get_current_user)):
     with engine.begin() as conn:
 
         result = conn.execute(text("""
-            SELECT email, profile_completed
+            SELECT email, profile_completed, plan
             FROM users
             WHERE email = :email
         """), {"email": user}).fetchone()
@@ -118,13 +118,13 @@ def me(user: str = Depends(get_current_user)):
         if not result:
             raise HTTPException(404, "User not found")
 
-        email, profile_completed = result
+        email, profile_completed, plan = result
 
     return {
         "email": email,
-        "profile_completed": profile_completed
+        "profile_completed": profile_completed,
+        "plan": plan
     }
-
 
 # =========================
 # PROFILE SAVE (LIGHT)
