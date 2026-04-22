@@ -318,3 +318,34 @@ def onboarding_save(
         "status": "onboarding completed",
         "profile_completed": True
     }
+
+
+# =========================
+# UPDATE PLAN
+# =========================
+@router.post("/plan/update")
+def update_plan(
+    plan: str,
+    user: str = Depends(get_current_user)
+):
+
+    allowed_plans = ["FREE", "SILVER", "GOLD", "ELITE"]
+
+    if plan not in allowed_plans:
+        raise HTTPException(400, "Invalid plan")
+
+    with engine.begin() as conn:
+
+        conn.execute(text("""
+            UPDATE users
+            SET plan = :plan
+            WHERE email = :email
+        """), {
+            "plan": plan,
+            "email": user
+        })
+
+    return {
+        "status": "plan updated",
+        "plan": plan
+    }
