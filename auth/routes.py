@@ -66,6 +66,7 @@ def register(data: UserAuth):
     return {
         "message": "User created",
         "user_id": user_id
+        "verification_token": token   # 👈 AJOUT IMPORTANT
     }
 
 
