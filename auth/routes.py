@@ -25,87 +25,76 @@ router = APIRouter()
 # =========================
 # REGISTER
 # =========================
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import text
+import secrets
+from datetime import datetime, timedelta
+
+router = APIRouter()
+
 @router.post("/register")
-@limiter.limit("2/minute")
-def register(request: Request, data: UserRegister):
+def register(data, conn):
 
-    with engine.begin() as conn:
+    # 1. hash password (tu l'as déjà normalement)
+    hashed_password = hash_password(data.password)
 
-        existing = conn.execute(text("""
-            SELECT email FROM users WHERE email=:email
-        """), {"email": data.email}).fetchone()
+    # 2. créer user
+    result = conn.execute(text("""
+        INSERT INTO users (email, password_hash, is_verified)
+        VALUES (:email, :password_hash, FALSE)
+        RETURNING id
+    """), {
+        "email": data.email,
+        "password_hash": hashed_password
+    })
 
-        if existing:
-            raise HTTPException(400, "email déjà utilisé")
+    user_id = result.fetchone()[0]
 
-        conn.execute(text("""
-            INSERT INTO users (email, password_hash, is_verified)
-            VALUES (:email, :password, FALSE)
-        """), {
-            "email": data.email,
-            "password": hash_password(data.password)
-        })
+    # 3. générer token verification
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=24)
 
-        # 🔥 UN SEUL SYSTEME DE TOKEN
-        token = str(uuid.uuid4())
+    # 4. insert email verification
+    conn.execute(text("""
+        INSERT INTO email_verifications (user_id, email, token, expires_at, is_used)
+        VALUES (:user_id, :email, :token, :expires_at, FALSE)
+    """), {
+        "user_id": user_id,
+        "email": data.email,
+        "token": token,
+        "expires_at": expires_at
+    })
 
-        conn.execute(text("""
-            INSERT INTO email_verifications (email, token, expires_at, verified)
-            VALUES (:email, :token, :expires_at, FALSE)
-            ON CONFLICT (email)
-            DO UPDATE SET
-                token = EXCLUDED.token,
-                expires_at = EXCLUDED.expires_at,
-                verified = FALSE
-        """), {
-            "email": data.email,
-            "token": token,
-            "expires_at": datetime.utcnow() + timedelta(minutes=30)
-        })
+    conn.commit()
 
-        send_verification_email(data.email, token)
-
-    return {"status": "created"}
-    
+    return {
+        "message": "User created successfully",
+        "user_id": user_id
+    }    
 
 # =========================
 # LOGIN (OAUTH Swagger COMPATIBLE)
 # =========================
 @router.post("/login")
-@limiter.limit("3/minute")
-def login(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends()
-):
+def login(data, conn):
 
-    with engine.connect() as conn:
-        user = conn.execute(
-            text("""
-                SELECT email, password_hash
-                FROM users
-                WHERE email=:email
-            """),
-            {"email": form_data.username}
-        ).fetchone()
+    user = conn.execute(text("""
+        SELECT * FROM users WHERE email = :email
+    """), {"email": data.email}).fetchone()
 
-    # 🔴 user check
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="User not found")
 
-    email, password_hash = user
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Wrong password")
 
-    # 🔴 password check safe
-    if not password_hash or not verify_password(form_data.password, password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # 🔐 token
-    token = create_token({"sub": email})
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
 
     return {
-        "access_token": token,
-        "token_type": "bearer"
+        "message": "Login success",
+        "user_id": user.id
     }
-
 
 # =========================
 # ME
