@@ -125,47 +125,25 @@ def save_profile(
                 user_email,
                 gender,
                 age,
-                employment_status,
-                monthly_income,
-                marital_status,
-                children_count,
-                housing_status,
-                real_estate_value,
-                real_estate_purchase_price,
-                total_debt,
-                savings,
-                investments
+                employment_status
             )
             VALUES (
                 :email,
                 :genre,
                 :age,
-                :situation_pro,
-                :revenus_mensuels,
-                :situation_familiale,
-                :nb_enfants,
-                :logement,
-                :valeur_bien,
-                :prix_achat,
-                :dettes,
-                :epargne,
-                :investissements
+                :situation_pro
             )
             ON CONFLICT (user_email)
             DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age = EXCLUDED.age,
                 employment_status = EXCLUDED.employment_status,
-                monthly_income = EXCLUDED.monthly_income,
-                marital_status = EXCLUDED.marital_status,
-                children_count = EXCLUDED.children_count,
-                housing_status = EXCLUDED.housing_status,
-                real_estate_value = EXCLUDED.real_estate_value,
-                real_estate_purchase_price = EXCLUDED.real_estate_purchase_price,
                 updated_at = CURRENT_TIMESTAMP
         """), {
             "email": user,
-            **data.dict()
+            "genre": data.genre,
+            "age": data.age,
+            "situation_pro": data.situation_pro,
         })
 
     return {"status": "profile saved"}
