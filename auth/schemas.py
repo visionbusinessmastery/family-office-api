@@ -3,15 +3,20 @@ from typing import Optional
 
 
 # =========================
-# REGISTER
+# REGISTER / LOGIN
 # =========================
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
 
 
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+
+
 # =========================
-# PROFILE INPUT
+# PROFILE
 # =========================
 class UserProfileRequest(BaseModel):
     genre: Optional[str] = None
@@ -34,9 +39,8 @@ class UserProfileRequest(BaseModel):
     investissements: float = 0
 
 
-
 # =========================
-# SET PASSWORD RECORD
+# SET PASSWORD
 # =========================
 class SetPasswordRequest(BaseModel):
     email: EmailStr
