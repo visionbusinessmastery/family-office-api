@@ -28,7 +28,6 @@ def register(data: UserAuth):
 
     with engine.begin() as conn:
 
-        # check existing user
         existing = conn.execute(text("""
             SELECT id FROM users WHERE email = :email
         """), {"email": data.email}).fetchone()
@@ -49,7 +48,6 @@ def register(data: UserAuth):
 
         user_id = result.fetchone()[0]
 
-        # verification token
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
@@ -66,7 +64,7 @@ def register(data: UserAuth):
     return {
         "message": "User created",
         "user_id": user_id,
-        "verification_token": token   # 👈 AJOUT IMPORTANT
+        "verification_token": token
     }
 
 
@@ -93,11 +91,8 @@ def login(data: UserAuth):
         if not user.is_verified:
             raise HTTPException(403, "Email not verified")
 
-        # 🔥 TOKEN enrichi pour frontend intelligent
-        token = create_token({
-            "sub": user.email,
-            "profile_completed": user.profile_completed
-        })
+        # ✅ TOKEN CLEAN
+        token = create_token({"sub": user.email})
 
         return {
             "access_token": token,
@@ -111,11 +106,28 @@ def login(data: UserAuth):
 # =========================
 @router.get("/me")
 def me(user: str = Depends(get_current_user)):
-    return {"email": user}
+
+    with engine.begin() as conn:
+
+        result = conn.execute(text("""
+            SELECT email, profile_completed
+            FROM users
+            WHERE email = :email
+        """), {"email": user}).fetchone()
+
+        if not result:
+            raise HTTPException(404, "User not found")
+
+        email, profile_completed = result
+
+    return {
+        "email": email,
+        "profile_completed": profile_completed
+    }
 
 
 # =========================
-# PROFILE SAVE
+# PROFILE SAVE (LIGHT)
 # =========================
 @router.post("/profile/save")
 def save_profile(
@@ -235,7 +247,7 @@ def set_password(data: SetPasswordRequest):
 
 
 # =========================
-# ONBOARDING PROFILE SAVE
+# ONBOARDING PROFILE SAVE (MAIN)
 # =========================
 @router.post("/onboarding/save")
 def onboarding_save(
@@ -245,7 +257,6 @@ def onboarding_save(
 
     with engine.begin() as conn:
 
-        # 1. UPDATE FULL PROFILE
         conn.execute(text("""
             INSERT INTO user_profiles (
                 user_email,
@@ -297,7 +308,6 @@ def onboarding_save(
             **data.dict()
         })
 
-        # 2. MARK COMPLETED
         conn.execute(text("""
             UPDATE users
             SET profile_completed = TRUE
