@@ -79,7 +79,7 @@ def login(data: UserAuth):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT id, email, password_hash, is_verified
+            SELECT id, email, password_hash, is_verified, profile_completed
             FROM users
             WHERE email = :email
         """), {"email": data.email}).fetchone()
@@ -93,11 +93,16 @@ def login(data: UserAuth):
         if not user.is_verified:
             raise HTTPException(403, "Email not verified")
 
-        token = create_token({"sub": user.email})
+        # 🔥 TOKEN enrichi pour frontend intelligent
+        token = create_token({
+            "sub": user.email,
+            "profile_completed": user.profile_completed
+        })
 
         return {
             "access_token": token,
-            "token_type": "bearer"
+            "token_type": "bearer",
+            "profile_completed": user.profile_completed
         }
 
 
@@ -226,4 +231,80 @@ def set_password(data: SetPasswordRequest):
     return {
         "access_token": token,
         "token_type": "bearer"
+    }
+
+
+# =========================
+# ONBOARDING PROFILE SAVE
+# =========================
+@router.post("/onboarding/save")
+def onboarding_save(
+    data: UserProfileRequest,
+    user: str = Depends(get_current_user)
+):
+
+    with engine.begin() as conn:
+
+        # 1. UPDATE FULL PROFILE
+        conn.execute(text("""
+            INSERT INTO user_profiles (
+                user_email,
+                gender,
+                age,
+                employment_status,
+                monthly_income,
+                marital_status,
+                children_count,
+                housing_status,
+                real_estate_value,
+                real_estate_purchase_price,
+                total_debt,
+                savings,
+                investments
+            )
+            VALUES (
+                :email,
+                :genre,
+                :age,
+                :situation_pro,
+                :revenus_mensuels,
+                :situation_familiale,
+                :nb_enfants,
+                :logement,
+                :valeur_bien,
+                :prix_achat,
+                :dettes,
+                :epargne,
+                :investissements
+            )
+            ON CONFLICT (user_email)
+            DO UPDATE SET
+                gender = EXCLUDED.gender,
+                age = EXCLUDED.age,
+                employment_status = EXCLUDED.employment_status,
+                monthly_income = EXCLUDED.monthly_income,
+                marital_status = EXCLUDED.marital_status,
+                children_count = EXCLUDED.children_count,
+                housing_status = EXCLUDED.housing_status,
+                real_estate_value = EXCLUDED.real_estate_value,
+                real_estate_purchase_price = EXCLUDED.real_estate_purchase_price,
+                total_debt = EXCLUDED.total_debt,
+                savings = EXCLUDED.savings,
+                investments = EXCLUDED.investments,
+                updated_at = CURRENT_TIMESTAMP
+        """), {
+            "email": user,
+            **data.dict()
+        })
+
+        # 2. MARK COMPLETED
+        conn.execute(text("""
+            UPDATE users
+            SET profile_completed = TRUE
+            WHERE email = :email
+        """), {"email": user})
+
+    return {
+        "status": "onboarding completed",
+        "profile_completed": True
     }
