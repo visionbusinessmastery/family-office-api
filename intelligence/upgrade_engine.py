@@ -1,7 +1,5 @@
 from sqlalchemy import text
 
-from intelligence.analyzers.family_office_score import compute_family_office_score
-
 
 # =========================
 # PLAN FROM SCORE
@@ -48,14 +46,17 @@ def compute_upgrade_decision(current_plan: str, score: int):
         "upgrade": False,
         "from": current_plan,
         "to": current_plan,
-        "recommended_plan": recommended_plan
+        "recommended_plan": recommended_plan,
+        "reason": None
     }
 
 
 # =========================
-# MAIN INTELLIGENCE ENGINE
+# MAIN PIPELINE (OPTIONNEL BACKEND AUTO APPLY)
 # =========================
 def process_user_intelligence(user_email, profile, portfolio, conn):
+
+    from intelligence.analyzers.family_office_score import compute_family_office_score
 
     score_data = compute_family_office_score(profile, portfolio)
 
@@ -65,7 +66,7 @@ def process_user_intelligence(user_email, profile, portfolio, conn):
     )
 
     # =========================
-    # AUTO UPGRADE ACTION
+    # AUTO UPGRADE DB
     # =========================
     if upgrade.get("upgrade"):
 
@@ -105,3 +106,9 @@ def process_user_intelligence(user_email, profile, portfolio, conn):
         "score": score_data,
         "upgrade": upgrade
     }
+
+
+# =========================
+# COMPAT LAYER (IMPORTANT)
+# =========================
+evaluate_upgrade = compute_upgrade_decision
