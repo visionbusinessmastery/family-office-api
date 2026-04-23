@@ -12,7 +12,7 @@ def generate_verification_token():
 
 
 # =========================
-# SAVE TOKEN (FIXED)
+# SAVE TOKEN
 # =========================
 def save_verification_token(email: str, token: str):
 
@@ -20,17 +20,14 @@ def save_verification_token(email: str, token: str):
 
     with engine.begin() as conn:
 
-        # =========================
-        # CLEAN OLD TOKENS (IMPORTANT)
-        # =========================
+        # invalidate old tokens
         conn.execute(text("""
-            DELETE FROM email_verifications
-            WHERE email = :email
+            UPDATE email_verifications
+            SET is_used = TRUE
+            WHERE email = :email AND is_used = FALSE
         """), {"email": email})
 
-        # =========================
-        # INSERT NEW TOKEN
-        # =========================
+        # insert new token
         conn.execute(text("""
             INSERT INTO email_verifications (
                 email,
@@ -52,3 +49,11 @@ def save_verification_token(email: str, token: str):
             "created_at": datetime.utcnow(),
             "expires_at": expires
         })
+
+    print("📧 TOKEN SAVED:", email, token)
+
+    return {
+        "email": email,
+        "token": token,
+        "expires_at": expires
+    }
