@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import secrets
@@ -17,9 +18,7 @@ from auth.schemas import (
     SetPasswordRequest
 )
 
-import stripe
 import os
-from fastapi import Request
 
 
 router = APIRouter()
@@ -423,6 +422,9 @@ async def stripe_webhook(request: Request):
 
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
+    if not endpoint_secret:
+        raise HTTPException(500, "Missing STRIPE_WEBHOOK_SECRET")
+
     try:
         event = stripe.Webhook.construct_event(
             payload,
@@ -432,6 +434,30 @@ async def stripe_webhook(request: Request):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if event["type"] == "checkout.session.completed":
+
+        session = event["data"]["object"]
+
+        customer_email = session.get("customer_email")
+        plan = session.get("metadata", {}).get("plan")
+
+        if customer_email and plan:
+
+            with engine.begin() as conn:
+
+                conn.execute(text("""
+                    UPDATE users
+                    SET plan = :plan,
+                        subscription_status = 'active'
+                    WHERE email = :email
+                """), {
+                    "plan": plan,
+                    "email": customer_email
+                })
+
+    return {"status": "success"}
+    
 
     # =========================
     # PAYMENT SUCCESS
