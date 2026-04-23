@@ -1,7 +1,11 @@
 from intelligence.analyzers.family_office_score import compute_family_office_score
 from intelligence.upgrade_engine import compute_upgrade_decision
+from intelligence.dashboard_engine import build_dashboard
 
 
+# =========================
+# RUN USER INTELLIGENCE
+# =========================
 def run_user_intelligence(user_email, profile, portfolio, conn):
 
     # =========================
@@ -58,8 +62,14 @@ def run_user_intelligence(user_email, profile, portfolio, conn):
     # =========================
     # 5. RETURN UNIFIED OUTPUT
     # =========================
+    dashboard = build_dashboard(
+    user={"plan": profile.get("plan")},
+    intelligence=result
+    )
+
     return {
         "score": score_data,
         "segment": segment,
-        "upgrade": upgrade
+        "upgrade": upgrade,
+        "dashboard": dashboard
     }
