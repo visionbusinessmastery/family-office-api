@@ -9,6 +9,8 @@ from database import engine
 from auth.utils import hash_password
 from auth.email_service import send_verification_email
 
+from auth.verification import save_verification_token, generate_verification_token
+
 router = APIRouter()
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -57,9 +59,10 @@ def register(data):
         # =========================
         # TOKEN CLEAN (UUID UNIQUE)
         # =========================
-        token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(hours=24)
+        token = generate_verification_token()
 
+        save_verification_token(email, token)
+       
         conn.execute(text("""
             INSERT INTO email_verifications (
                 email,
