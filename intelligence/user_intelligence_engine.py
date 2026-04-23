@@ -37,7 +37,7 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict = dict(profile._mapping) if profile else {}
 
-        # 🔥 IMPORTANT : enrichir avec user
+        # 🔥 enrichissement
         profile_dict["email"] = user.email
         profile_dict["plan"] = user.plan
 
@@ -59,7 +59,7 @@ def compute_user_intelligence(user_email: str):
     score = score_result["score"]
 
     # =========================
-    # 5. LEVEL LOGIC (inchangé)
+    # 5. LEVEL
     # =========================
     if score >= 80:
         level = "ELITE"
@@ -75,7 +75,7 @@ def compute_user_intelligence(user_email: str):
         recommendation = "start onboarding"
 
     # =========================
-    # 6. UPGRADE ENGINE (NEW)
+    # 6. UPGRADE
     # =========================
     upgrade = evaluate_upgrade(
         user_email=user.email,
@@ -84,17 +84,17 @@ def compute_user_intelligence(user_email: str):
     )
 
     # =========================
-    # 7. FEATURES (NEW)
+    # 7. FEATURES
     # =========================
     features = compute_feature_access(profile_dict, score_result)
 
     # =========================
-    # 8. OPPORTUNITIES (NEW)
+    # 8. OPPORTUNITIES
     # =========================
     opportunities = compute_opportunities(profile_dict, portfolio_list)
 
     # =========================
-    # 9. UPGRADE TARGET (compat)
+    # 9. UPGRADE TARGET
     # =========================
     upgrade_target = None
 
@@ -121,9 +121,7 @@ def compute_user_intelligence(user_email: str):
         "upgrade_target": upgrade_target,
         "upgrade": upgrade,
 
-        # 🔥 NEW AI LAYER
+        # 🔥 AI LAYER
         "features": features,
         "opportunities": opportunities
-    }
-        "upgrade_target": upgrade_target
     }
