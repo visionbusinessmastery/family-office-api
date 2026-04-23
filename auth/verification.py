@@ -4,16 +4,10 @@ from database import engine
 import uuid
 
 
-# =========================
-# GENERATE TOKEN
-# =========================
 def generate_verification_token():
     return str(uuid.uuid4())
 
 
-# =========================
-# SAVE TOKEN
-# =========================
 def save_verification_token(email: str, token: str):
 
     expires = datetime.utcnow() + timedelta(hours=24)
