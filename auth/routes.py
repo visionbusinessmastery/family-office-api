@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import secrets
+import os
 
 from database import engine
 from auth.utils import (
@@ -18,14 +19,16 @@ from auth.schemas import (
     SetPasswordRequest
 )
 
-import os
-
-
 router = APIRouter()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
+# 🔒 SECURITÉ API KEY STRIPE
+if not stripe.api_key:
+    raise Exception("Missing STRIPE_SECRET_KEY")
+
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 
 # =========================
 # REGISTER
@@ -33,11 +36,13 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 @router.post("/register")
 def register(data: UserAuth):
 
+    email = data.email.lower()
+
     with engine.begin() as conn:
 
         existing = conn.execute(text("""
             SELECT id FROM users WHERE email = :email
-        """), {"email": data.email}).fetchone()
+        """), {"email": email}).fetchone()
 
         if existing:
             raise HTTPException(400, "User already exists")
@@ -49,7 +54,7 @@ def register(data: UserAuth):
             VALUES (:email, :password_hash, FALSE)
             RETURNING id
         """), {
-            "email": data.email,
+            "email": email,
             "password_hash": hashed_password
         })
 
@@ -63,7 +68,7 @@ def register(data: UserAuth):
             VALUES (:user_id, :email, :token, :expires_at, FALSE)
         """), {
             "user_id": user_id,
-            "email": data.email,
+            "email": email,
             "token": token,
             "expires_at": expires_at
         })
@@ -71,7 +76,6 @@ def register(data: UserAuth):
     return {
         "message": "User created",
         "user_id": user_id,
-        "verification_token": token
     }
 
 
@@ -81,13 +85,15 @@ def register(data: UserAuth):
 @router.post("/login")
 def login(data: UserAuth):
 
+    email = data.email.lower()
+
     with engine.begin() as conn:
 
         user = conn.execute(text("""
             SELECT id, email, password_hash, is_verified, profile_completed, plan
             FROM users
             WHERE email = :email
-        """), {"email": data.email}).fetchone()
+        """), {"email": email}).fetchone()
 
         if not user:
             raise HTTPException(401, "User not found")
@@ -133,14 +139,12 @@ def me(user: str = Depends(get_current_user)):
         "plan": plan
     }
 
+
 # =========================
 # PROFILE SAVE (LIGHT)
 # =========================
 @router.post("/profile/save")
-def save_profile(
-    data: UserProfileRequest,
-    user: str = Depends(get_current_user)
-):
+def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
 
@@ -210,10 +214,7 @@ def verify_email(token: str):
             WHERE email = :email
         """), {"email": email})
 
-    return {
-        "status": "verified",
-        "email": email
-    }
+    return {"status": "verified", "email": email}
 
 
 # =========================
@@ -222,11 +223,13 @@ def verify_email(token: str):
 @router.post("/set-password")
 def set_password(data: SetPasswordRequest):
 
+    email = data.email.lower()
+
     with engine.begin() as conn:
 
         user = conn.execute(text("""
             SELECT password_hash FROM users WHERE email = :email
-        """), {"email": data.email}).fetchone()
+        """), {"email": email}).fetchone()
 
         if not user:
             raise HTTPException(404, "User not found")
@@ -241,11 +244,11 @@ def set_password(data: SetPasswordRequest):
             SET password_hash = :password
             WHERE email = :email
         """), {
-            "email": data.email,
+            "email": email,
             "password": hashed
         })
 
-    token = create_token({"sub": data.email})
+    token = create_token({"sub": email})
 
     return {
         "access_token": token,
@@ -254,13 +257,10 @@ def set_password(data: SetPasswordRequest):
 
 
 # =========================
-# ONBOARDING PROFILE SAVE (MAIN)
+# ONBOARDING SAVE
 # =========================
 @router.post("/onboarding/save")
-def onboarding_save(
-    data: UserProfileRequest,
-    user: str = Depends(get_current_user)
-):
+def onboarding_save(data: UserProfileRequest, user: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
 
@@ -312,7 +312,18 @@ def onboarding_save(
                 updated_at = CURRENT_TIMESTAMP
         """), {
             "email": user,
-            **data.dict()
+            "genre": data.genre,
+            "age": data.age,
+            "situation_pro": data.situation_pro,
+            "revenus_mensuels": data.monthly_income,
+            "situation_familiale": data.marital_status,
+            "nb_enfants": data.children_count,
+            "logement": data.housing_status,
+            "valeur_bien": data.real_estate_value,
+            "prix_achat": data.real_estate_purchase_price,
+            "dettes": data.total_debt,
+            "epargne": data.savings,
+            "investissements": data.investments
         })
 
         conn.execute(text("""
@@ -321,20 +332,14 @@ def onboarding_save(
             WHERE email = :email
         """), {"email": user})
 
-    return {
-        "status": "onboarding completed",
-        "profile_completed": True
-    }
+    return {"status": "onboarding completed", "profile_completed": True}
 
 
 # =========================
 # UPDATE PLAN
 # =========================
 @router.post("/plan/update")
-def update_plan(
-    plan: str,
-    user: str = Depends(get_current_user)
-):
+def update_plan(plan: str, user: str = Depends(get_current_user)):
 
     allowed_plans = ["FREE", "SILVER", "GOLD", "ELITE"]
 
@@ -352,64 +357,49 @@ def update_plan(
             "email": user
         })
 
-    return {
-        "status": "plan updated",
-        "plan": plan
-    }
+    return {"status": "plan updated", "plan": plan}
 
 
 # =========================
-# CREATE STRIPE CHECKOUT SESSION
+# STRIPE CHECKOUT
 # =========================
 @router.post("/billing/create-checkout-session")
-def create_checkout_session(
-    plan: str,
-    user: str = Depends(get_current_user)
-):
+def create_checkout_session(plan: str, user: str = Depends(get_current_user)):
 
     price_mapping = {
-        "SILVER": "price_silver_prod_UNyBukgn7HCdYL",
-        "GOLD": "price_gold_prod_UNyF2ShyswcDzY",
-        "ELITE": "price_elite_prod_UNyGSrDkrgyjec"
+        "SILVER": "price_1TPCFFPdcZID0JqGbGk1LJoC",
+        "GOLD": "price_1TPCIdPdcZID0JqG2T0jFKGU",
+        "ELITE": "price_1TPCJpPdcZID0JqGG23BGZdtc"
     }
 
     if plan not in price_mapping:
         raise HTTPException(400, "Invalid plan")
 
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="subscription",
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="subscription",
+        customer_email=user,
 
-            # 👇 email utilisateur
-            customer_email=user,
-
-            line_items=[
-                {
-                    "price": price_mapping[plan],
-                    "quantity": 1,
-                }
-            ],
-
-            # ✅ dynamique (important prod)
-            success_url=f"{FRONTEND_URL}/dashboard?success=true",
-            cancel_url=f"{FRONTEND_URL}/dashboard?canceled=true",
-
-            # 🔥 CRUCIAL POUR WEBHOOK
-            metadata={
-                "user_email": user,
-                "plan": plan
+        line_items=[
+            {
+                "price": price_mapping[plan],
+                "quantity": 1,
             }
-        )
+        ],
 
-        return {"url": session.url}
+        allow_promotion_codes=True,
 
-    except Exception as e:
-        raise HTTPException(500, str(e))
+        success_url=f"{FRONTEND_URL}/dashboard?success=true",
+        cancel_url=f"{FRONTEND_URL}/dashboard?canceled=true",
 
+        metadata={
+            "user_email": user,
+            "plan": plan
+        }
+    )
 
-import stripe
-from fastapi import Request
+    return {"url": session.url}
+
 
 # =========================
 # STRIPE WEBHOOK
@@ -420,68 +410,45 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
+    if not sig_header:
+        raise HTTPException(400, "Missing stripe-signature header")
+
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     if not endpoint_secret:
         raise HTTPException(500, "Missing STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            endpoint_secret
-        )
-
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(400, str(e))
 
-    if event["type"] == "checkout.session.completed":
+    print("STRIPE EVENT:", event["type"])
 
-        session = event["data"]["object"]
+    if event["type"] != "checkout.session.completed":
+        return {"status": "ignored"}
 
-        customer_email = session.get("customer_email")
-        plan = session.get("metadata", {}).get("plan")
+    session = event["data"]["object"]
 
-        if customer_email and plan:
+    customer_email = session.get("customer_email") or session.get("customer_details", {}).get("email")
+    plan = session.get("metadata", {}).get("plan")
 
-            with engine.begin() as conn:
+    print("EMAIL:", customer_email)
+    print("PLAN:", plan)
 
-                conn.execute(text("""
-                    UPDATE users
-                    SET plan = :plan,
-                        subscription_status = 'active'
-                    WHERE email = :email
-                """), {
-                    "plan": plan,
-                    "email": customer_email
-                })
+    if customer_email and plan:
 
-    return {"status": "success"}
-    
+        with engine.begin() as conn:
 
-    # =========================
-    # PAYMENT SUCCESS
-    # =========================
-    if event["type"] == "checkout.session.completed":
-
-        session = event["data"]["object"]
-
-        customer_email = session.get("customer_email")
-        plan = session.get("metadata", {}).get("plan")
-
-        if customer_email and plan:
-
-            with engine.begin() as conn:
-
-                # 1. UPDATE PLAN USER
-                conn.execute(text("""
-                    UPDATE users
-                    SET plan = :plan,
-                        subscription_status = 'active'
-                    WHERE email = :email
-                """), {
-                    "plan": plan,
-                    "email": customer_email
-                })
+            conn.execute(text("""
+                UPDATE users
+                SET plan = :plan,
+                    subscription_status = 'active'
+                WHERE email = :email
+                AND subscription_status != 'active'
+            """), {
+                "plan": plan,
+                "email": customer_email
+            })
 
     return {"status": "success"}
