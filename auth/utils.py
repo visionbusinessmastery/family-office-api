@@ -22,18 +22,21 @@ oauth2_scheme = HTTPBearer()
 
 
 # =========================
-# PASSWORD
+# HASH PASSWORD
 # =========================
 def hash_password(password: str):
     return pwd_context.hash(password)
 
 
+# =========================
+# VERIFY PASSWORD
+# =========================
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
 
 # =========================
-# TOKEN
+# CREATE TOKEN
 # =========================
 def create_token(data: dict):
     to_encode = data.copy()
@@ -42,6 +45,9 @@ def create_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# =========================
+# DECODE TOKEN
+# =========================
 def decode_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -63,3 +69,26 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_
     token = credentials.credentials  # 👈 C'EST LA QUE TOUT SE JOUE
 
     return decode_token(token)
+
+
+# =========================
+# BUILD UNLOCKS
+# =========================
+def build_unlocks(plan: str, level: str):
+
+    base = ["dashboard"]
+
+    if plan != "FREE":
+        base.append("portfolio")
+
+    if plan in ["GOLD", "ELITE"]:
+        base.append("analytics")
+
+    if level == "Advanced":
+        base.append("ai_insights")
+
+    if level == "Elite":
+        base.append("family_office_ai")
+
+    return base
+
