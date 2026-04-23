@@ -19,6 +19,8 @@ from auth.schemas import (
     SetPasswordRequest
 )
 
+from intelligence.analyzers.family_office_score import compute_family_office_score
+
 router = APIRouter()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -123,22 +125,43 @@ def me(user: str = Depends(get_current_user)):
     with engine.begin() as conn:
 
         result = conn.execute(text("""
-            SELECT email, profile_completed, plan
+            SELECT *
             FROM users
             WHERE email = :email
         """), {"email": user}).fetchone()
 
-        if not result:
-            raise HTTPException(404, "User not found")
+        profile = conn.execute(text("""
+            SELECT *
+            FROM user_profiles
+            WHERE user_email = :email
+        """), {"email": user}).fetchone()
 
-        email, profile_completed, plan = result
+        portfolio = conn.execute(text("""
+            SELECT *
+            FROM portfolio
+            WHERE user_email = :email
+        """), {"email": user}).fetchall()
+
+    # -------------------------
+    # SCORE ENGINE
+    # -------------------------
+    score_data = compute_family_office_score(
+        dict(profile._mapping) if profile else {},
+        [dict(p._mapping) for p in portfolio] if portfolio else []
+    )
 
     return {
-        "email": email,
-        "profile_completed": profile_completed,
-        "plan": plan
-    }
+        "email": result.email,
+        "plan": result.plan,
+        "profile_completed": result.profile_completed,
+        "profile_stage": profile.profile_stage if profile else "basic",
 
+        "family_office_score": score_data["score"],
+        "level": score_data["level"],
+        "advice": score_data["advice"],
+
+        "unlock_features": build_unlocks(result.plan, score_data["level"])
+    }
 
 # =========================
 # PROFILE SAVE (LIGHT)
