@@ -22,3 +22,5 @@ yfinance
 pytrends
 
 playwright
+
+stripe
