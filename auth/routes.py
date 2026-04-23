@@ -257,10 +257,13 @@ def set_password(data: SetPasswordRequest):
 
 
 # =========================
-# ONBOARDING SAVE
+# ONBOARDING / PROFILE UPDATE (PROGRESSIVE)
 # =========================
 @router.post("/onboarding/save")
-def onboarding_save(data: UserProfileRequest, user: str = Depends(get_current_user)):
+def onboarding_save(
+    data: UserProfileRequest,
+    user: str = Depends(get_current_user)
+):
 
     with engine.begin() as conn:
 
@@ -282,57 +285,62 @@ def onboarding_save(data: UserProfileRequest, user: str = Depends(get_current_us
             )
             VALUES (
                 :email,
-                :genre,
+                :gender,
                 :age,
-                :situation_pro,
-                :revenus_mensuels,
-                :situation_familiale,
-                :nb_enfants,
-                :logement,
-                :valeur_bien,
-                :prix_achat,
-                :dettes,
-                :epargne,
-                :investissements
+                :employment_status,
+                :monthly_income,
+                :marital_status,
+                :children_count,
+                :housing_status,
+                :real_estate_value,
+                :real_estate_purchase_price,
+                :total_debt,
+                :savings,
+                :investments
             )
             ON CONFLICT (user_email)
             DO UPDATE SET
-                gender = EXCLUDED.gender,
-                age = EXCLUDED.age,
-                employment_status = EXCLUDED.employment_status,
-                monthly_income = EXCLUDED.monthly_income,
-                marital_status = EXCLUDED.marital_status,
-                children_count = EXCLUDED.children_count,
-                housing_status = EXCLUDED.housing_status,
-                real_estate_value = EXCLUDED.real_estate_value,
-                real_estate_purchase_price = EXCLUDED.real_estate_purchase_price,
-                total_debt = EXCLUDED.total_debt,
-                savings = EXCLUDED.savings,
-                investments = EXCLUDED.investments,
+                gender = COALESCE(EXCLUDED.gender, user_profiles.gender),
+                age = COALESCE(EXCLUDED.age, user_profiles.age),
+                employment_status = COALESCE(EXCLUDED.employment_status, user_profiles.employment_status),
+                monthly_income = COALESCE(EXCLUDED.monthly_income, user_profiles.monthly_income),
+                marital_status = COALESCE(EXCLUDED.marital_status, user_profiles.marital_status),
+                children_count = COALESCE(EXCLUDED.children_count, user_profiles.children_count),
+                housing_status = COALESCE(EXCLUDED.housing_status, user_profiles.housing_status),
+                real_estate_value = COALESCE(EXCLUDED.real_estate_value, user_profiles.real_estate_value),
+                real_estate_purchase_price = COALESCE(EXCLUDED.real_estate_purchase_price, user_profiles.real_estate_purchase_price),
+                total_debt = COALESCE(EXCLUDED.total_debt, user_profiles.total_debt),
+                savings = COALESCE(EXCLUDED.savings, user_profiles.savings),
+                investments = COALESCE(EXCLUDED.investments, user_profiles.investments),
                 updated_at = CURRENT_TIMESTAMP
         """), {
             "email": user,
-            "genre": data.genre,
+            "gender": data.gender,
             "age": data.age,
-            "situation_pro": data.situation_pro,
-            "revenus_mensuels": data.monthly_income,
-            "situation_familiale": data.marital_status,
-            "nb_enfants": data.children_count,
-            "logement": data.housing_status,
-            "valeur_bien": data.real_estate_value,
-            "prix_achat": data.real_estate_purchase_price,
-            "dettes": data.total_debt,
-            "epargne": data.savings,
-            "investissements": data.investments
+            "employment_status": data.situation_pro,
+
+            "monthly_income": data.monthly_income,
+            "marital_status": data.marital_status,
+            "children_count": data.children_count,
+            "housing_status": data.housing_status,
+            "real_estate_value": data.real_estate_value,
+            "real_estate_purchase_price": data.real_estate_purchase_price,
+            "total_debt": data.total_debt,
+            "savings": data.savings,
+            "investments": data.investments
         })
 
+        # On peut garder ça MAIS ce n’est plus un onboarding strict
         conn.execute(text("""
             UPDATE users
             SET profile_completed = TRUE
             WHERE email = :email
         """), {"email": user})
 
-    return {"status": "onboarding completed", "profile_completed": True}
+    return {
+        "status": "profile updated",
+        "profile_completed": True
+    }
 
 
 # =========================
