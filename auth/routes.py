@@ -407,3 +407,55 @@ def create_checkout_session(
 
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+import stripe
+from fastapi import Request
+
+# =========================
+# STRIPE WEBHOOK
+# =========================
+@router.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload,
+            sig_header,
+            endpoint_secret
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # =========================
+    # PAYMENT SUCCESS
+    # =========================
+    if event["type"] == "checkout.session.completed":
+
+        session = event["data"]["object"]
+
+        customer_email = session.get("customer_email")
+        plan = session.get("metadata", {}).get("plan")
+
+        if customer_email and plan:
+
+            with engine.begin() as conn:
+
+                # 1. UPDATE PLAN USER
+                conn.execute(text("""
+                    UPDATE users
+                    SET plan = :plan,
+                        subscription_status = 'active'
+                    WHERE email = :email
+                """), {
+                    "plan": plan,
+                    "email": customer_email
+                })
+
+    return {"status": "success"}
