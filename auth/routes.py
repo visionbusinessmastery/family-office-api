@@ -12,7 +12,7 @@ from auth.utils import (
     create_token,
     get_current_user,
     build_unlocks   # ✅ AJOUT
-))
+)
 
 from auth.schemas import (
     UserAuth,
