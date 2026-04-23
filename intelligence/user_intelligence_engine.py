@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from database import engine
 
-from intelligence.family_office_score import compute_family_office_score
+from intelligence.analyzers.family_office_score import compute_family_office_score
 
 
 # =========================
