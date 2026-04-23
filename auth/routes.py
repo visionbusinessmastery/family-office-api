@@ -10,8 +10,9 @@ from auth.utils import (
     hash_password,
     verify_password,
     create_token,
-    get_current_user
-)
+    get_current_user,
+    build_unlocks   # ✅ AJOUT
+))
 
 from auth.schemas import (
     UserAuth,
@@ -43,11 +44,21 @@ def register(data: UserAuth):
     with engine.begin() as conn:
 
         existing = conn.execute(text("""
-            SELECT id FROM users WHERE email = :email
+            SELECT id, is_verified FROM users WHERE email = :email
         """), {"email": email}).fetchone()
 
         if existing:
-            raise HTTPException(400, "User already exists")
+
+            if not existing.is_verified:
+                return {
+                    "message": "User exists but not verified",
+                    "action": "resend_verification"
+                }
+
+            return {
+                "message": "User already exists",
+                "action": "login"
+            }
 
         hashed_password = hash_password(data.password)
 
@@ -78,8 +89,9 @@ def register(data: UserAuth):
     return {
         "message": "User created",
         "user_id": user_id,
+        "verification_required": True
     }
-
+    
 
 # =========================
 # LOGIN
@@ -204,7 +216,10 @@ def save_profile(data: UserProfileRequest, user: str = Depends(get_current_user)
 # VERIFY EMAIL
 # =========================
 @router.get("/verify-email")
-def verify_email(token: str):
+def verify_email(token: str = None):
+
+    if not token:
+        raise HTTPException(400, "Missing token")
 
     with engine.begin() as conn:
 
