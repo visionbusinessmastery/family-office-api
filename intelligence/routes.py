@@ -151,3 +151,23 @@ def user_upgrade_check(request: Request):
             }
 
     return safe_execute(_upgrade_check, module_name="USER_UPGRADE_CHECK")
+
+
+
+from intelligence.user_intelligence_engine import compute_user_intelligence
+
+
+@router.get("/user-intelligence")
+def user_intelligence(request: Request):
+
+    def _engine():
+        user_email = request.state.user_email
+
+        result = compute_user_intelligence(user_email)
+
+        return {
+            "user": user_email,
+            "intelligence": result
+        }
+
+    return safe_execute(_engine, module_name="USER_INTELLIGENCE")
