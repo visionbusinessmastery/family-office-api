@@ -369,9 +369,9 @@ def create_checkout_session(
 ):
 
     price_mapping = {
-        "SILVER": "price_silver_id",
-        "GOLD": "price_gold_id",
-        "ELITE": "price_elite_id"
+        "SILVER": "price_silver_prod_UNyBukgn7HCdYL",
+        "GOLD": "price_gold_prod_UNyF2ShyswcDzY",
+        "ELITE": "price_elite_prod_UNyGSrDkrgyjec"
     }
 
     if plan not in price_mapping:
