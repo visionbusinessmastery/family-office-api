@@ -1,12 +1,12 @@
 import os
-from resend import Resend
+import resend
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 if not RESEND_API_KEY:
     raise Exception("RESEND_API_KEY manquante")
 
-resend = Resend(RESEND_API_KEY)
+resend.api_key = RESEND_API_KEY
 
 FRONT_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
@@ -21,7 +21,7 @@ def send_verification_email(to_email: str, token: str):
     print("🔗 VERIFY LINK:", verify_link)
 
     try:
-        response = resend.emails.send({
+        response = resend.Emails.send({
             "from": "Vision Business Mastery <onboarding@resend.dev>",
             "to": to_email,
             "subject": "Active ton compte Vision Business Mastery",
