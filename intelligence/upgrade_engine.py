@@ -1,6 +1,6 @@
 from sqlalchemy import text
 
-from intelligence.family_office_score import compute_family_office_score
+from intelligence.analyzers.family_office_score import compute_family_office_score
 
 
 # =========================
