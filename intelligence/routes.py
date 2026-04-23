@@ -12,9 +12,15 @@ from intelligence.upgrade_engine import compute_upgrade_decision
 from sqlalchemy import text
 from database import engine
 
+from intelligence.user_intelligence_engine import compute_user_intelligence
+
 
 router = APIRouter()
 
+
+# =========================
+# GLOBAL
+# =========================
 @router.post("/global")
 @limiter.limit("5/minute")
 def global_intelligence(request: Request, data: GlobalRequest):   
@@ -39,6 +45,9 @@ def global_intelligence(request: Request, data: GlobalRequest):
 
 
 
+# =========================
+# FAMILY OFFICE SOCRE
+# =========================
 @router.get("/family-office-score")
 def family_office_score(request: Request):
 
@@ -55,6 +64,10 @@ def family_office_score(request: Request):
     return safe_execute(_score, module_name="FAMILY_OFFICE_SCORE")
 
 
+
+# =========================
+# USER UPGRADE CHECK
+# =========================
 @router.get("/user/upgrade-check")
 def user_upgrade_check(request: Request):
 
@@ -154,9 +167,9 @@ def user_upgrade_check(request: Request):
 
 
 
-from intelligence.user_intelligence_engine import compute_user_intelligence
-
-
+# =========================
+# USER INTELLIGENCE
+# =========================
 @router.get("/user-intelligence")
 def user_intelligence(request: Request):
 
@@ -171,3 +184,32 @@ def user_intelligence(request: Request):
         }
 
     return safe_execute(_engine, module_name="USER_INTELLIGENCE")
+
+
+# =========================
+# RUN INTELLIGENCE
+# =========================
+@router.get("/run")
+def run_intelligence(request: Request):
+
+    def _run():
+
+        user_email = request.state.user_email
+
+        # DB fetch
+        profile = get_profile(user_email)
+        portfolio = get_portfolio(user_email)
+
+        result = run_user_intelligence(
+            user_email,
+            profile,
+            portfolio,
+            conn
+        )
+
+        return {
+            "user": user_email,
+            "intelligence": result
+        }
+
+    return safe_execute(_run, module_name="USER_INTELLIGENCE_PIPELINE")
