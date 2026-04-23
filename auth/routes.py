@@ -1,43 +1,24 @@
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import secrets
 import os
 
 from database import engine
-from auth.utils import (
-    hash_password,
-    verify_password,
-    create_token,
-    get_current_user,
-    build_unlocks
-)
-
-from auth.schemas import (
-    UserAuth,
-    UserProfileRequest,
-    SetPasswordRequest
-)
-
-from intelligence.analyzers.family_office_score import compute_family_office_score
+from auth.utils import hash_password
 from auth.email_service import send_verification_email
 
 router = APIRouter()
-
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
-if not stripe.api_key:
-    raise Exception("Missing STRIPE_SECRET_KEY")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 # =========================
-# REGISTER
+# REGISTER (FIX FINAL)
 # =========================
 @router.post("/register")
-def register(data: UserAuth):
+def register(data):
 
     email = data.email.lower()
 
@@ -60,7 +41,6 @@ def register(data: UserAuth):
                 "action": "login"
             }
 
-        # CREATE USER
         hashed_password = hash_password(data.password)
 
         result = conn.execute(text("""
@@ -74,34 +54,36 @@ def register(data: UserAuth):
 
         user_id = result.fetchone()[0]
 
-        # TOKEN
+        # =========================
+        # TOKEN CLEAN (UUID UNIQUE)
+        # =========================
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
         conn.execute(text("""
             INSERT INTO email_verifications (
-                user_id,
                 email,
                 token,
-                expires_at,
-                is_used
+                is_used,
+                created_at,
+                expires_at
             )
             VALUES (
-                :user_id,
                 :email,
                 :token,
-                :expires_at,
-                FALSE
+                FALSE,
+                :created_at,
+                :expires_at
             )
         """), {
-            "user_id": user_id,
             "email": email,
             "token": token,
+            "created_at": datetime.utcnow(),
             "expires_at": expires_at
         })
 
     # =========================
-    # SEND EMAIL (IMPORTANT FIX)
+    # SEND EMAIL (CRUCIAL FIX)
     # =========================
     send_verification_email(email, token)
 
@@ -113,7 +95,7 @@ def register(data: UserAuth):
 
 
 # =========================
-# VERIFY EMAIL
+# VERIFY EMAIL (OK FINAL)
 # =========================
 @router.get("/verify-email")
 def verify_email(token: str = None):
@@ -135,10 +117,6 @@ def verify_email(token: str = None):
             raise HTTPException(400, "Invalid token")
 
         email, expires_at, is_used = record
-
-        print("EMAIL:", email)
-        print("EXPIRES:", expires_at)
-        print("USED:", is_used)
 
         if is_used:
             return {"status": "already_verified"}
