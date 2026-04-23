@@ -140,3 +140,80 @@ def verify_email(token: str = None):
         """), {"email": email})
 
     return {"status": "verified", "email": email}
+
+
+# =========================
+# RESEND EMAIL VERIFICATION
+# =========================
+@router.post("/resend-verification")
+def resend_verification(email: str):
+
+    email = email.lower()
+
+    with engine.begin() as conn:
+
+        user = conn.execute(text("""
+            SELECT id, is_verified
+            FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not user:
+            raise HTTPException(404, "User not found")
+
+        if user.is_verified:
+            return {"status": "already_verified"}
+
+        # CHECK COOLDOWN
+        last = conn.execute(text("""
+            SELECT created_at
+            FROM email_verifications
+            WHERE email = :email
+            ORDER BY created_at DESC
+            LIMIT 1
+        """), {"email": email}).fetchone()
+
+        if last:
+            diff = datetime.utcnow() - last.created_at
+            if diff.total_seconds() < 60:
+                raise HTTPException(
+                    429,
+                    "Please wait 60 seconds before resending email"
+                )
+
+        # GENERATE NEW TOKEN
+        token = secrets.token_urlsafe(32)
+
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+
+        conn.execute(text("""
+            INSERT INTO email_verifications (
+                email,
+                token,
+                is_used,
+                created_at,
+                expires_at
+            )
+            VALUES (
+                :email,
+                :token,
+                FALSE,
+                :created_at,
+                :expires_at
+            )
+        """), {
+            "email": email,
+            "token": token,
+            "created_at": datetime.utcnow(),
+            "expires_at": expires_at
+        })
+
+    # SEND EMAIL
+    send_verification_email(email, token)
+
+    return {
+        "status": "sent",
+        "cooldown": 60
+    }
+
+
