@@ -17,8 +17,15 @@ from auth.schemas import (
     SetPasswordRequest
 )
 
+import stripe
+import os
+from fastapi import Request
+from config.stripe import FRONTEND_URL
+
+
 router = APIRouter()
 
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 # =========================
 # REGISTER
@@ -349,3 +356,53 @@ def update_plan(
         "status": "plan updated",
         "plan": plan
     }
+
+
+# =========================
+# CREATE STRIPE CHECKOUT SESSION
+# =========================
+@router.post("/billing/create-checkout-session")
+def create_checkout_session(
+    plan: str,
+    user: str = Depends(get_current_user)
+):
+
+    price_mapping = {
+        "SILVER": "price_silver_id",
+        "GOLD": "price_gold_id",
+        "ELITE": "price_elite_id"
+    }
+
+    if plan not in price_mapping:
+        raise HTTPException(400, "Invalid plan")
+
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="subscription",
+
+            # 👇 email utilisateur
+            customer_email=user,
+
+            line_items=[
+                {
+                    "price": price_mapping[plan],
+                    "quantity": 1,
+                }
+            ],
+
+            # ✅ dynamique (important prod)
+            success_url=f"{FRONTEND_URL}/dashboard?success=true",
+            cancel_url=f"{FRONTEND_URL}/dashboard?canceled=true",
+
+            # 🔥 CRUCIAL POUR WEBHOOK
+            metadata={
+                "user_email": user,
+                "plan": plan
+            }
+        )
+
+        return {"url": session.url}
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
