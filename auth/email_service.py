@@ -1,83 +1,59 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
-from urllib.parse import quote
+from resend import Resend
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
-EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+if not RESEND_API_KEY:
+    raise Exception("RESEND_API_KEY manquante")
 
-FRONT_URL = os.getenv("FRONT_URL", "http://localhost:3000")
+resend = Resend(RESEND_API_KEY)
+
+FRONT_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
+# =========================
+# SEND EMAIL VERIFICATION
+# =========================
 def send_verification_email(to_email: str, token: str):
 
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        raise Exception("EMAIL_SENDER ou EMAIL_PASSWORD manquant")
-
-    # =========================
-    # SAFE TOKEN ENCODING
-    # =========================
-    safe_token = quote(token)
-
-    verify_link = f"{FRONT_URL}/verify-email?token={safe_token}"
+    verify_link = f"{FRONT_URL}/verify-email?token={token}"
 
     print("🔗 VERIFY LINK:", verify_link)
 
-    subject = "Active ton compte Vision Business Mastery"
-
-    html_content = f"""
-    <html>
-        <body style="font-family: Arial;">
-            <h2>Bienvenue 👋</h2>
-
-            <p>Pour activer ton compte, clique ici :</p>
-
-            <a href="{verify_link}" style="
-                display:inline-block;
-                padding:12px 20px;
-                background:#1DA2CF;
-                color:white;
-                text-decoration:none;
-                border-radius:8px;
-            ">
-                Activer mon compte
-            </a>
-
-            <p style="margin-top:20px; font-size:12px;">
-                Si le bouton ne fonctionne pas :
-                <br/>
-                {verify_link}
-            </p>
-        </body>
-    </html>
-    """
-
     try:
-        print("📡 Connexion SMTP...")
+        response = resend.emails.send({
+            "from": "Vision Business Mastery <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": "Active ton compte Vision Business Mastery",
+            "html": f"""
+                <html>
+                    <body style="font-family:Arial;">
+                        <h2>Bienvenue 👋</h2>
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
+                        <p>Pour activer ton compte :</p>
 
-        print("🔐 Login SMTP...")
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                        <a href="{verify_link}" style="
+                            display:inline-block;
+                            padding:12px 20px;
+                            background:#1DA2CF;
+                            color:white;
+                            text-decoration:none;
+                            border-radius:8px;
+                        ">
+                            Activer mon compte
+                        </a>
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = EMAIL_SENDER
-        msg["To"] = to_email
+                        <p style="margin-top:20px;font-size:12px;">
+                            Si le bouton ne fonctionne pas :
+                            <br/>
+                            {verify_link}
+                        </p>
+                    </body>
+                </html>
+            """
+        })
 
-        msg.attach(MIMEText(html_content, "html"))
-
-        print("📤 Envoi email à:", to_email)
-
-        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
-        server.quit()
-
-        print("✅ EMAIL SENT SUCCESS")
+        print("✅ EMAIL SENT:", response)
 
     except Exception as e:
         print("❌ EMAIL ERROR:", str(e))
