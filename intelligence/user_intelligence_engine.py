@@ -2,7 +2,7 @@ from sqlalchemy import text
 from database import engine
 
 from intelligence.analyzers.family_office_score import compute_family_office_score
-from intelligence.upgrade_engine import evaluate_upgrade
+from intelligence.upgrade_engine import compute_upgrade_decision
 from intelligence.feature_engine import compute_feature_access
 from intelligence.opportunity_engine import compute_opportunities
 
@@ -37,7 +37,7 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict = dict(profile._mapping) if profile else {}
 
-        # 🔥 enrichissement
+        # enrichissement
         profile_dict["email"] = user.email
         profile_dict["plan"] = user.plan
 
@@ -56,6 +56,7 @@ def compute_user_intelligence(user_email: str):
     # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
+
     score = score_result["score"]
 
     # =========================
@@ -75,12 +76,11 @@ def compute_user_intelligence(user_email: str):
         recommendation = "start onboarding"
 
     # =========================
-    # 6. UPGRADE
+    # 6. UPGRADE ENGINE
     # =========================
-    upgrade = evaluate_upgrade(
-        user_email=user.email,
-        score=score,
-        current_plan=user.plan
+    upgrade = compute_upgrade_decision(
+        current_plan=user.plan,
+        score=score
     )
 
     # =========================
@@ -94,34 +94,21 @@ def compute_user_intelligence(user_email: str):
     opportunities = compute_opportunities(profile_dict, portfolio_list)
 
     # =========================
-    # 9. UPGRADE TARGET
-    # =========================
-    upgrade_target = None
-
-    if level == "FREE":
-        upgrade_target = "SILVER"
-    elif level == "SILVER":
-        upgrade_target = "GOLD"
-    elif level == "GOLD":
-        upgrade_target = "ELITE"
-
-    # =========================
-    # 10. FINAL OUTPUT
+    # 9. FINAL OUTPUT
     # =========================
     return {
         "user": user.email,
         "plan": user.plan,
 
-        # 🧠 CORE
+        # CORE
         "score": score_result,
         "level": level,
         "recommendation": recommendation,
 
-        # 🚀 BUSINESS
-        "upgrade_target": upgrade_target,
+        # BUSINESS
         "upgrade": upgrade,
 
-        # 🔥 AI LAYER
+        # AI LAYER
         "features": features,
         "opportunities": opportunities
     }
