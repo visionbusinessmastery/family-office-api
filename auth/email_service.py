@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
-
+from urllib.parse import quote
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -14,21 +14,28 @@ FRONT_URL = os.getenv("FRONT_URL", "http://localhost:3000")
 
 
 def send_verification_email(to_email: str, token: str):
+
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
         raise Exception("EMAIL_SENDER ou EMAIL_PASSWORD manquant")
 
-    verify_link = f"{FRONT_URL}/verify-email?token={token}"
+    # =========================
+    # SAFE TOKEN ENCODING
+    # =========================
+    safe_token = quote(token)
+
+    verify_link = f"{FRONT_URL}/verify-email?token={safe_token}"
 
     print("🔗 VERIFY LINK:", verify_link)
 
     subject = "Active ton compte Vision Business Mastery"
 
-    # 👉 VERSION HTML (mieux que texte brut)
     html_content = f"""
     <html>
-        <body>
+        <body style="font-family: Arial;">
             <h2>Bienvenue 👋</h2>
+
             <p>Pour activer ton compte, clique ici :</p>
+
             <a href="{verify_link}" style="
                 display:inline-block;
                 padding:12px 20px;
@@ -40,8 +47,8 @@ def send_verification_email(to_email: str, token: str):
                 Activer mon compte
             </a>
 
-            <p style="margin-top:20px;">
-                Ou copie ce lien :
+            <p style="margin-top:20px; font-size:12px;">
+                Si le bouton ne fonctionne pas :
                 <br/>
                 {verify_link}
             </p>
