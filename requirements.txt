@@ -24,3 +24,5 @@ pytrends
 playwright
 
 stripe
+
+resend
