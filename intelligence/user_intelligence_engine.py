@@ -2,6 +2,9 @@ from sqlalchemy import text
 from database import engine
 
 from intelligence.analyzers.family_office_score import compute_family_office_score
+from intelligence.upgrade_engine import evaluate_upgrade
+from intelligence.feature_engine import compute_feature_access
+from intelligence.opportunity_engine import compute_opportunities
 
 
 # =========================
@@ -12,7 +15,7 @@ def compute_user_intelligence(user_email: str):
     with engine.begin() as conn:
 
         # =========================
-        # 1. USER PROFILE
+        # 1. USER (CORE)
         # =========================
         user = conn.execute(text("""
             SELECT email, plan, profile_completed
@@ -24,7 +27,7 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # 2. USER PROFILE DATA
+        # 2. PROFILE DATA
         # =========================
         profile = conn.execute(text("""
             SELECT *
@@ -34,8 +37,12 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict = dict(profile._mapping) if profile else {}
 
+        # 🔥 IMPORTANT : enrichir avec user
+        profile_dict["email"] = user.email
+        profile_dict["plan"] = user.plan
+
         # =========================
-        # 3. PORTFOLIO DATA
+        # 3. PORTFOLIO
         # =========================
         portfolio = conn.execute(text("""
             SELECT asset_name, type, value
@@ -46,15 +53,14 @@ def compute_user_intelligence(user_email: str):
         portfolio_list = [dict(p._mapping) for p in portfolio]
 
     # =========================
-    # 4. FAMILY OFFICE SCORE
+    # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
-
-    # =========================
-    # 5. USER MATURITY LEVEL
-    # =========================
     score = score_result["score"]
 
+    # =========================
+    # 5. LEVEL LOGIC (inchangé)
+    # =========================
     if score >= 80:
         level = "ELITE"
         recommendation = "optimize & scale"
@@ -69,7 +75,26 @@ def compute_user_intelligence(user_email: str):
         recommendation = "start onboarding"
 
     # =========================
-    # 6. BUSINESS LOGIC
+    # 6. UPGRADE ENGINE (NEW)
+    # =========================
+    upgrade = evaluate_upgrade(
+        user_email=user.email,
+        score=score,
+        current_plan=user.plan
+    )
+
+    # =========================
+    # 7. FEATURES (NEW)
+    # =========================
+    features = compute_feature_access(profile_dict, score_result)
+
+    # =========================
+    # 8. OPPORTUNITIES (NEW)
+    # =========================
+    opportunities = compute_opportunities(profile_dict, portfolio_list)
+
+    # =========================
+    # 9. UPGRADE TARGET (compat)
     # =========================
     upgrade_target = None
 
@@ -81,13 +106,24 @@ def compute_user_intelligence(user_email: str):
         upgrade_target = "ELITE"
 
     # =========================
-    # 7. FINAL OUTPUT
+    # 10. FINAL OUTPUT
     # =========================
     return {
-        "user": user_email,
+        "user": user.email,
         "plan": user.plan,
+
+        # 🧠 CORE
         "score": score_result,
         "level": level,
         "recommendation": recommendation,
+
+        # 🚀 BUSINESS
+        "upgrade_target": upgrade_target,
+        "upgrade": upgrade,
+
+        # 🔥 NEW AI LAYER
+        "features": features,
+        "opportunities": opportunities
+    }
         "upgrade_target": upgrade_target
     }
