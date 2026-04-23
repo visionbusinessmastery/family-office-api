@@ -1,5 +1,11 @@
-from datetime import datetime
+from sqlalchemy import text
 
+from intelligence.family_office_score import compute_family_office_score
+
+
+# =========================
+# PLAN FROM SCORE
+# =========================
 def get_plan_from_score(score: int):
 
     if score >= 85:
@@ -12,6 +18,9 @@ def get_plan_from_score(score: int):
         return "FREE"
 
 
+# =========================
+# UPGRADE DECISION ENGINE
+# =========================
 def compute_upgrade_decision(current_plan: str, score: int):
 
     recommended_plan = get_plan_from_score(score)
@@ -26,26 +35,73 @@ def compute_upgrade_decision(current_plan: str, score: int):
     current_level = hierarchy.get(current_plan or "FREE", 0)
     recommended_level = hierarchy.get(recommended_plan, 0)
 
-    # =========================
-    # CASE 1: UPGRADE POSSIBLE
-    # =========================
     if recommended_level > current_level:
-
         return {
             "upgrade": True,
             "from": current_plan,
             "to": recommended_plan,
             "recommended_plan": recommended_plan,
-            "auto_apply": recommended_plan == "ELITE"  # auto upgrade ONLY ELITE (option safe SaaS)
+            "reason": "score_threshold_reached"
         }
 
-    # =========================
-    # CASE 2: NO CHANGE
-    # =========================
     return {
         "upgrade": False,
         "from": current_plan,
         "to": current_plan,
-        "recommended_plan": recommended_plan,
-        "auto_apply": False
+        "recommended_plan": recommended_plan
+    }
+
+
+# =========================
+# MAIN INTELLIGENCE ENGINE
+# =========================
+def process_user_intelligence(user_email, profile, portfolio, conn):
+
+    score_data = compute_family_office_score(profile, portfolio)
+
+    upgrade = compute_upgrade_decision(
+        current_plan=profile.get("plan", "FREE"),
+        score=score_data["score"]
+    )
+
+    # =========================
+    # AUTO UPGRADE ACTION
+    # =========================
+    if upgrade.get("upgrade"):
+
+        conn.execute(text("""
+            UPDATE users
+            SET plan = :new_plan
+            WHERE email = :email
+        """), {
+            "new_plan": upgrade["to"],
+            "email": user_email
+        })
+
+        conn.execute(text("""
+            INSERT INTO upgrade_events (
+                user_email,
+                from_plan,
+                to_plan,
+                trigger,
+                score
+            )
+            VALUES (
+                :email,
+                :from_plan,
+                :to_plan,
+                :trigger,
+                :score
+            )
+        """), {
+            "email": user_email,
+            "from_plan": upgrade["from"],
+            "to_plan": upgrade["to"],
+            "trigger": upgrade["reason"],
+            "score": score_data["score"]
+        })
+
+    return {
+        "score": score_data,
+        "upgrade": upgrade
     }
