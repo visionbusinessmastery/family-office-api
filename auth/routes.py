@@ -20,12 +20,13 @@ from auth.schemas import (
 import stripe
 import os
 from fastapi import Request
-from config.stripe import FRONTEND_URL
 
 
 router = APIRouter()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # =========================
 # REGISTER
