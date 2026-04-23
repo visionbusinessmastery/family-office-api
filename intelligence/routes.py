@@ -7,7 +7,7 @@ from .service import get_global_intelligence
 
 from .service import get_family_office_score
 
-from intelligence.family_office_score import compute_family_office_score
+from intelligence.analyzers.family_office_score import compute_family_office_score
 from intelligence.upgrade_engine import compute_upgrade_decision
 from sqlalchemy import text
 from database import engine
