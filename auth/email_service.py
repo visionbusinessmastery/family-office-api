@@ -25,6 +25,7 @@ def send_verification_email(to_email: str, token: str):
     }
 
     response = requests.post(url, json=payload, headers=headers)
-
+    print("RESEND RESPONSE:", response.status_code, response.text)
+    
     if response.status_code != 200:
         raise Exception(f"Erreur email: {response.text}")
