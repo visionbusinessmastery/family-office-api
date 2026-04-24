@@ -1,30 +1,55 @@
 import stripe
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import secrets
 import os
 
 from database import engine
-from auth.utils import hash_password
+from auth.utils import (
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user,
+    build_unlocks
+)
+
+from auth.schemas import UserAuth
+from intelligence.analyzers.family_office_score import compute_family_office_score
 from auth.email_service import send_verification_email
 
-from auth.verification import save_verification_token, generate_verification_token
-
 router = APIRouter()
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+if not stripe.api_key:
+    raise Exception("Missing STRIPE_SECRET_KEY")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 # =========================
-# REGISTER (FIX FINAL)
+# REGISTER
 # =========================
 @router.post("/register")
-def register(data):
+def register(data: UserAuth, request: Request):
 
     email = data.email.lower()
+    ip = request.client.host
 
     with engine.begin() as conn:
+
+        # =========================
+        # RATE LIMIT IP (SIMPLE)
+        # =========================
+        ip_check = conn.execute(text("""
+            SELECT COUNT(*) 
+            FROM email_verifications
+            WHERE created_at > NOW() - INTERVAL '10 minutes'
+        """)).scalar()
+
+        if ip_check and ip_check > 10:
+            raise HTTPException(429, "Too many requests, try later")
 
         existing = conn.execute(text("""
             SELECT id, is_verified FROM users WHERE email = :email
@@ -43,11 +68,14 @@ def register(data):
                 "action": "login"
             }
 
+        # =========================
+        # CREATE USER
+        # =========================
         hashed_password = hash_password(data.password)
 
         result = conn.execute(text("""
-            INSERT INTO users (email, password_hash, is_verified)
-            VALUES (:email, :password_hash, FALSE)
+            INSERT INTO users (email, password_hash, is_verified, verification_attempts)
+            VALUES (:email, :password_hash, FALSE, 0)
             RETURNING id
         """), {
             "email": email,
@@ -57,12 +85,11 @@ def register(data):
         user_id = result.fetchone()[0]
 
         # =========================
-        # TOKEN CLEAN (UUID UNIQUE)
+        # TOKEN
         # =========================
-        token = generate_verification_token()
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=24)
 
-        save_verification_token(email, token)
-       
         conn.execute(text("""
             INSERT INTO email_verifications (
                 email,
@@ -75,18 +102,24 @@ def register(data):
                 :email,
                 :token,
                 FALSE,
-                :created_at,
+                NOW(),
                 :expires_at
             )
         """), {
             "email": email,
             "token": token,
-            "created_at": datetime.utcnow(),
             "expires_at": expires_at
         })
 
+        # increment attempts
+        conn.execute(text("""
+            UPDATE users
+            SET verification_attempts = verification_attempts + 1
+            WHERE email = :email
+        """), {"email": email})
+
     # =========================
-    # SEND EMAIL (CRUCIAL FIX)
+    # SEND EMAIL
     # =========================
     send_verification_email(email, token)
 
@@ -98,12 +131,10 @@ def register(data):
 
 
 # =========================
-# VERIFY EMAIL (OK FINAL)
+# VERIFY EMAIL
 # =========================
 @router.get("/verify-email")
 def verify_email(token: str = None):
-
-    print("VERIFY TOKEN RECEIVED:", token)
 
     if not token:
         raise HTTPException(400, "Missing token")
@@ -122,20 +153,23 @@ def verify_email(token: str = None):
         email, expires_at, is_used = record
 
         if is_used:
-            return {"status": "already_verified"}
+            return {"status": "already_verified", "email": email}
 
         if expires_at < datetime.utcnow():
             raise HTTPException(400, "Token expired")
 
+        # mark token used
         conn.execute(text("""
             UPDATE email_verifications
             SET is_used = TRUE
             WHERE token = :token
         """), {"token": token})
 
+        # update user
         conn.execute(text("""
             UPDATE users
-            SET is_verified = TRUE
+            SET is_verified = TRUE,
+                email_verified_at = NOW()
             WHERE email = :email
         """), {"email": email})
 
@@ -143,17 +177,45 @@ def verify_email(token: str = None):
 
 
 # =========================
-# RESEND EMAIL VERIFICATION
+# EMAIL STATUS
 # =========================
-@router.post("/resend-verification")
-def resend_verification(email: str):
+@router.get("/email-status")
+def email_status(email: str):
 
     email = email.lower()
 
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT id, is_verified
+            SELECT is_verified, email_verified_at, verification_attempts
+            FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not user:
+            raise HTTPException(404, "User not found")
+
+        return {
+            "email": email,
+            "verified": user.is_verified,
+            "verified_at": user.email_verified_at,
+            "attempts": user.verification_attempts,
+            "status": "verified" if user.is_verified else "pending"
+        }
+
+
+# =========================
+# RESEND EMAIL
+# =========================
+@router.post("/resend-verification")
+def resend_verification(data: dict):
+
+    email = data.get("email", "").lower()
+
+    with engine.begin() as conn:
+
+        user = conn.execute(text("""
+            SELECT is_verified, verification_attempts
             FROM users
             WHERE email = :email
         """), {"email": email}).fetchone()
@@ -162,28 +224,12 @@ def resend_verification(email: str):
             raise HTTPException(404, "User not found")
 
         if user.is_verified:
-            return {"status": "already_verified"}
+            return {"message": "Already verified"}
 
-        # CHECK COOLDOWN
-        last = conn.execute(text("""
-            SELECT created_at
-            FROM email_verifications
-            WHERE email = :email
-            ORDER BY created_at DESC
-            LIMIT 1
-        """), {"email": email}).fetchone()
+        if user.verification_attempts >= 5:
+            raise HTTPException(429, "Too many attempts")
 
-        if last:
-            diff = datetime.utcnow() - last.created_at
-            if diff.total_seconds() < 60:
-                raise HTTPException(
-                    429,
-                    "Please wait 60 seconds before resending email"
-                )
-
-        # GENERATE NEW TOKEN
         token = secrets.token_urlsafe(32)
-
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
         conn.execute(text("""
@@ -198,22 +244,22 @@ def resend_verification(email: str):
                 :email,
                 :token,
                 FALSE,
-                :created_at,
+                NOW(),
                 :expires_at
             )
         """), {
             "email": email,
             "token": token,
-            "created_at": datetime.utcnow(),
             "expires_at": expires_at
         })
 
-    # SEND EMAIL
+        conn.execute(text("""
+            UPDATE users
+            SET verification_attempts = verification_attempts + 1
+            WHERE email = :email
+        """), {"email": email})
+
     send_verification_email(email, token)
 
-    return {
-        "status": "sent",
-        "cooldown": 60
-    }
-
+    return {"message": "Email resent"}
 
