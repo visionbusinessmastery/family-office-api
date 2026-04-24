@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 
@@ -7,6 +7,7 @@ from typing import Optional
 # =========================
 class UserAuth(BaseModel):
     email: EmailStr
+
 
 # =========================
 # PROFILE
@@ -18,8 +19,8 @@ class UserProfileRequest(BaseModel):
 
 
 # =========================
-# SET PASSWORD
+# SET PASSWORD (step après vérification)
 # =========================
 class SetPasswordRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str
