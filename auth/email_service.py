@@ -1,57 +1,30 @@
 import os
-from resend import Resend
+import requests
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
-if not RESEND_API_KEY:
-    raise Exception("RESEND_API_KEY manquante")
-
-resend = Resend(api_key=RESEND_API_KEY)
-
-FRONT_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-
 def send_verification_email(to_email: str, token: str):
+    url = "https://api.resend.com/emails"
 
-    verify_link = f"{FRONT_URL}/verify-email?token={token}"
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
-    print("🔗 VERIFY LINK:", verify_link)
+    verification_link = f"https://ton-frontend.com/verify-email?token={token}"
 
-    try:
-        response = resend.emails.send({
-            "from": "Vision Business Mastery <onboarding@resend.dev>",
-            "to": to_email,
-            "subject": "Active ton compte Vision Business Mastery",
-            "html": f"""
-                <html>
-                    <body style="font-family:Arial;">
-                        <h2>Bienvenue 👋</h2>
+    payload = {
+        "from": "Vision Business Mastery <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": "Vérifie ton email",
+        "html": f"""
+            <h2>Bienvenue 🚀</h2>
+            <p>Confirme ton email ici :</p>
+            <a href="{verification_link}">Vérifier mon compte</a>
+        """,
+    }
 
-                        <p>Pour activer ton compte :</p>
+    response = requests.post(url, json=payload, headers=headers)
 
-                        <a href="{verify_link}" style="
-                            display:inline-block;
-                            padding:12px 20px;
-                            background:#1DA2CF;
-                            color:white;
-                            text-decoration:none;
-                            border-radius:8px;
-                        ">
-                            Activer mon compte
-                        </a>
-
-                        <p style="margin-top:20px;font-size:12px;">
-                            Si le bouton ne fonctionne pas :
-                            <br/>
-                            {verify_link}
-                        </p>
-                    </body>
-                </html>
-            """
-        })
-
-        print("✅ EMAIL SENT:", response)
-
-    except Exception as e:
-        print("❌ EMAIL ERROR:", str(e))
-        raise
+    if response.status_code != 200:
+        raise Exception(f"Erreur email: {response.text}")
