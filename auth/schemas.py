@@ -7,8 +7,6 @@ from typing import Optional
 # =========================
 class UserAuth(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
-
 
 # =========================
 # PROFILE
