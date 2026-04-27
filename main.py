@@ -24,6 +24,7 @@ from portfolio.routes import router as portfolio_router
 from real_estate.routes import router as real_router
 from stocks.routes import router as stocks_router
 from trading.routes import router as trading_router
+from billing.routes import router as billing_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -146,4 +147,5 @@ app.include_router(trading_router, prefix="/trading", tags=["TRADING"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 app.include_router(content_router)
+app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 
