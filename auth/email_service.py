@@ -5,7 +5,14 @@ import requests
 # CONFIG
 # =========================
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+ENV = os.getenv("ENV", "dev")
+
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL_PROD")
+    if ENV == "prod"
+    else os.getenv("FRONTEND_URL_DEV", "http://localhost:3000")
+)
 
 if not RESEND_API_KEY:
     raise Exception("Missing RESEND_API_KEY")
