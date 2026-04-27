@@ -23,7 +23,7 @@ if not stripe.api_key:
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # =========================
-# REGISTER (SAFE + RESEND FIX)
+# REGISTER (FINAL CLEAN SYNC FRONTEND)
 # =========================
 @router.post("/register")
 def register(data: UserAuth, request: Request):
@@ -42,15 +42,15 @@ def register(data: UserAuth, request: Request):
             # =========================
             if existing:
 
+                # 🔐 USER VERIFIED → LOGIN
                 if existing.is_verified:
                     return {
-                        "message": "User already exists",
-                        "action": "login"
+                        "status": "success",
+                        "action": "login",
+                        "message": "Compte déjà existant"
                     }
 
-                # =========================
-                # RESEND TOKEN
-                # =========================
+                # 🔁 USER NOT VERIFIED → RESEND EMAIL
                 token = secrets.token_urlsafe(32)
                 expires_at = datetime.utcnow() + timedelta(hours=24)
 
@@ -77,8 +77,9 @@ def register(data: UserAuth, request: Request):
                 send_verification_email(email, token)
 
                 return {
-                    "message": "User exists but not verified",
-                    "action": "resend_verification"
+                    "status": "success",
+                    "action": "resend_verification",
+                    "message": "Email déjà enregistré. Vérifie ta boîte mail."
                 }
 
             # =========================
@@ -97,7 +98,7 @@ def register(data: UserAuth, request: Request):
             user_id = result.fetchone()[0]
 
             # =========================
-            # TOKEN
+            # CREATE TOKEN
             # =========================
             token = secrets.token_urlsafe(32)
             expires_at = datetime.utcnow() + timedelta(hours=24)
@@ -116,20 +117,22 @@ def register(data: UserAuth, request: Request):
             })
 
         # =========================
-        # SEND EMAIL
+        # SEND EMAIL (OUTSIDE TRANSACTION)
         # =========================
         send_verification_email(email, token)
 
         return {
-            "message": "User created",
+            "status": "success",
+            "action": "verify_email",
+            "message": "Compte créé. Vérifie ton email.",
             "user_id": user_id,
-            "verification_required": True,
-            "action": "verify_email"
+            "verification_required": True
         }
 
     except Exception as e:
         print("REGISTER ERROR:", str(e))
         raise HTTPException(status_code=500, detail="Erreur serveur register")
+        
 
 # =========================
 # VERIFY EMAIL
