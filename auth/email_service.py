@@ -29,3 +29,19 @@ def send_verification_email(to_email: str, token: str):
     
     if response.status_code != 200:
         raise Exception(f"Erreur email: {response.text}")
+
+
+
+import resend
+
+resend.api_key = "re_7AVvj66B_HpHQBLK3b1bbEGftTX9JDdgo"
+
+response = resend.Emails.send({
+    "from": "Vision Business <noreply@send.vision-business.com>",
+    "to": "	visionbusinessmastery@gmail.com",
+    "subject": "Test Resend OK",
+    "html": "<p>🔥 Email Resend fonctionne correctement</p>"
+})
+
+print(response)
+        
