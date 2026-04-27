@@ -30,19 +30,27 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-app = FastAPI(title="Family Office AI", version="10.1")
+app = FastAPI(title="Family Office AI", version="10.2")
 
 app.state.limiter = limiter
 
+# =========================
+# CORS FIX (IMPORTANT)
+# =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://ton-frontend.com",  # 🔥 remplace plus tard
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
+# =========================
+# RATE LIMIT HANDLER
+# =========================
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
@@ -53,16 +61,33 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         },
     )
 
+# =========================
+# GLOBAL ERROR HANDLER 🔥
+# =========================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logging.error(f"❌ ERROR: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "message": str(exc),
+        },
+    )
 
+# =========================
+# STARTUP
+# =========================
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
 
-
+# =========================
+# BASIC ROUTES
+# =========================
 @app.get("/")
 def root():
     return {"message": "API Family Office running"}
-
 
 @app.get("/health")
 def health():
@@ -71,32 +96,40 @@ def health():
         "modules": ["advisor", "alerts", "trading", "portfolio", "market"],
     }
 
-
 @app.get("/info")
 def info():
     return {
         "app": "Family Office AI",
-        "version": "10.1",
+        "version": "10.2",
         "status": "running",
     }
 
-
+# =========================
+# AUTH MIDDLEWARE FIX 🔥
+# =========================
 @app.middleware("http")
 async def add_user_to_request(request: Request, call_next):
     try:
         token = request.headers.get("Authorization")
+
         if token:
             token = token.replace("Bearer ", "")
-            request.state.user_email = decode_token(token)
+            try:
+                request.state.user_email = decode_token(token)
+            except Exception:
+                request.state.user_email = "anonymous"
         else:
             request.state.user_email = "anonymous"
+
     except Exception:
         request.state.user_email = "anonymous"
 
     response = await call_next(request)
     return response
 
-
+# =========================
+# ROUTERS
+# =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
@@ -113,10 +146,4 @@ app.include_router(trading_router, prefix="/trading", tags=["TRADING"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 app.include_router(content_router)
-
-
-
-
-
-
 
