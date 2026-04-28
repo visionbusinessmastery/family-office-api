@@ -28,7 +28,7 @@ def send_verification_email(to_email: str, token: str):
     verification_link = f"{FRONTEND_URL}/verify-email?token={token}"
 
     payload = {
-        "from": "Vision Business Mastery <onboarding@resend.dev>",
+        "from": "Vision Business Mastery <onboarding@ton-domaine.com>",
         "to": [to_email],
         "subject": "🚀 Vérifie ton email - Vision Business Mastery",
         "html": f"""
