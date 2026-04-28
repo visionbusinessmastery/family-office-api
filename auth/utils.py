@@ -3,6 +3,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 
 import os
 
@@ -19,6 +20,8 @@ if not SECRET_KEY:
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = HTTPBearer()
+
+security = HTTPBearer()
 
 
 # =========================
@@ -65,10 +68,22 @@ def decode_token(token: str):
 # =========================
 # GET CURRENT USER
 # =========================
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
-    token = credentials.credentials  # 👈 C'EST LA QUE TOUT SE JOUE
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
-    return decode_token(token)
+    try:
+        token = credentials.credentials
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("sub")
+
+        if not email:
+            raise HTTPException(status_code=401, detail="Token invalide")
+
+        return email
+
+    except Exception as e:
+        print("TOKEN ERROR:", e)
+        raise HTTPException(status_code=401, detail="Token invalide")
 
 
 # =========================
