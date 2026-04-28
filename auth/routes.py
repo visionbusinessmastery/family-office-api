@@ -186,19 +186,27 @@ def login(data: LoginRequest):
             WHERE email = :email
         """), {"email": email}).fetchone()
 
+        # USER NOT FOUND
         if not user:
             raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
-        if not user.password_hash:
-            raise HTTPException(status_code=400, detail="Mot de passe non défini")
+        # PASSWORD NOT SET (CAS IMPORTANT)
+        if user.password_hash is None:
+            return {
+                "action": "set_password_required",
+                "message": "Compte non activé"
+            }
 
+        # PASSWORD CHECK
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
     token = create_token({"sub": email})
 
-    return {"access_token": token}
-
+    return {
+        "access_token": token,
+        "action": "login_success"
+    }
 
 # =========================
 # ONBOARDING
