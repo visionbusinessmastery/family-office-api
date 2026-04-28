@@ -3,7 +3,6 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
 
 import os
 
@@ -19,10 +18,7 @@ if not SECRET_KEY:
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = HTTPBearer()
-
 security = HTTPBearer()
-
 
 # =========================
 # HASH PASSWORD
@@ -30,23 +26,22 @@ security = HTTPBearer()
 def hash_password(password: str):
     return pwd_context.hash(password)
 
-
 # =========================
 # VERIFY PASSWORD
 # =========================
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
-
 # =========================
 # CREATE TOKEN
 # =========================
 def create_token(data: dict):
     to_encode = data.copy()
+
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # =========================
 # DECODE TOKEN
@@ -64,16 +59,16 @@ def decode_token(token: str):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-
 # =========================
 # GET CURRENT USER
 # =========================
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     try:
         token = credentials.credentials
 
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
 
         if not email:
@@ -84,7 +79,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except Exception as e:
         print("TOKEN ERROR:", e)
         raise HTTPException(status_code=401, detail="Token invalide")
-
 
 # =========================
 # BUILD UNLOCKS
