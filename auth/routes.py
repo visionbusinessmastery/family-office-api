@@ -139,18 +139,15 @@ def set_password(data: SetPasswordRequest):
 
     with engine.begin() as conn:
 
-        conn.execute(text("""
+        result = conn.execute(text("""
             UPDATE users
             SET password_hash = :password
             WHERE email = :email
-            AND is_verified = TRUE
         """), {"email": email, "password": password_hash})
 
-        if conn.rowcount == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Email non vérifié"
-            )
+        # OPTIONNEL SAFE CHECK
+        if result.rowcount == 0:
+            raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
     token = create_token({"sub": email})
 
@@ -178,7 +175,7 @@ def get_me(email: str = get_current_user):
 # LOGIN
 # =========================
 @router.post("/login")
-def login(data: SetPasswordRequest):
+def login(data: LoginRequest):
 
     email = data.email.lower()
 
@@ -193,11 +190,8 @@ def login(data: SetPasswordRequest):
             raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
         if not user.password_hash:
-            raise HTTPException(
-                status_code=400,
-                detail="Mot de passe non défini. Vérifie ton email."
-            )
-    
+            raise HTTPException(status_code=400, detail="Mot de passe non défini")
+
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
