@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from database import engine
 from auth.schemas import UserAuth, SetPasswordRequest
-from auth.utils import hash_password, create_token, get_current_user
+from auth.utils import hash_password, create_token, get_current_user, verify_password
 from auth.email_service import send_verification_email
 
 router = APIRouter()
@@ -171,6 +171,32 @@ def get_me(email: str = get_current_user):
         """), {"email": email}).fetchone()
 
         return dict(user)
+
+
+# =========================
+# LOGIN
+# =========================
+@router.post("/login")
+def login(data: SetPasswordRequest):
+
+    email = data.email.lower()
+
+    with engine.begin() as conn:
+
+        user = conn.execute(text("""
+            SELECT password_hash FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not user or not user.password_hash:
+            raise HTTPException(status_code=400, detail="Utilisateur invalide")
+
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Mot de passe incorrect")
+
+    token = create_token({"sub": email})
+
+    return {"access_token": token}
 
 
 # =========================
