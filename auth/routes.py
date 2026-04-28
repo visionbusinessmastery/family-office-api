@@ -95,8 +95,8 @@ def register(data: UserAuth, request: Request):
         }
 
     except Exception as e:
-        print("REGISTER ERROR:", str(e))
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+        print("REGISTER ERROR FULL:", repr(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =========================
@@ -179,14 +179,35 @@ def get_me(email: str = get_current_user):
 @router.post("/onboarding/save")
 def save_onboarding(data: dict, email: str = get_current_user):
 
-    with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE users
-            SET profile_completed = TRUE
-            WHERE email = :email
-        """), {"email": email})
+    try:
+        with engine.begin() as conn:
 
-    return {"status": "ok"}
+            conn.execute(text("""
+                UPDATE users
+                SET
+                    profile_completed = TRUE,
+                    genre = :genre,
+                    age = :age,
+                    situation_pro = :situation_pro,
+                    revenus_mensuels = :revenus,
+                    dettes = :dettes,
+                    epargne = :epargne
+                WHERE email = :email
+            """), {
+                "email": email,
+                "genre": data.get("genre"),
+                "age": data.get("age"),
+                "situation_pro": data.get("situation_pro"),
+                "revenus": data.get("revenus_mensuels", 0),
+                "dettes": data.get("dettes", 0),
+                "epargne": data.get("epargne", 0),
+            })
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        print("ONBOARDING ERROR:", str(e))
+        raise HTTPException(status_code=500, detail="Erreur onboarding")
 
 
 # =========================
