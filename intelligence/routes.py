@@ -193,19 +193,38 @@ def user_intelligence(request: Request):
 def run_intelligence(request: Request):
 
     def _run():
-
         user_email = request.state.user_email
 
-        # DB fetch
-        profile = get_profile(user_email)
-        portfolio = get_portfolio(user_email)
+        # DB FETCH SAFE
+        with engine.begin() as conn:
 
-        result = run_user_intelligence(
-            user_email,
-            profile,
-            portfolio,
-            conn
-        )
+            profile = conn.execute(text("""
+                SELECT *
+                FROM user_profiles
+                WHERE user_email = :email
+            """), {"email": user_email}).fetchone()
+
+            profile_dict = dict(profile._mapping) if profile else {}
+
+            user = conn.execute(text("""
+                SELECT plan
+                FROM users
+                WHERE email = :email
+            """), {"email": user_email}).fetchone()
+
+            portfolio = conn.execute(text("""
+                SELECT asset_name, type, value
+                FROM portfolio
+                WHERE user_email = :email
+            """), {"email": user_email}).fetchall()
+
+        profile_dict["plan"] = user.plan if user else "FREE"
+
+        portfolio_list = [dict(p._mapping) for p in portfolio]
+
+        from intelligence.user_intelligence_engine import compute_user_intelligence
+
+        result = compute_user_intelligence(user_email)
 
         return {
             "user": user_email,
