@@ -24,3 +24,11 @@ class UserProfileRequest(BaseModel):
 class SetPasswordRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+# =========================
+# LOGIN REQUEST
+# =========================
+class LoginRequest(BaseModel):
+    email: str
+    password: str
