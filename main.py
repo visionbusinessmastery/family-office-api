@@ -42,7 +42,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://ton-frontend.com",  # 🔥 remplace plus tard
+        "https://family-office-api-n4sv.onrender.com",
+        "https://vision-business.com",  # futur domaine
     ],
     allow_credentials=True,
     allow_methods=["*"],
