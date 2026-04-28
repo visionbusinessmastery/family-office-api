@@ -9,6 +9,8 @@ from auth.schemas import UserAuth, SetPasswordRequest
 from auth.utils import hash_password, create_token, get_current_user, verify_password
 from auth.email_service import send_verification_email
 
+from passlib.context import CryptContext
+
 router = APIRouter()
 
 
@@ -16,7 +18,7 @@ router = APIRouter()
 # REGISTER
 # =========================
 @router.post("/register")
-def register(data: UserAuth, request: Request):
+def register(data: UserAuth):
 
     email = data.email.lower()
 
@@ -27,9 +29,6 @@ def register(data: UserAuth, request: Request):
                 SELECT id, is_verified FROM users WHERE email = :email
             """), {"email": email}).fetchone()
 
-            # =========================
-            # USER EXISTS
-            # =========================
             if existing:
 
                 if existing.is_verified:
@@ -39,7 +38,6 @@ def register(data: UserAuth, request: Request):
                         "message": "Compte existant"
                     }
 
-                # resend verification
                 token = secrets.token_urlsafe(32)
 
                 conn.execute(text("""
@@ -55,13 +53,10 @@ def register(data: UserAuth, request: Request):
 
                 return {
                     "status": "success",
-                    "action": "resend_verification",
-                    "message": "Email déjà non vérifié"
+                    "action": "resend_verification"
                 }
 
-            # =========================
-            # CREATE USER
-            # =========================
+            # ✅ CREATE USER WITHOUT PASSWORD (OK)
             result = conn.execute(text("""
                 INSERT INTO users (email, is_verified, verification_attempts)
                 VALUES (:email, FALSE, 0)
@@ -81,7 +76,7 @@ def register(data: UserAuth, request: Request):
                 )
             """), {"email": email, "token": token})
 
-        # EMAIL SAFE (NO CRASH)
+        # EMAIL SAFE
         try:
             send_verification_email(email, token)
         except Exception as e:
@@ -90,7 +85,6 @@ def register(data: UserAuth, request: Request):
         return {
             "status": "success",
             "action": "verify_email",
-            "message": "Compte créé",
             "user_id": user_id
         }
 
@@ -149,7 +143,14 @@ def set_password(data: SetPasswordRequest):
             UPDATE users
             SET password_hash = :password
             WHERE email = :email
+            AND is_verified = TRUE
         """), {"email": email, "password": password_hash})
+
+        if conn.rowcount == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Email non vérifié"
+            )
 
     token = create_token({"sub": email})
 
@@ -188,9 +189,15 @@ def login(data: SetPasswordRequest):
             WHERE email = :email
         """), {"email": email}).fetchone()
 
-        if not user or not user.password_hash:
-            raise HTTPException(status_code=400, detail="Utilisateur invalide")
+        if not user:
+            raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
+        if not user.password_hash:
+            raise HTTPException(
+                status_code=400,
+                detail="Mot de passe non défini. Vérifie ton email."
+            )
+    
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
