@@ -228,35 +228,48 @@ def save_onboarding(
     data: dict,
     email: str = Depends(get_current_user)
 ):
+    print("ONBOARDING DATA:", data)
+    print("USER:", email)
 
-    with engine.begin() as conn:
+    try:
+        with engine.begin() as conn:
 
-        result = conn.execute(text("""
-            UPDATE users
-            SET
-                genre = :genre,
-                age = :age,
-                situation_pro = :situation_pro,
-                revenus_mensuels = :revenus,
-                dettes = :dettes,
-                epargne = :epargne,
-                profile_completed = true
-            WHERE email = :email
-        """), {
-            "email": email,
-            "genre": data.get("genre"),
-            "age": data.get("age"),
-            "situation_pro": data.get("situation_pro"),
-            "revenus": data.get("revenus_mensuels"),
-            "dettes": data.get("dettes"),
-            "epargne": data.get("epargne"),
-        })
+            # 🔥 TEST SI USER EXISTE
+            user = conn.execute(text("""
+                SELECT email FROM users WHERE email = :email
+            """), {"email": email}).fetchone()
 
-        if result.rowcount == 0:
-            raise HTTPException(status_code=400, detail="Onboarding failed")
+            if not user:
+                raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
-    return {"status": "ok"}
+            # 🔥 UPDATE
+            conn.execute(text("""
+                UPDATE users
+                SET
+                    genre = :genre,
+                    age = :age,
+                    situation_pro = :situation_pro,
+                    revenus_mensuels = :revenus,
+                    dettes = :dettes,
+                    epargne = :epargne,
+                    profile_completed = true
+                WHERE email = :email
+            """), {
+                "email": email,
+                "genre": data.get("genre"),
+                "age": data.get("age"),
+                "situation_pro": data.get("situation_pro"),
+                "revenus": data.get("revenus_mensuels"),
+                "dettes": data.get("dettes"),
+                "epargne": data.get("epargne"),
+            })
 
+        return {"status": "ok"}
+
+    except Exception as e:
+        print("ONBOARDING ERROR:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+        
 
 # =========================
 # PLAN UPDATE (MANUEL)
