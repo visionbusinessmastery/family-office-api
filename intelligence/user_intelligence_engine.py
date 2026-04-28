@@ -27,7 +27,7 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # 2. PROFILE DATA
+        # 2. PROFILE DATA (SAFE FIX)
         # =========================
         profile = conn.execute(text("""
             SELECT *
@@ -35,7 +35,16 @@ def compute_user_intelligence(user_email: str):
             WHERE user_email = :email
         """), {"email": user_email}).fetchone()
 
-        profile_dict = dict(profile._mapping) if profile else {}
+        # 🔥 SAFE PROFILE FIX (ANTI-CRASH)
+        if not profile:
+            profile_dict = {
+                "plan": user.plan,
+                "savings": 0,
+                "investments": 0,
+                "risk_profile": "medium"
+            }
+        else:
+            profile_dict = dict(profile._mapping)
 
         # enrichissement
         profile_dict["email"] = user.email
@@ -56,7 +65,6 @@ def compute_user_intelligence(user_email: str):
     # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
-
     score = score_result["score"]
 
     # =========================
