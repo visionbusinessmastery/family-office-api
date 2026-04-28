@@ -1,12 +1,17 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from sqlalchemy import text
 
 from database import engine
 from auth.schemas import UserAuth, SetPasswordRequest, LoginRequest
-from auth.utils import hash_password, create_token, get_current_user, verify_password
+from auth.utils import (
+    hash_password,
+    create_token,
+    get_current_user,
+    verify_password
+)
 from auth.email_service import send_verification_email
 
 from passlib.context import CryptContext
