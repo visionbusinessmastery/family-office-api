@@ -158,7 +158,7 @@ def set_password(data: SetPasswordRequest):
 # ME
 # =========================
 @router.get("/me")
-def get_me(email: str = get_current_user):
+def get_me(email: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
 
@@ -168,7 +168,14 @@ def get_me(email: str = get_current_user):
             WHERE email = :email
         """), {"email": email}).fetchone()
 
-        return dict(user)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "email": user.email,
+        "plan": user.plan,
+        "profile_completed": user.profile_completed
+    }
 
 
 # =========================
@@ -212,37 +219,38 @@ def login(data: LoginRequest):
 # ONBOARDING
 # =========================
 @router.post("/onboarding/save")
-def save_onboarding(data: dict, email: str = get_current_user):
+def save_onboarding(
+    data: dict,
+    email: str = Depends(get_current_user)
+):
 
-    try:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
 
-            conn.execute(text("""
-                UPDATE users
-                SET
-                    profile_completed = TRUE,
-                    genre = :genre,
-                    age = :age,
-                    situation_pro = :situation_pro,
-                    revenus_mensuels = :revenus,
-                    dettes = :dettes,
-                    epargne = :epargne
-                WHERE email = :email
-            """), {
-                "email": email,
-                "genre": data.get("genre"),
-                "age": data.get("age"),
-                "situation_pro": data.get("situation_pro"),
-                "revenus": data.get("revenus_mensuels", 0),
-                "dettes": data.get("dettes", 0),
-                "epargne": data.get("epargne", 0),
-            })
+        result = conn.execute(text("""
+            UPDATE users
+            SET
+                genre = :genre,
+                age = :age,
+                situation_pro = :situation_pro,
+                revenus_mensuels = :revenus,
+                dettes = :dettes,
+                epargne = :epargne,
+                profile_completed = true
+            WHERE email = :email
+        """), {
+            "email": email,
+            "genre": data.get("genre"),
+            "age": data.get("age"),
+            "situation_pro": data.get("situation_pro"),
+            "revenus": data.get("revenus_mensuels"),
+            "dettes": data.get("dettes"),
+            "epargne": data.get("epargne"),
+        })
 
-        return {"status": "ok"}
+        if result.rowcount == 0:
+            raise HTTPException(status_code=400, detail="Onboarding failed")
 
-    except Exception as e:
-        print("ONBOARDING ERROR:", str(e))
-        raise HTTPException(status_code=500, detail="Erreur onboarding")
+    return {"status": "ok"}
 
 
 # =========================
