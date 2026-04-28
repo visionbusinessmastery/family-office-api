@@ -4,8 +4,8 @@
 def build_dashboard(user, intelligence):
 
     plan = user.get("plan", "FREE")
-    score = intelligence["score"]["score"]
-    segment = intelligence["segment"]
+    score = intelligence["score"]["score"] if isinstance(intelligence.get("score"), dict) else 0
+    segment = intelligence.get("segment", "BEGINNER")
 
     dashboard = {
         "hero": True,
