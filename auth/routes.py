@@ -224,51 +224,33 @@ def login(data: LoginRequest):
 # ONBOARDING
 # =========================
 @router.post("/onboarding/save")
-def save_onboarding(
-    data: dict,
-    email: str = Depends(get_current_user)
-):
-    print("ONBOARDING DATA:", data)
-    print("USER:", email)
+def save_onboarding(data: dict, email: str = Depends(get_current_user)):
 
-    try:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
 
-            # 🔥 TEST SI USER EXISTE
-            user = conn.execute(text("""
-                SELECT email FROM users WHERE email = :email
-            """), {"email": email}).fetchone()
+        result = conn.execute(text("""
+            UPDATE users
+            SET
+                age = :age,
+                situation_pro = :situation_pro,
+                revenus_mensuels = :revenus,
+                dettes = :dettes,
+                epargne = :epargne,
+                profile_completed = true
+            WHERE email = :email
+        """), {
+            "email": email,
+            "age": data.get("age"),
+            "situation_pro": data.get("situation_pro"),
+            "revenus": data.get("revenus_mensuels"),
+            "dettes": data.get("dettes"),
+            "epargne": data.get("epargne"),
+        })
 
-            if not user:
-                raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        if result.rowcount == 0:
+            raise HTTPException(status_code=400, detail="Onboarding failed")
 
-            # 🔥 UPDATE
-            conn.execute(text("""
-                UPDATE users
-                SET
-                    genre = :genre,
-                    age = :age,
-                    situation_pro = :situation_pro,
-                    revenus_mensuels = :revenus,
-                    dettes = :dettes,
-                    epargne = :epargne,
-                    profile_completed = true
-                WHERE email = :email
-            """), {
-                "email": email,
-                "genre": data.get("genre"),
-                "age": data.get("age"),
-                "situation_pro": data.get("situation_pro"),
-                "revenus": data.get("revenus_mensuels"),
-                "dettes": data.get("dettes"),
-                "epargne": data.get("epargne"),
-            })
-
-        return {"status": "ok"}
-
-    except Exception as e:
-        print("ONBOARDING ERROR:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "ok"}
         
 
 # =========================
