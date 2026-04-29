@@ -1,3 +1,6 @@
+# =========================
+# IMPORTS
+# =========================
 from sqlalchemy import text
 from database import engine
 
@@ -15,7 +18,7 @@ def compute_user_intelligence(user_email: str):
     with engine.begin() as conn:
 
         # =========================
-        # 1. USER (CORE)
+        # 1. USER
         # =========================
         user = conn.execute(text("""
             SELECT id, email, plan, profile_completed
@@ -27,7 +30,23 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # 2. PROFILE DATA (SAFE FIX)
+        # 🛡️ STATE RECOVERY CHECK
+        # =========================
+        if not user.profile_completed:
+            return {
+                "state": "ONBOARDING_REQUIRED",
+                "score": {
+                    "score": 0,
+                    "status": "incomplete_profile"
+                },
+                "level": "ONBOARDING",
+                "features": [],
+                "opportunities": [],
+                "upgrade": None
+            }
+
+        # =========================
+        # 2. PROFILE
         # =========================
         profile = conn.execute(text("""
             SELECT *
@@ -35,7 +54,6 @@ def compute_user_intelligence(user_email: str):
             WHERE user_email = :email
         """), {"email": user_email}).fetchone()
 
-        # 🔥 SAFE PROFILE FIX (ANTI-CRASH)
         if not profile:
             profile_dict = {
                 "plan": user.plan,
@@ -46,12 +64,11 @@ def compute_user_intelligence(user_email: str):
         else:
             profile_dict = dict(profile._mapping)
 
-        # enrichissement
         profile_dict["email"] = user.email
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO (SAFE + ADAPTÉ À TA DB)
+        # 3. PORTFOLIO (SAFE DB STRUCTURE)
         # =========================
         try:
             portfolio = conn.execute(text("""
@@ -67,8 +84,8 @@ def compute_user_intelligence(user_email: str):
 
                 portfolio_list.append({
                     "asset_name": p.asset_name,
-                    "type": p.category,   # mapping vers "type"
-                    "value": float(value) # mapping vers "value"
+                    "type": p.category,
+                    "value": float(value)
                 })
 
         except Exception as e:
@@ -86,51 +103,26 @@ def compute_user_intelligence(user_email: str):
     # =========================
     if score >= 80:
         level = "ELITE"
-        recommendation = "optimize & scale"
     elif score >= 60:
         level = "GOLD"
-        recommendation = "upgrade recommended"
     elif score >= 40:
         level = "SILVER"
-        recommendation = "build portfolio"
     else:
         level = "FREE"
-        recommendation = "start onboarding"
 
     # =========================
-    # 6. UPGRADE ENGINE
+    # 6. ENGINE
     # =========================
-    upgrade = compute_upgrade_decision(
-        current_plan=user.plan,
-        score=score
-    )
-
-    # =========================
-    # 7. FEATURES
-    # =========================
+    upgrade = compute_upgrade_decision(user.plan, score)
     features = compute_feature_access(profile_dict, score_result)
-
-    # =========================
-    # 8. OPPORTUNITIES
-    # =========================
     opportunities = compute_opportunities(profile_dict, portfolio_list)
 
-    # =========================
-    # 9. FINAL OUTPUT
-    # =========================
     return {
         "user": user.email,
         "plan": user.plan,
-
-        # CORE
         "score": score_result,
         "level": level,
-        "recommendation": recommendation,
-
-        # BUSINESS
         "upgrade": upgrade,
-
-        # AI LAYER
         "features": features,
         "opportunities": opportunities
     }
