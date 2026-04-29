@@ -1,7 +1,10 @@
+# =========================
+# IMPORTS
+# =========================
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text
 
 from database import engine
@@ -13,8 +16,6 @@ from auth.utils import (
     verify_password
 )
 from auth.email_service import send_verification_email
-
-from passlib.context import CryptContext
 
 router = APIRouter()
 
@@ -39,8 +40,7 @@ def register(data: UserAuth):
                 if existing.is_verified:
                     return {
                         "status": "success",
-                        "action": "login",
-                        "message": "Compte existant"
+                        "action": "login"
                     }
 
                 token = secrets.token_urlsafe(32)
@@ -56,15 +56,11 @@ def register(data: UserAuth):
 
                 send_verification_email(email, token)
 
-                return {
-                    "status": "success",
-                    "action": "resend_verification"
-                }
+                return {"status": "success", "action": "resend_verification"}
 
-            # ✅ CREATE USER WITHOUT PASSWORD (OK)
             result = conn.execute(text("""
-                INSERT INTO users (email, is_verified, verification_attempts)
-                VALUES (:email, FALSE, 0)
+                INSERT INTO users (email, is_verified, verification_attempts, profile_completed)
+                VALUES (:email, FALSE, 0, FALSE)
                 RETURNING id
             """), {"email": email})
 
@@ -81,11 +77,7 @@ def register(data: UserAuth):
                 )
             """), {"email": email, "token": token})
 
-        # EMAIL SAFE
-        try:
-            send_verification_email(email, token)
-        except Exception as e:
-            print("EMAIL ERROR:", e)
+        send_verification_email(email, token)
 
         return {
             "status": "success",
@@ -94,7 +86,6 @@ def register(data: UserAuth):
         }
 
     except Exception as e:
-        print("REGISTER ERROR FULL:", repr(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -119,14 +110,13 @@ def verify_email(token: str):
         email = record.email
 
         conn.execute(text("""
-            UPDATE email_verifications
-            SET is_used = TRUE
-            WHERE token = :token
+            UPDATE email_verifications SET is_used = TRUE WHERE token = :token
         """), {"token": token})
 
         conn.execute(text("""
             UPDATE users
-            SET is_verified = TRUE
+            SET is_verified = TRUE,
+                profile_completed = FALSE
             WHERE email = :email
         """), {"email": email})
 
@@ -150,7 +140,6 @@ def set_password(data: SetPasswordRequest):
             WHERE email = :email
         """), {"email": email, "password": password_hash})
 
-        # OPTIONNEL SAFE CHECK
         if result.rowcount == 0:
             raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
@@ -160,7 +149,7 @@ def set_password(data: SetPasswordRequest):
 
 
 # =========================
-# ME
+# ME (FIX IMPORTANT NULL SAFE)
 # =========================
 @router.get("/me")
 def get_me(email: str = Depends(get_current_user)):
@@ -176,10 +165,16 @@ def get_me(email: str = Depends(get_current_user)):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # 🔥 SAFE FIX NULL
+        profile_completed = user.profile_completed
+
+        if profile_completed is None:
+            profile_completed = False
+
     return {
         "email": user.email,
         "plan": user.plan,
-        "profile_completed": user.profile_completed
+        "profile_completed": profile_completed
     }
 
 
@@ -194,34 +189,25 @@ def login(data: LoginRequest):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT password_hash FROM users
-            WHERE email = :email
+            SELECT password_hash FROM users WHERE email = :email
         """), {"email": email}).fetchone()
 
-        # USER NOT FOUND
         if not user:
             raise HTTPException(status_code=400, detail="Utilisateur introuvable")
 
-        # PASSWORD NOT SET (CAS IMPORTANT)
         if user.password_hash is None:
-            return {
-                "action": "set_password_required",
-                "message": "Compte non activé"
-            }
+            return {"action": "set_password_required"}
 
-        # PASSWORD CHECK
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=400, detail="Mot de passe incorrect")
 
     token = create_token({"sub": email})
 
-    return {
-        "access_token": token,
-        "action": "login_success"
-    }
+    return {"access_token": token}
+
 
 # =========================
-# ONBOARDING
+# ONBOARDING (IMPORTANT FIX)
 # =========================
 @router.post("/onboarding/save")
 def save_onboarding(data: dict, email: str = Depends(get_current_user)):
@@ -236,7 +222,7 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
                 revenus_mensuels = :revenus,
                 dettes = :dettes,
                 epargne = :epargne,
-                profile_completed = true
+                profile_completed = TRUE
             WHERE email = :email
         """), {
             "email": email,
@@ -251,13 +237,13 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Onboarding failed")
 
     return {"status": "ok"}
-        
+
 
 # =========================
-# PLAN UPDATE (MANUEL)
+# PLAN UPDATE
 # =========================
 @router.post("/plan/update")
-def update_plan(plan: str, email: str = get_current_user):
+def update_plan(plan: str, email: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
         conn.execute(text("""
