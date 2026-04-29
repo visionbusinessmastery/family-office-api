@@ -34,15 +34,15 @@ def add_asset(request: Request, data: PortfolioRequest):
 
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO portfolios (user_email, asset, asset_type, quantity, buy_price)
+                INSERT INTO portfolio (user_email, asset, asset_type, quantity, buy_price)
                 VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
                 ON CONFLICT ON CONSTRAINT unique_user_asset
                 DO UPDATE SET
-                    quantity = portfolios.quantity + EXCLUDED.quantity,
+                    quantity = portfolio.quantity + EXCLUDED.quantity,
                     buy_price = (
-                        (portfolios.quantity * portfolios.buy_price) +
+                        (portfolio.quantity * portfolios.buy_price) +
                         (EXCLUDED.quantity * EXCLUDED.buy_price)
-                    ) / (portfolios.quantity + EXCLUDED.quantity)
+                    ) / (portfolio.quantity + EXCLUDED.quantity)
             """), {
                 "email": user_email,
                 "asset": data.asset.upper(),
