@@ -149,7 +149,7 @@ def set_password(data: SetPasswordRequest):
 
 
 # =========================
-# ME (FIX IMPORTANT NULL SAFE)
+# ME (STATE RECOVERY SAFE)
 # =========================
 @router.get("/me")
 def get_me(email: str = Depends(get_current_user)):
@@ -165,18 +165,25 @@ def get_me(email: str = Depends(get_current_user)):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # 🔥 SAFE FIX NULL
-        profile_completed = user.profile_completed
+        # =========================
+        # 🛡️ STATE RECOVERY LOGIC
+        # =========================
+        profile_completed = bool(user.profile_completed)
 
-        if profile_completed is None:
-            profile_completed = False
+        if not profile_completed:
+            return {
+                "email": user.email,
+                "plan": user.plan,
+                "profile_completed": False,
+                "state": "ONBOARDING_REQUIRED"
+            }
 
-    return {
-        "email": user.email,
-        "plan": user.plan,
-        "profile_completed": profile_completed
-    }
-
+        return {
+            "email": user.email,
+            "plan": user.plan,
+            "profile_completed": True,
+            "state": "READY"
+        }
 
 # =========================
 # LOGIN
