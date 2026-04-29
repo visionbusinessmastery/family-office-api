@@ -51,7 +51,7 @@ def compute_user_intelligence(user_email: str):
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO (SAFE FIX ADAPTÉ À TA DB)
+        # 3. PORTFOLIO (SAFE + ADAPTÉ À TA DB)
         # =========================
         try:
             portfolio = conn.execute(text("""
@@ -67,8 +67,8 @@ def compute_user_intelligence(user_email: str):
 
                 portfolio_list.append({
                     "asset_name": p.asset_name,
-                    "type": p.category,  # mapping logique
-                    "value": value       # calcul dynamique
+                    "type": p.category,   # mapping vers "type"
+                    "value": float(value) # mapping vers "value"
                 })
 
         except Exception as e:
@@ -79,7 +79,7 @@ def compute_user_intelligence(user_email: str):
     # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
-    score = score_result["score"]
+    score = score_result.get("score", 0)
 
     # =========================
     # 5. LEVEL
