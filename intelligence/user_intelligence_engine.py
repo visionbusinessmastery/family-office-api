@@ -18,7 +18,7 @@ def compute_user_intelligence(user_email: str):
         # 1. USER (CORE)
         # =========================
         user = conn.execute(text("""
-            SELECT email, plan, profile_completed
+            SELECT id, email, plan, profile_completed
             FROM users
             WHERE email = :email
         """), {"email": user_email}).fetchone()
@@ -51,15 +51,29 @@ def compute_user_intelligence(user_email: str):
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO
+        # 3. PORTFOLIO (SAFE FIX ADAPTÉ À TA DB)
         # =========================
-        portfolio = conn.execute(text("""
-            SELECT asset_name, type, value
-            FROM portfolio
-            WHERE user_email = :email
-        """), {"email": user_email}).fetchall()
+        try:
+            portfolio = conn.execute(text("""
+                SELECT asset_name, category, quantity, purchase_price
+                FROM portfolio
+                WHERE user_id = :user_id
+            """), {"user_id": user.id}).fetchall()
 
-        portfolio_list = [dict(p._mapping) for p in portfolio]
+            portfolio_list = []
+
+            for p in portfolio:
+                value = (p.quantity or 0) * (p.purchase_price or 0)
+
+                portfolio_list.append({
+                    "asset_name": p.asset_name,
+                    "type": p.category,  # mapping logique
+                    "value": value       # calcul dynamique
+                })
+
+        except Exception as e:
+            print("PORTFOLIO ERROR:", e)
+            portfolio_list = []
 
     # =========================
     # 4. SCORE
