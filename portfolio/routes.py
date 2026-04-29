@@ -23,35 +23,43 @@ def get_portfolio(request: Request):
 
 
 # =========================
-# ADD ASSET
+# ADD ASSET (FIXED)
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):
 
     def _add():
-        user_email = request.state.user_email
+
+        user_id = request.state.user_id
 
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO portfolio (user_email, asset, asset_type, quantity, buy_price)
-                VALUES (:email, :asset, :asset_type, :quantity, :buy_price)
-                ON CONFLICT ON CONSTRAINT unique_user_asset
-                DO UPDATE SET
-                    quantity = portfolio.quantity + EXCLUDED.quantity,
-                    buy_price = (
-                        (portfolio.quantity * portfolios.buy_price) +
-                        (EXCLUDED.quantity * EXCLUDED.buy_price)
-                    ) / (portfolio.quantity + EXCLUDED.quantity)
+                INSERT INTO portfolio (
+                    user_id,
+                    asset_name,
+                    category,
+                    quantity,
+                    purchase_price
+                )
+                VALUES (
+                    :user_id,
+                    :asset_name,
+                    :category,
+                    :quantity,
+                    :purchase_price
+                )
             """), {
-                "email": user_email,
-                "asset": data.asset.upper(),
-                "asset_type": data.asset_type.upper().strip(),
+                "user_id": user_id,
+                "asset_name": data.asset.upper(),
+                "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
-                "buy_price": data.buy_price
+                "purchase_price": data.buy_price
             })
 
-        return {"status": "asset ajouté ou mis à jour"}
+        return {"status": "asset ajouté"}
+
+    return safe_execute(_add, module_name="PORTFOLIO")
 
     return safe_execute(_add, module_name="PORTFOLIO")
   
