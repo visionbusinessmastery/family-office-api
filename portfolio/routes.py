@@ -23,7 +23,7 @@ def get_portfolio(request: Request):
 
 
 # =========================
-# ADD ASSET (FIXED)
+# ADD ASSET (FINAL FIX)
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
@@ -31,9 +31,21 @@ def add_asset(request: Request, data: PortfolioRequest):
 
     def _add():
 
-        user_id = request.state.user_id
+        user_email = request.state.user_email
 
         with engine.begin() as conn:
+
+            # 🔥 GET USER ID
+            user = conn.execute(text("""
+                SELECT id FROM users WHERE email = :email
+            """), {"email": user_email}).fetchone()
+
+            if not user:
+                raise Exception("User not found")
+
+            user_id = user.id
+
+            # 🔥 INSERT ASSET
             conn.execute(text("""
                 INSERT INTO portfolio (
                     user_id,
