@@ -60,7 +60,3 @@ def add_asset(request: Request, data: PortfolioRequest):
         return {"status": "asset ajouté"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
-
-    return safe_execute(_add, module_name="PORTFOLIO")
-  
-
