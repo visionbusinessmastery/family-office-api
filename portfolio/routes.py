@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 # =========================
-# GET PORTFOLIO (CLEAN)
+# GET PORTFOLIO (FIXED + CLEAN)
 # =========================
 @router.get("/")
 @limiter.limit("10/minute")
@@ -28,8 +28,9 @@ def get_portfolio(request: Request):
             if not user:
                 raise Exception("User not found")
 
+            # ✅ VERSION CORRIGÉE SCHEMA
             rows = conn.execute(text("""
-                SELECT asset, asset_type, quantity, buy_price
+                SELECT asset_name, category, quantity, purchase_price
                 FROM portfolio
                 WHERE user_id = :user_id
             """), {"user_id": user.id}).fetchall()
@@ -38,11 +39,11 @@ def get_portfolio(request: Request):
 
             for r in rows:
                 result.append({
-                    "asset_name": r.asset,
-                    "category": r.asset_type,
+                    "asset_name": r.asset_name,
+                    "category": r.category,
                     "quantity": float(r.quantity or 0),
-                    "purchase_price": float(r.buy_price or 0),
-                    "value": float((r.quantity or 0) * (r.buy_price or 0))
+                    "purchase_price": float(r.purchase_price or 0),
+                    "value": float((r.quantity or 0) * (r.purchase_price or 0))
                 })
 
             return result
@@ -51,7 +52,7 @@ def get_portfolio(request: Request):
 
 
 # =========================
-# ADD ASSET (SAFE + NORMALIZED INPUT)
+# ADD ASSET (FIXED SCHEMA)
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
@@ -70,27 +71,28 @@ def add_asset(request: Request, data: PortfolioRequest):
             if not user:
                 raise Exception("User not found")
 
+            # ✅ VERSION COHERENTE AVEC GET
             conn.execute(text("""
                 INSERT INTO portfolio (
                     user_id,
-                    asset,
-                    asset_type,
+                    asset_name,
+                    category,
                     quantity,
-                    buy_price
+                    purchase_price
                 )
                 VALUES (
                     :user_id,
-                    :asset,
-                    :asset_type,
+                    :asset_name,
+                    :category,
                     :quantity,
-                    :buy_price
+                    :purchase_price
                 )
             """), {
                 "user_id": user.id,
-                "asset": data.asset.upper().strip(),
-                "asset_type": data.asset_type.upper().strip(),
+                "asset_name": data.asset.upper().strip(),
+                "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
-                "buy_price": data.buy_price
+                "purchase_price": data.buy_price
             })
 
         return {"status": "asset ajouté"}
