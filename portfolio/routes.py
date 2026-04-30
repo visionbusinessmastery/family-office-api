@@ -7,19 +7,20 @@ from database import engine
 
 router = APIRouter()
 
+
 # =========================
-# GET PORTFOLIO (FIXED)
+# GET PORTFOLIO (CLEAN)
 # =========================
 @router.get("/")
 @limiter.limit("10/minute")
 def get_portfolio(request: Request):
 
     def _get():
+
         user_email = request.state.user_email
 
         with engine.begin() as conn:
 
-            # 🔥 GET USER ID
             user = conn.execute(text("""
                 SELECT id FROM users WHERE email = :email
             """), {"email": user_email}).fetchone()
@@ -27,27 +28,22 @@ def get_portfolio(request: Request):
             if not user:
                 raise Exception("User not found")
 
-            user_id = user.id
-
-            # 🔥 GET PORTFOLIO
-            portfolio = conn.execute(text("""
-                SELECT asset_name, category, quantity, purchase_price
+            rows = conn.execute(text("""
+                SELECT asset, asset_type, quantity, buy_price
                 FROM portfolio
                 WHERE user_id = :user_id
-            """), {"user_id": user_id}).fetchall()
+            """), {"user_id": user.id}).fetchall()
 
             result = []
 
-            for p in portfolio:
+            for r in rows:
                 result.append({
-                    "asset_name": p.asset_name,
-                    "category": p.category,
-                    "quantity": float(p.quantity or 0),
-                    "purchase_price": float(p.purchase_price or 0),
-                    "value": float((p.quantity or 0) * (p.purchase_price or 0))
+                    "asset_name": r.asset,
+                    "category": r.asset_type,
+                    "quantity": float(r.quantity or 0),
+                    "purchase_price": float(r.buy_price or 0),
+                    "value": float((r.quantity or 0) * (r.buy_price or 0))
                 })
-
-            print("🔥 GET PORTFOLIO:", result)
 
             return result
 
@@ -55,7 +51,7 @@ def get_portfolio(request: Request):
 
 
 # =========================
-# ADD ASSET (OK + CLEAN)
+# ADD ASSET (SAFE + NORMALIZED INPUT)
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
@@ -67,7 +63,6 @@ def add_asset(request: Request, data: PortfolioRequest):
 
         with engine.begin() as conn:
 
-            # 🔥 GET USER ID
             user = conn.execute(text("""
                 SELECT id FROM users WHERE email = :email
             """), {"email": user_email}).fetchone()
@@ -75,30 +70,27 @@ def add_asset(request: Request, data: PortfolioRequest):
             if not user:
                 raise Exception("User not found")
 
-            user_id = user.id
-
-            # 🔥 INSERT (NO DUPLICATE LOGIC YET)
             conn.execute(text("""
                 INSERT INTO portfolio (
                     user_id,
-                    asset_name,
-                    category,
+                    asset,
+                    asset_type,
                     quantity,
-                    purchase_price
+                    buy_price
                 )
                 VALUES (
                     :user_id,
-                    :asset_name,
-                    :category,
+                    :asset,
+                    :asset_type,
                     :quantity,
-                    :purchase_price
+                    :buy_price
                 )
             """), {
-                "user_id": user_id,
-                "asset_name": data.asset.upper(),
-                "category": data.asset_type.upper().strip(),
+                "user_id": user.id,
+                "asset": data.asset.upper().strip(),
+                "asset_type": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
-                "purchase_price": data.buy_price
+                "buy_price": data.buy_price
             })
 
         return {"status": "asset ajouté"}
