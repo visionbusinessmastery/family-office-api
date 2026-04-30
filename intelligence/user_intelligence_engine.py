@@ -68,7 +68,7 @@ def compute_user_intelligence(user_email: str):
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO (FIXED)
+        # 3. PORTFOLIO (FIXED & SAFE)
         # =========================
         portfolio = conn.execute(text("""
             SELECT asset_name, category, quantity, purchase_price
@@ -79,24 +79,45 @@ def compute_user_intelligence(user_email: str):
         portfolio_list = []
 
         for p in portfolio:
-            value = (p.quantity or 0) * (p.purchase_price or 0)
+
+            # 🔥 SAFE VALUE CALC (anti-bug)
+            qty = float(p.quantity or 0)
+            price = float(p.purchase_price or 0)
+
+            value = qty * price
 
             portfolio_list.append({
                 "asset_name": p.asset_name,
-                "type": (p.category or "").lower(),  # 🔥 CRITIQUE pour le scoring
+                "type": (p.category or "").lower(),
                 "value": float(value)
             })
 
-        # 🔥 DEBUG (ultra important)
+        # 🔥 DEBUG PORTFOLIO
         print("🔥 PORTFOLIO DEBUG:", portfolio_list)
 
     # =========================
     # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
-    score = score_result.get("score", 0)
+
+    # 🔥 SAFE SCORE EXTRACTION (IMPORTANT FIX)
+    if isinstance(score_result, dict) and "score" in score_result:
+
+        # CAS 1: {"score": 62}
+        if isinstance(score_result["score"], (int, float)):
+            score = score_result["score"]
+
+        # CAS 2: {"score": {"score": 62}}
+        elif isinstance(score_result["score"], dict):
+            score = score_result["score"].get("score", 0)
+
+        else:
+            score = 0
+    else:
+        score = 0
 
     print("🔥 SCORE DEBUG:", score_result)
+    print("🔥 FINAL SCORE:", score)
 
     # =========================
     # 5. LEVEL
@@ -120,7 +141,11 @@ def compute_user_intelligence(user_email: str):
     return {
         "user": user.email,
         "plan": user.plan,
-        "score": score_result,
+        "score": {
+            "score": score,
+            "details": score_result.get("details", {}),
+            "advice": score_result.get("advice", [])
+        },
         "level": level,
         "upgrade": upgrade,
         "features": features,
