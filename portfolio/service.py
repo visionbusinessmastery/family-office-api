@@ -1,12 +1,15 @@
 from sqlalchemy import text
 from database import engine
-from stocks.service import get_stock_data, resolve_ticker  # 🔥 ajout
+from stocks.service import get_stock_data, resolve_ticker
 import requests
 import time
 
-# CACHE
+# =========================
+# CACHE PRICES
+# =========================
 cache = {}
 CACHE_DURATION = 900
+
 
 def get_cached(url):
     if url in cache and time.time() - cache[url]["time"] < CACHE_DURATION:
@@ -25,11 +28,43 @@ def get_cached(url):
         return None
 
 
+# =========================
+# 🔥 NORMALIZER (ANTI DOUBLONS)
+# =========================
+def normalize_portfolio(rows):
+    """
+    Merge assets by (asset + type)
+    """
+    merged = {}
+
+    for r in rows:
+        key = (r.asset, r.asset_type)
+
+        if key not in merged:
+            merged[key] = {
+                "asset": r.asset,
+                "asset_type": r.asset_type,
+                "quantity": 0,
+                "buy_price_total": 0,
+                "count": 0
+            }
+
+        merged[key]["quantity"] += float(r.quantity or 0)
+        merged[key]["buy_price_total"] += float(r.buy_price or 0)
+        merged[key]["count"] += 1
+
+    return merged.values()
+
+
+# =========================
+# MAIN PORTFOLIO SERVICE
+# =========================
 def get_user_portfolio(user_email):
+
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT asset, asset_type, quantity, buy_price
-            FROM portfolios
+            FROM portfolio
             WHERE user_email=:email
         """), {"email": user_email}).fetchall()
 
@@ -37,33 +72,25 @@ def get_user_portfolio(user_email):
     total_value = 0
     total_cost = 0
 
-    for r in rows:
-        asset, asset_type, quantity, buy_price = r
+    # 🔥 NORMALIZE FIRST
+    normalized_rows = normalize_portfolio(rows)
 
-        # =========================
-        # 🔥 NORMALISATION TICKER
-        # =========================
+    for r in normalized_rows:
+
+        asset = r["asset"]
+        asset_type = r["asset_type"]
+        quantity = r["quantity"]
+
         ticker = resolve_ticker(asset)
-
-        # =========================
-        # 🔥 PRIX LIVE
-        # =========================
         stock_data = get_stock_data(ticker)
 
-        current_price = None
+        current_price = stock_data.get("price") if stock_data else None
 
-        if stock_data and isinstance(stock_data, dict):
-            current_price = stock_data.get("price")
-
-        # fallback sécurité
         if not current_price:
-            current_price = buy_price
+            current_price = r["buy_price_total"] / max(r["count"], 1)
 
-        # =========================
-        # CALCULS
-        # =========================
         value = quantity * current_price
-        cost = quantity * buy_price
+        cost = r["buy_price_total"]
         gain = value - cost
 
         gain_percent = (gain / cost * 100) if cost > 0 else 0
@@ -73,15 +100,15 @@ def get_user_portfolio(user_email):
 
         portfolio.append({
             "asset": asset,
-            "ticker": ticker,  # 🔥 AJOUT IMPORTANT UX
-            "type": asset_type,
+            "ticker": ticker,
+            "type": asset_type.lower(),
             "quantity": quantity,
-            "buy_price": buy_price,
+            "buy_price": round(cost / max(r["count"], 1), 2),
             "current_price": current_price,
-            "value": value,
-            "gain": gain,
+            "value": round(value, 2),
+            "gain": round(gain, 2),
             "gain_percent": round(gain_percent, 2),
-            "source": stock_data.get("source") if stock_data and isinstance(stock_data, dict) else "N/A"
+            "source": stock_data.get("source") if stock_data else "N/A"
         })
 
     return {
