@@ -68,35 +68,35 @@ def compute_user_intelligence(user_email: str):
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO (SAFE DB STRUCTURE)
+        # 3. PORTFOLIO (FIXED)
         # =========================
-        try:
-            portfolio = conn.execute(text("""
-                SELECT asset_name, category, quantity, purchase_price
-                FROM portfolio
-                WHERE user_id = :user_id
-            """), {"user_id": user.id}).fetchall()
+        portfolio = conn.execute(text("""
+            SELECT asset_name, category, quantity, purchase_price
+            FROM portfolio
+            WHERE user_id = :user_id
+        """), {"user_id": user.id}).fetchall()
 
-            portfolio_list = []
+        portfolio_list = []
 
-            for p in portfolio:
-                value = (p.quantity or 0) * (p.purchase_price or 0)
+        for p in portfolio:
+            value = (p.quantity or 0) * (p.purchase_price or 0)
 
-                portfolio_list.append({
-                    "asset_name": p.asset_name,
-                    "type": p.category,
-                    "value": float(value)
-                })
+            portfolio_list.append({
+                "asset_name": p.asset_name,
+                "type": (p.category or "").lower(),  # 🔥 CRITIQUE pour le scoring
+                "value": float(value)
+            })
 
-        except Exception as e:
-            print("PORTFOLIO ERROR:", e)
-            portfolio_list = []
+        # 🔥 DEBUG (ultra important)
+        print("🔥 PORTFOLIO DEBUG:", portfolio_list)
 
     # =========================
     # 4. SCORE
     # =========================
     score_result = compute_family_office_score(profile_dict, portfolio_list)
     score = score_result.get("score", 0)
+
+    print("🔥 SCORE DEBUG:", score_result)
 
     # =========================
     # 5. LEVEL
