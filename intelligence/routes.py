@@ -178,10 +178,8 @@ def user_intelligence(request: Request):
 
         result = compute_user_intelligence(user_email)
 
-        return {
-            "user": user_email,
-            "intelligence": result
-        }
+        # ✅ FIX CRITIQUE → PAS DE NESTING
+        return result
 
     return safe_execute(_engine, module_name="USER_INTELLIGENCE")
 
