@@ -53,5 +53,3 @@ def advisor_logic(user_email, message):
         "intelligence": intelligence,
         "advice": response.choices[0].message.content
     }
-        return {"error": str(e)}
-
