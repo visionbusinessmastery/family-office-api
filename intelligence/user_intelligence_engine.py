@@ -151,3 +151,10 @@ def compute_user_intelligence(user_email: str):
         "features": features,
         "opportunities": opportunities
     }
+
+
+# =========================
+# PUBLIC ALIAS (COMPAT ADVISOR)
+# =========================
+def get_user_intelligence(user_email: str):
+    return compute_user_intelligence(user_email)
