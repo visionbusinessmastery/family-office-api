@@ -52,7 +52,7 @@ def get_portfolio(request: Request):
 
 
 # =========================
-# ADD ASSET (FIXED SCHEMA)
+# ADD ASSET (UPSERT + NO DUPLICATES)
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
@@ -71,7 +71,7 @@ def add_asset(request: Request, data: PortfolioRequest):
             if not user:
                 raise Exception("User not found")
 
-            # ✅ VERSION COHERENTE AVEC GET
+            # 🔥 UPSERT (NO DUPLICATES)
             conn.execute(text("""
                 INSERT INTO portfolio (
                     user_id,
@@ -87,6 +87,10 @@ def add_asset(request: Request, data: PortfolioRequest):
                     :quantity,
                     :purchase_price
                 )
+                ON CONFLICT (user_id, asset_name, category)
+                DO UPDATE SET
+                    quantity = portfolio.quantity + EXCLUDED.quantity,
+                    purchase_price = EXCLUDED.purchase_price
             """), {
                 "user_id": user.id,
                 "asset_name": data.asset.upper().strip(),
@@ -95,6 +99,6 @@ def add_asset(request: Request, data: PortfolioRequest):
                 "purchase_price": data.buy_price
             })
 
-        return {"status": "asset ajouté"}
+        return {"status": "asset ajouté ou mis à jour"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
