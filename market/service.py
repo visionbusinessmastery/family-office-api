@@ -6,6 +6,8 @@ from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
 import xml.etree.ElementTree as ET  # 🔥 ajout
 
+from data_engine.market import get_news
+
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
