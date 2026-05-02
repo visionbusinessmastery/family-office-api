@@ -1,23 +1,9 @@
-import os
-import json
-from openai import OpenAI
-
 from business.service import get_business_intelligence
 from portfolio.service import get_user_portfolio
 from market.service import get_market
-
-# ⚠️ fonctions manquantes protégées
-try:
-    from intelligence.service import get_user_intelligence
-except:
-    def get_user_intelligence(user_email):
-        return {}
-
-try:
-    from business.service import get_business_opportunities
-except:
-    def get_business_opportunities(user_email):
-        return {}
+from openai import OpenAI
+import os
+import json
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -25,21 +11,29 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # =========================
 # CORE ADVISOR ENGINE
 # =========================
-def advisor_logic(user_email, message, mode="free"):
+def advisor_logic(user_email: str, message: str, mode: str = "free"):
 
-    intelligence = get_user_intelligence(user_email)
+    # 1. DATA LAYER (stable sources)
+    intelligence = get_business_intelligence(user_email)
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
 
-    business = None
-    if mode in ["premium", "elite"]:
-        business = get_business_opportunities(user_email)
+    # ELITE ONLY ADDITION (placeholder safe)
+    business_opportunities = intelligence.get("opportunities", {}) if isinstance(intelligence, dict) else {}
 
+    # 2. MODE CONFIG
+    if mode == "free":
+        context_limit = "basic"
+    elif mode == "premium":
+        context_limit = "extended"
+    else:
+        context_limit = "full institutional"
+
+    # 3. PROMPT ENGINE
     prompt = f"""
 Tu es un conseiller financier IA de niveau institutionnel.
 
-=== MODE ===
-{mode.upper()}
+MODE ACTUEL : {mode.upper()} ({context_limit})
 
 === INTELLIGENCE UTILISATEUR ===
 {json.dumps(intelligence, indent=2)}
@@ -49,20 +43,18 @@ Tu es un conseiller financier IA de niveau institutionnel.
 
 === MARCHÉ ===
 {market}
-"""
 
-    if business:
-        prompt += f"\n=== OPPORTUNITÉS BUSINESS ===\n{business}\n"
+=== OPPORTUNITÉS BUSINESS ===
+{json.dumps(business_opportunities, indent=2)}
 
-    prompt += f"""
 === DEMANDE UTILISATEUR ===
 {message}
 
-Donne une réponse :
-- stratégique
-- actionnable
-- allocation claire
-- décisions concrètes
+INSTRUCTIONS :
+- donne une stratégie claire
+- propose allocation si pertinent
+- sois actionnable immédiatement
+- adapte le niveau de profondeur au mode
 """
 
     response = client.chat.completions.create(
@@ -78,9 +70,8 @@ Donne une réponse :
 
 
 # =========================
-# LEVELS (FREE / PREMIUM / ELITE)
+# TIERS LOGIC
 # =========================
-
 def get_advisor_free(user_email, message):
     return advisor_logic(user_email, message, mode="free")
 
