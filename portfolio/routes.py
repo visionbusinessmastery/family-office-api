@@ -7,7 +7,6 @@ from database import engine
 
 router = APIRouter()
 
-
 # =========================
 # GET PORTFOLIO
 # =========================
@@ -16,7 +15,6 @@ router = APIRouter()
 def get_portfolio(request: Request):
 
     def _get():
-
         user_email = request.state.user_email
 
         with engine.begin() as conn:
@@ -38,7 +36,7 @@ def get_portfolio(request: Request):
 
             for r in rows:
                 result.append({
-                    "id": r.id,  # 🔥 IMPORTANT
+                    "id": r.id,
                     "asset_name": r.asset_name,
                     "asset_type": r.category,
                     "quantity": float(r.quantity or 0),
@@ -54,12 +52,11 @@ def get_portfolio(request: Request):
 # =========================
 # ADD ASSET
 # =========================
-@router.post("/portfolio/add")
+@router.post("/")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):
 
     def _add():
-
         user_email = request.state.user_email
 
         with engine.begin() as conn:
@@ -99,16 +96,14 @@ def add_asset(request: Request, data: PortfolioRequest):
     return safe_execute(_add, module_name="PORTFOLIO")
 
 
-
 # =========================
 # UPDATE ASSET
 # =========================
-@router.put("/portfolio/{asset_id}")
+@router.put("/{asset_id}")
 @limiter.limit("10/minute")
 def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
 
     def _update():
-
         user_email = request.state.user_email
 
         with engine.begin() as conn:
@@ -132,10 +127,10 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
             """), {
                 "asset_id": asset_id,
                 "user_id": user.id,
-                "asset_name": data.asset.upper().strip(),
+                "asset_name": data.asset_name.upper().strip(),
                 "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
-                "purchase_price": data.buy_price
+                "purchase_price": data.purchase_price
             })
 
             if result.rowcount == 0:
@@ -146,16 +141,14 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
     return safe_execute(_update, module_name="PORTFOLIO")
 
 
-
 # =========================
 # DELETE ASSET
 # =========================
-@router.delete("/portfolio/{asset_id}")
+@router.delete("/{asset_id}")
 @limiter.limit("10/minute")
 def delete_asset(request: Request, asset_id: int):
 
     def _delete():
-
         user_email = request.state.user_email
 
         with engine.begin() as conn:
@@ -167,7 +160,6 @@ def delete_asset(request: Request, asset_id: int):
             if not user:
                 raise Exception("User not found")
 
-            # 🔥 DELETE SAFE (user-scoped)
             result = conn.execute(text("""
                 DELETE FROM portfolio
                 WHERE id = :asset_id AND user_id = :user_id
