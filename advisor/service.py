@@ -1,47 +1,69 @@
+import os
+import json
+from openai import OpenAI
+
 from business.service import get_business_intelligence
 from portfolio.service import get_user_portfolio
 from market.service import get_market
-from openai import OpenAI
-import os
-import json
+
+# ⚠️ fonctions manquantes protégées
+try:
+    from intelligence.service import get_user_intelligence
+except:
+    def get_user_intelligence(user_email):
+        return {}
+
+try:
+    from business.service import get_business_opportunities
+except:
+    def get_business_opportunities(user_email):
+        return {}
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# =========================
-# ADVISOR = ORCHESTRATOR ONLY
-# =========================
-def advisor_logic(user_email, message):
 
-    # 1. SINGLE SOURCE OF TRUTH
+# =========================
+# CORE ADVISOR ENGINE
+# =========================
+def advisor_logic(user_email, message, mode="free"):
+
     intelligence = get_user_intelligence(user_email)
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
-    business = get_business_opportunities(user_email)
 
-    # 2. CLEAN PROMPT
+    business = None
+    if mode in ["premium", "elite"]:
+        business = get_business_opportunities(user_email)
+
     prompt = f"""
-    Tu es un conseiller financier IA de niveau institutionnel.
+Tu es un conseiller financier IA de niveau institutionnel.
 
-    === INTELLIGENCE UTILISATEUR ===
-    {json.dumps(intelligence, indent=2)}
+=== MODE ===
+{mode.upper()}
 
-    === PORTFOLIO ===
-    {portfolio}
+=== INTELLIGENCE UTILISATEUR ===
+{json.dumps(intelligence, indent=2)}
 
-    === MARCHÉ ===
-    {market}
+=== PORTFOLIO ===
+{portfolio}
 
-    === OPPORTUNITÉS BUSINESS ===
-    {business}
+=== MARCHÉ ===
+{market}
+"""
 
-    === DEMANDE UTILISATEUR ===
-    {message}
+    if business:
+        prompt += f"\n=== OPPORTUNITÉS BUSINESS ===\n{business}\n"
 
-    Donne une réponse :
-    - stratégique
-    - actionnable
-    - orientée allocation + décisions concrètes
-    """
+    prompt += f"""
+=== DEMANDE UTILISATEUR ===
+{message}
+
+Donne une réponse :
+- stratégique
+- actionnable
+- allocation claire
+- décisions concrètes
+"""
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -49,22 +71,23 @@ def advisor_logic(user_email, message):
     )
 
     return {
+        "mode": mode,
         "intelligence": intelligence,
         "advice": response.choices[0].message.content
     }
 
 
+# =========================
+# LEVELS (FREE / PREMIUM / ELITE)
+# =========================
 
 def get_advisor_free(user_email, message):
-    # version simple (pas de market / business intelligence)
-    return advisor_logic(user_email, message)
+    return advisor_logic(user_email, message, mode="free")
 
 
 def get_advisor_premium(user_email, message):
-    # version enrichie (market + portfolio)
-    return advisor_logic(user_email, message)
+    return advisor_logic(user_email, message, mode="premium")
 
 
 def get_advisor_elite(user_email, message):
-    # version full (tout activé)
-    return advisor_logic(user_email, message)
+    return advisor_logic(user_email, message, mode="elite")
