@@ -1,5 +1,4 @@
-
-from business.service import get_business_opportunities
+from business.service import get_business_intelligence
 from portfolio.service import get_user_portfolio
 from market.service import get_market
 from openai import OpenAI
