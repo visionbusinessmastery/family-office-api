@@ -10,7 +10,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
     total_assets = savings + investments
 
     # =========================
-    # WEALTH
+    # WEALTH SCORE
     # =========================
     if total_assets >= 100000:
         wealth = 90
@@ -26,7 +26,11 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
     # =========================
     # DIVERSIFICATION
     # =========================
-    asset_types = {a.get("type") for a in (portfolio or []) if a}
+    asset_types = set()
+
+    for asset in portfolio or []:
+        if asset.get("type"):
+            asset_types.add(asset["type"])
 
     diversification = min(len(asset_types) * 25, 100)
 
@@ -36,16 +40,19 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
     crypto = sum(a.get("value", 0) for a in portfolio if a.get("type") == "crypto")
     total_value = sum(a.get("value", 0) for a in portfolio)
 
-    crypto_ratio = crypto / total_value if total_value else 0
+    crypto_ratio = crypto / total_value if total_value > 0 else 0
 
     risk_score = 100
-    if risk_profile == "low":
-        if crypto_ratio > 0.2:
-            risk_score = 40
-    elif risk_profile == "medium":
-        if crypto_ratio > 0.4:
-            risk_score = 60
 
+    if risk_profile == "low":
+        risk_score = 40 if crypto_ratio > 0.2 else 60 if crypto_ratio > 0.1 else 80
+
+    elif risk_profile == "medium":
+        risk_score = 40 if crypto_ratio > 0.6 else 60 if crypto_ratio > 0.4 else 80
+
+    # =========================
+    # ACTIVITY
+    # =========================
     activity = 100 if profile else 30
 
     # =========================
@@ -62,13 +69,13 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         )
 
     # =========================
-    # GLOBAL SCORE
+    # FINAL SCORE
     # =========================
     score = int(
         (wealth * 0.25) +
-        (diversification * 0.2) +
-        (risk_score * 0.2) +
-        (activity * 0.1) +
+        (diversification * 0.20) +
+        (risk_score * 0.20) +
+        (activity * 0.10) +
         (financial_score * 0.25)
     )
 
@@ -77,14 +84,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
     # =========================
     # LEVEL
     # =========================
-    if score >= 85:
-        level = "ELITE"
-    elif score >= 70:
-        level = "ADVANCED"
-    elif score >= 50:
-        level = "INTERMEDIATE"
-    else:
-        level = "BEGINNER"
+    level = "ELITE" if score >= 85 else "ADVANCED" if score >= 70 else "INTERMEDIATE" if score >= 50 else "BEGINNER"
 
     # =========================
     # ADVICE
@@ -93,8 +93,10 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
 
     if diversification < 50:
         advice.append("Diversifie tes actifs")
+
     if financial and financial.get("debt_risk_score", 0) > 60:
-        advice.append("Réduis ton endettement")
+        advice.append("Réduis ton niveau d'endettement")
+
     if financial and financial.get("cashflow_score", 0) < 0:
         advice.append("Améliore ton cashflow")
 
@@ -105,8 +107,8 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             "wealth": wealth,
             "diversification": diversification,
             "risk": risk_score,
-            "financial_score": financial_score,
-            "crypto_ratio": round(crypto_ratio, 3)
+            "activity": activity,
+            "financial": financial_score
         },
         "advice": advice
     }
