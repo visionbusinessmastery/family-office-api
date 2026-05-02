@@ -1,64 +1,77 @@
+from openai import OpenAI
 import os
 import json
-from openai import OpenAI
 
+from business.service import get_business_intelligence
 from portfolio.service import get_user_portfolio
 from market.service import get_market
-from business.service import get_business_intelligence
-from advisor.engine import detect_risk, detect_goal, extract_budget, build_allocation
+
+from advisor.engine import (
+    detect_risk,
+    extract_budget
+)
+
+from advisor.portfolio_ai import (
+    score_portfolio,
+    generate_actions,
+    optimal_allocation
+)
+
+from advisor.autopilot import autopilot_engine
+from advisor.engine import detect_risk, extract_budget
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-# =========================
-# CORE ENGINE (REUSABLE)
-# =========================
-def advisor_core(user_email: str, message: str, level: str):
-
-    budget = extract_budget(message)
-    risk = detect_risk(message)
-    goal = detect_goal(message)
-    allocation = build_allocation(budget, risk)
+def portfolio_manager(user_email: str, message: str, level="free"):
 
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
-    business = get_business_intelligence(user_email)
+    intelligence = get_business_intelligence(user_email)
 
+    budget = extract_budget(message)
+    risk = detect_risk(message)
+
+    # =========================
+    # 1. SCORING ENGINE
+    # =========================
+    score = score_portfolio(portfolio, market)
+
+    # =========================
+    # 2. ACTION ENGINE
+    # =========================
+    actions = generate_actions(score)
+
+    # =========================
+    # 3. TARGET ALLOCATION
+    # =========================
+    allocation = optimal_allocation(risk)
+
+    # =========================
+    # 4. AI STRATEGY LAYER
+    # =========================
     prompt = f"""
-Tu es un AI advisor de type hedge fund.
+    Tu es un Portfolio Manager quant institutionnel.
 
-LEVEL: {level}
+    SCORE PORTFOLIO:
+    {json.dumps(score, indent=2)}
 
-USER MESSAGE:
-{message}
+    ACTIONS:
+    {actions}
 
-BUDGET:
-{budget}
+    ALLOCATION CIBLE:
+    {json.dumps(allocation, indent=2)}
 
-RISK:
-{risk}
+    USER MESSAGE:
+    {message}
 
-GOAL:
-{goal}
-
-ALLOCATION SUGGÉRÉE:
-{json.dumps(allocation, indent=2)}
-
-PORTFOLIO:
-{portfolio}
-
-MARKET:
-{market}
-
-BUSINESS OPPORTUNITIES:
-{business}
-
-INSTRUCTIONS:
-- Donne une stratégie claire
-- Donne allocation concrète
-- Donne 3 actions immédiates
-- Optimise rendement vs risque
-"""
+    Donne :
+    - analyse portefeuille
+    - risques majeurs
+    - plan d'action
+    - recommandation précise
+    """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -66,26 +79,25 @@ INSTRUCTIONS:
     )
 
     return {
-        "level": level,
-        "budget": budget,
-        "risk": risk,
-        "goal": goal,
+        "score": score,
+        "actions": actions,
         "allocation": allocation,
         "advice": response.choices[0].message.content
     }
 
 
-# =========================
-# TIERS (IMPORTANT POUR STRIPE)
-# =========================
+def portfolio_autopilot(user_email, message):
 
-def get_advisor_free(user_email, message):
-    return advisor_core(user_email, message, level="FREE")
+    portfolio = get_user_portfolio(user_email)
+    market = get_market("global")
 
+    risk = detect_risk(message)
 
-def get_advisor_premium(user_email, message):
-    return advisor_core(user_email, message, level="PREMIUM")
+    system = autopilot_engine(
+        user_email,
+        portfolio,
+        market,
+        risk
+    )
 
-
-def get_advisor_elite(user_email, message):
-    return advisor_core(user_email, message, level="ELITE")
+    return system
