@@ -1,107 +1,55 @@
 import re
 
 
-# =========================
-# BUDGET EXTRACTION (robuste)
-# =========================
 def extract_budget(message: str):
-    message = message.lower().replace(" ", "")
-
-    # cas 10k / 10K
-    match_k = re.search(r"(\d+)[kK]", message)
-    if match_k:
-        return float(match_k.group(1)) * 1000
-
-    # cas 10 000 / 10000
-    match = re.search(r"(\d{3,})", message)
-    if match:
-        return float(match.group(1))
-
-    return 1000  # fallback
+    match = re.search(r'(\d+)', message.replace(",", ""))
+    return float(match.group(1)) if match else 1000
 
 
-# =========================
-# RISK DETECTION (amélioré)
-# =========================
 def detect_risk(message: str):
     message = message.lower()
 
-    high_risk_keywords = [
-        "agressif", "risqué", "risque", "high risk",
-        "leveraged", "levier", "speculatif"
-    ]
-
-    low_risk_keywords = [
-        "safe", "sécur", "sécurisé", "low risk",
-        "stable", "sécurité", "sans risque"
-    ]
-
-    if any(word in message for word in high_risk_keywords):
-        return "high"
-
-    if any(word in message for word in low_risk_keywords):
+    if any(x in message for x in ["safe", "sécur", "prudence"]):
         return "low"
-
+    if any(x in message for x in ["agressif", "risqué", "risk"]):
+        return "high"
     return "medium"
 
 
-# =========================
-# GOAL DETECTION
-# =========================
 def detect_goal(message: str):
     message = message.lower()
 
-    if any(w in message for w in ["revenu", "income", "cashflow", "cash flow"]):
+    if "revenu" in message:
         return "income"
-
-    if any(w in message for w in ["rapide", "short", "quick", "court terme"]):
+    if "rapide" in message:
         return "short_term"
-
-    if any(w in message for w in ["long", "patrimoine", "wealth", "build"]):
-        return "long_term"
-
     return "long_term"
 
 
-# =========================
-# ALLOCATION ENGINE
-# =========================
-def build_allocation(budget, risk):
+def build_allocation(risk: str):
 
-    base = {
-        "real_estate": 25,
-        "stocks": 30,
-        "crypto": 15,
-        "business": 20,
-        "crowdfunding": 10
-    }
-
-    if risk == "low":
-        base = {
+    allocations = {
+        "low": {
             "real_estate": 40,
-            "stocks": 35,
+            "stocks": 30,
             "crypto": 5,
             "business": 15,
-            "crowdfunding": 5
-        }
-
-    elif risk == "high":
-        base = {
+            "crowdfunding": 10
+        },
+        "medium": {
+            "real_estate": 25,
+            "stocks": 30,
+            "crypto": 15,
+            "business": 20,
+            "crowdfunding": 10
+        },
+        "high": {
             "real_estate": 10,
-            "stocks": 25,
-            "crypto": 35,
+            "stocks": 30,
+            "crypto": 30,
             "business": 20,
             "crowdfunding": 10
         }
-
-    # convert % → money allocation
-    allocation = {
-        k: round(budget * v / 100, 2)
-        for k, v in base.items()
     }
 
-    return {
-        "percent": base,
-        "allocation": allocation,
-        "total": budget
-    }
+    return allocations[risk]
