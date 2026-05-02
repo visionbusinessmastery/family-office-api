@@ -101,6 +101,53 @@ def add_asset(request: Request, data: PortfolioRequest):
 
 
 # =========================
+# UPDATE ASSET
+# =========================
+@router.put("/portfolio/{asset_id}")
+@limiter.limit("10/minute")
+def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
+
+    def _update():
+
+        user_email = request.state.user_email
+
+        with engine.begin() as conn:
+
+            user = conn.execute(text("""
+                SELECT id FROM users WHERE email = :email
+            """), {"email": user_email}).fetchone()
+
+            if not user:
+                raise Exception("User not found")
+
+            result = conn.execute(text("""
+                UPDATE portfolio
+                SET
+                    asset_name = :asset_name,
+                    category = :category,
+                    quantity = :quantity,
+                    purchase_price = :purchase_price
+                WHERE id = :asset_id
+                AND user_id = :user_id
+            """), {
+                "asset_id": asset_id,
+                "user_id": user.id,
+                "asset_name": data.asset.upper().strip(),
+                "category": data.asset_type.upper().strip(),
+                "quantity": data.quantity,
+                "purchase_price": data.buy_price
+            })
+
+            if result.rowcount == 0:
+                raise Exception("Asset not found")
+
+        return {"status": "updated", "id": asset_id}
+
+    return safe_execute(_update, module_name="PORTFOLIO")
+
+
+
+# =========================
 # DELETE ASSET
 # =========================
 @router.delete("/portfolio/{asset_id}")
