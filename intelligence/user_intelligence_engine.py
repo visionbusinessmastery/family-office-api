@@ -20,6 +20,16 @@ def get_user_intelligence(user_email: str):
 
 
 # =========================
+# SAFE HELPERS
+# =========================
+def safe_get(obj, key, default=0):
+    try:
+        return obj.get(key, default) if isinstance(obj, dict) else default
+    except:
+        return default
+
+
+# =========================
 # MAIN ENGINE
 # =========================
 def compute_user_intelligence(user_email: str):
@@ -81,29 +91,31 @@ def compute_user_intelligence(user_email: str):
             qty = float(p.quantity or 0)
             price = float(p.purchase_price or 0)
 
-            value = qty * price
-
             portfolio_list.append({
                 "asset_name": p.asset_name,
                 "type": (p.category or "").lower(),
-                "value": float(value)
+                "value": qty * price
             })
 
         # =========================
         # 4. FINANCIAL DATA (SAFE)
         # =========================
-        financial = get_user_financial_overview(user.id)
+        financial = get_user_financial_overview(user.id) or {}
 
         financial_features = None
 
-        if financial and "totals" in financial:
+        totals = financial.get("totals", {})
 
-            income = financial["totals"].get("monthly_income", 0)
-            debt = financial["totals"].get("total_debt", 0)
-            savings = financial["totals"].get("total_savings", 0)
-            cashflow = financial["totals"].get("net_cashflow", 0)
+        if totals:
 
-            cashflow_score = max(min((cashflow / (income + 1)) * 100, 100), -100)
+            income = safe_get(totals, "monthly_income", 0)
+            debt = safe_get(totals, "total_debt", 0)
+            savings = safe_get(totals, "total_savings", 0)
+            cashflow = safe_get(totals, "net_cashflow", 0)
+
+            cashflow_score = (cashflow / (income + 1)) * 100
+            cashflow_score = max(min(cashflow_score, 100), -100)
+
             debt_risk_score = min((debt / (savings + 1)) * 100, 100)
             savings_velocity = (savings / (income + 1)) * 100
 
@@ -116,7 +128,7 @@ def compute_user_intelligence(user_email: str):
                 "debt_risk_score": round(debt_risk_score, 2),
                 "savings_velocity_score": round(savings_velocity, 2),
                 "income_stability_score": round(income_stability_score, 2),
-                "raw": financial["totals"]
+                "raw": totals
             }
 
         # =========================
@@ -126,14 +138,17 @@ def compute_user_intelligence(user_email: str):
             profile_dict,
             portfolio_list,
             financial_features
-        )
+        ) or {}
 
-        # SAFE SCORE EXTRACTION
-        score = 0
-        if isinstance(score_result, dict):
-            score = score_result.get("score", 0)
-            if isinstance(score, dict):
-                score = score.get("score", 0)
+        # =========================
+        # SAFE SCORE EXTRACTION (FIXED)
+        # =========================
+        score = safe_get(score_result, "score", 0)
+
+        if isinstance(score, dict):
+            score = safe_get(score, "score", 0)
+
+        score = int(score or 0)
 
         # =========================
         # 6. LEVEL
