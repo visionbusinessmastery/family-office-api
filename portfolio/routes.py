@@ -1,9 +1,14 @@
+# =========================
+# IMPORTS
+# =========================
 from core.limiter import limiter
 from core.utils import safe_execute
 from fastapi import APIRouter, Request
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
+
+from .service import save_portfolio_snapshot
 
 router = APIRouter()
 
@@ -90,7 +95,9 @@ def add_asset(request: Request, data: PortfolioRequest):
                 "quantity": data.quantity,
                 "purchase_price": data.purchase_price
             })
-
+            
+            save_portfolio_snapshot(user.id)
+        
         return {"status": "asset ajouté"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
@@ -136,6 +143,8 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
             if result.rowcount == 0:
                 raise Exception("Asset not found")
 
+            save_portfolio_snapshot(user.id)
+
         return {"status": "updated", "id": asset_id}
 
     return safe_execute(_update, module_name="PORTFOLIO")
@@ -171,6 +180,8 @@ def delete_asset(request: Request, asset_id: int):
             if result.rowcount == 0:
                 raise Exception("Asset not found or not owned by user")
 
+            save_portfolio_snapshot(user.id)
+
         return {"status": "deleted", "id": asset_id}
 
     return safe_execute(_delete, module_name="PORTFOLIO")
@@ -179,25 +190,28 @@ def delete_asset(request: Request, asset_id: int):
 # =========================
 # PORTFOLIO HISTORY
 # =========================
-@router.get("/portfolio/history")
+@router.get("/history")
 def portfolio_history(request: Request):
 
     user_email = request.state.user_email
 
     with engine.begin() as conn:
+        user = conn.execute(text("""
+            SELECT id FROM users WHERE email = :email
+        """), {"email": user_email}).fetchone()
+
         rows = conn.execute(text("""
             SELECT total_value, created_at
-            FROM portfolio_history ph
-            JOIN users u ON u.id = ph.user_id
-            WHERE u.email = :email
+            FROM portfolio_history
+            WHERE user_id = :user_id
             ORDER BY created_at ASC
-        """), {"email": user_email}).fetchall()
+        """), {"user_id": user.id}).fetchall()
 
     return {
         "history": [
             {
-                "date": r.created_at,
-                "value": r.total_value
+                "date": r.created_at.isoformat(),
+                "value": float(r.total_value)
             }
             for r in rows
         ]
