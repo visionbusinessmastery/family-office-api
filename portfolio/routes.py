@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 # =========================
-# GET PORTFOLIO (FIXED + CLEAN)
+# GET PORTFOLIO
 # =========================
 @router.get("/")
 @limiter.limit("10/minute")
@@ -28,9 +28,8 @@ def get_portfolio(request: Request):
             if not user:
                 raise Exception("User not found")
 
-            # ✅ VERSION CORRIGÉE SCHEMA
             rows = conn.execute(text("""
-                SELECT asset_name, category, quantity, purchase_price
+                SELECT id, asset_name, category, quantity, purchase_price
                 FROM portfolio
                 WHERE user_id = :user_id
             """), {"user_id": user.id}).fetchall()
@@ -39,20 +38,21 @@ def get_portfolio(request: Request):
 
             for r in rows:
                 result.append({
+                    "id": r.id,  # 🔥 IMPORTANT
                     "asset_name": r.asset_name,
-                    "category": r.category,
+                    "asset_type": r.category,
                     "quantity": float(r.quantity or 0),
                     "purchase_price": float(r.purchase_price or 0),
                     "value": float((r.quantity or 0) * (r.purchase_price or 0))
                 })
 
-            return result
+            return {"portfolio": result}
 
     return safe_execute(_get, module_name="PORTFOLIO")
 
 
 # =========================
-# ADD ASSET (UPSERT + NO DUPLICATES)
+# ADD ASSET
 # =========================
 @router.post("/portfolio/add")
 @limiter.limit("10/minute")
@@ -71,7 +71,6 @@ def add_asset(request: Request, data: PortfolioRequest):
             if not user:
                 raise Exception("User not found")
 
-            # 🔥 UPSERT (NO DUPLICATES)
             conn.execute(text("""
                 INSERT INTO portfolio (
                     user_id,
@@ -87,18 +86,14 @@ def add_asset(request: Request, data: PortfolioRequest):
                     :quantity,
                     :purchase_price
                 )
-                ON CONFLICT (user_id, asset_name, category)
-                DO UPDATE SET
-                    quantity = portfolio.quantity + EXCLUDED.quantity,
-                    purchase_price = EXCLUDED.purchase_price
             """), {
                 "user_id": user.id,
-                "asset_name": data.asset.upper().strip(),
+                "asset_name": data.asset_name.upper().strip(),
                 "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
-                "purchase_price": data.buy_price
+                "purchase_price": data.purchase_price
             })
 
-        return {"status": "asset ajouté ou mis à jour"}
+        return {"status": "asset ajouté"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
