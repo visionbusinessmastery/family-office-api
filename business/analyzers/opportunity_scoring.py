@@ -1,29 +1,15 @@
 def score_opportunity(item, mode):
-
     score = 0
 
-    if mode == "create":
-        score += 30
-
-    if mode == "grow":
-        score += 20
+    # base quality signals
+    score += min(item.get("market_size", 0) / 1000, 30)
+    score += min(item.get("competition_level", 10) * -2 + 20, 20)
 
     if mode == "buy":
-        score += 40
-
-    return score
-
-def global_score(return_rate, risk, duration):
-    score = 0
-
-    score += return_rate * 2
-
-    if risk == "low":
         score += 20
-    elif risk == "medium":
-        score += 10
-
-    if duration < 24:
+    elif mode == "grow":
+        score += 15
+    elif mode == "create":
         score += 10
 
     return min(score, 100)
