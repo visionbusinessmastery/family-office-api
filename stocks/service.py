@@ -122,32 +122,6 @@ def get_stock_data(query: str):
     return {"error": "Aucune donnée disponible"}
 
 
-# =========================
-# INTELLIGENCE
-# =========================
-def get_stock_intelligence(query):
-
-    symbol = query.symbol if hasattr(query, "symbol") else query
-
-    try:
-        stock = yf.Ticker(symbol)
-        info = stock.info
-
-        return {
-            "symbol": symbol,
-            "price": info.get("currentPrice"),
-            "market_cap": info.get("marketCap"),
-            "pe_ratio": info.get("trailingPE"),
-            "sector": info.get("sector"),
-            "recommendation": "buy" if (info.get("trailingPE") or 0) < 20 else "hold"
-        }
-
-    except Exception as e:
-        return {
-            "error": str(e),
-            "symbol": symbol
-        }
-
 
 # =========================
 # SEARCH (CACHE)
