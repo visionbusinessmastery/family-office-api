@@ -4,6 +4,11 @@ from core.limiter import limiter
 
 from .schemas import AdvisorRequest, AdvisorPremiumRequest
 from .service import advisor_logic
+from .service import (
+    get_advisor_free,
+    get_advisor_premium,
+    get_advisor_elite
+)
 
 router = APIRouter()
 
@@ -14,7 +19,7 @@ def advisor(request: Request, data: AdvisorRequest):
     def _advisor():
         user_email = request.state.user_email
 
-        result = advisor_logic(user_email, data.message)
+        result = get_advisor_free(user_email, data.message)
 
         return {
             "user": user_email,
@@ -42,14 +47,14 @@ def advisor_premium(request: Request, data: AdvisorPremiumRequest):
     return safe_execute(_advisor, module_name="ADVISOR_PREMIUM")
 
 
-@router.post("/advisor/auto")
+@router.post("/advisor/elite")
 @limiter.limit("10/minute")
-def advisor_auto(request: Request):
+def advisor_elite(request: Request):
 
     def _auto():
         user_email = request.state.user_email
 
-        result = get_advisor_auto(user_email)
+        result = get_advisor_elite(user_email)
 
         return {
             "user": user_email,
