@@ -1,10 +1,9 @@
 import re
 
+
 def extract_budget(message: str):
-    match = re.search(r'(\d+)', message.replace(",", "").lower())
-    if match:
-        return float(match.group(1))
-    return 1000  # fallback
+    match = re.search(r'(\d+)', message.replace(",", ""))
+    return float(match.group(1)) if match else 1000
 
 
 def detect_risk(message: str):
@@ -18,11 +17,14 @@ def detect_risk(message: str):
 
 
 def detect_goal(message: str):
+    message = message.lower()
+
     if "revenu" in message:
         return "income"
     elif "rapide" in message:
         return "short_term"
     return "long_term"
+
 
 def build_allocation(budget, risk):
 
@@ -35,7 +37,7 @@ def build_allocation(budget, risk):
             "crowdfunding": 10
         }
 
-    elif risk == "high":
+    if risk == "high":
         return {
             "real_estate": 10,
             "stocks": 30,
