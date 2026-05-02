@@ -1,5 +1,6 @@
-
-
+# =========================
+# IMPORTS
+# =========================
 from .analyzers.allocation import allocate_portfolio
 from .analyzers.ai_global import global_ai_analysis
 
@@ -7,8 +8,9 @@ from .analyzers.family_office_score import compute_family_office_score
 from sqlalchemy import text
 from database import engine
 
-
-# 🔥 NORMALISATION DU RISQUE (AJOUT)
+# =========================
+# NORMALISATION DU RISQUE
+# =========================
 def normalize_risk(risk: str):
 
     if not risk:
@@ -32,6 +34,9 @@ def normalize_risk(risk: str):
     return mapping.get(r, "modéré")
 
 
+# =========================
+# GET GLOBAL INTELLIGENCE
+# =========================
 def get_global_intelligence(query):
 
     try:
@@ -82,6 +87,126 @@ def get_global_intelligence(query):
         }
 
 
+# =========================
+# GET USER FINANCIAL OVERVIEW
+# =========================
+def get_user_financial_overview(user_id):
+
+    try:
+
+        # =========================
+        # INCOME SOURCES
+        # =========================
+        with engine.connect() as conn:
+            income_rows = conn.execute(text("""
+                SELECT name, income_type, monthly_income
+                FROM income_sources
+                WHERE user_id=:uid
+            """), {"uid": user_id}).fetchall()
+
+        income_sources = []
+        total_income = 0
+
+        for r in income_rows:
+            income_sources.append({
+                "name": r.name,
+                "type": r.income_type,
+                "monthly_income": float(r.monthly_income or 0)
+            })
+
+            total_income += float(r.monthly_income or 0)
+
+        # =========================
+        # DEBTS
+        # =========================
+        with engine.connect() as conn:
+            debt_rows = conn.execute(text("""
+                SELECT name, debt_type, remaining_amount, monthly_payment
+                FROM debts
+                WHERE user_id=:uid
+            """), {"uid": user_id}).fetchall()
+
+        debts = []
+        total_debt = 0
+        total_monthly_debt = 0
+
+        for r in debt_rows:
+            debts.append({
+                "name": r.name,
+                "type": r.debt_type,
+                "remaining_amount": float(r.remaining_amount or 0),
+                "monthly_payment": float(r.monthly_payment or 0)
+            })
+
+            total_debt += float(r.remaining_amount or 0)
+            total_monthly_debt += float(r.monthly_payment or 0)
+
+        # =========================
+        # SAVINGS
+        # =========================
+        with engine.connect() as conn:
+            savings_rows = conn.execute(text("""
+                SELECT name, bank, balance, currency
+                FROM savings_accounts
+                WHERE user_id=:uid
+            """), {"uid": user_id}).fetchall()
+
+        savings = []
+        total_savings = 0
+
+        for r in savings_rows:
+            savings.append({
+                "name": r.name,
+                "bank": r.bank,
+                "balance": float(r.balance or 0),
+                "currency": r.currency
+            })
+
+            total_savings += float(r.balance or 0)
+
+        # =========================
+        # KPI CALCULS (IMPORTANT)
+        # =========================
+        net_cashflow = total_income - total_monthly_debt
+
+        net_worth_estimate = total_savings - total_debt
+
+        savings_rate = (total_savings / total_income * 100) if total_income > 0 else 0
+
+        debt_ratio = (total_debt / (total_savings + 1)) * 100
+
+        # =========================
+        # RETURN STRUCTURE (LIKE YOUR STYLE)
+        # =========================
+        return {
+            "income_sources": income_sources,
+            "debts": debts,
+            "savings": savings,
+
+            "totals": {
+                "monthly_income": round(total_income, 2),
+                "monthly_debt_payment": round(total_monthly_debt, 2),
+                "total_debt": round(total_debt, 2),
+                "total_savings": round(total_savings, 2),
+
+                "net_cashflow": round(net_cashflow, 2),
+                "net_worth_estimate": round(net_worth_estimate, 2),
+
+                "savings_rate": round(savings_rate, 2),
+                "debt_ratio": round(debt_ratio, 2)
+            }
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
+        
+
+
+# =========================
+# GET FAMILY OFFICE SCORE
+# =========================
 def get_family_office_score(user_email):
 
     # =========================
