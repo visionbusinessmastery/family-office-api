@@ -97,3 +97,41 @@ def add_asset(request: Request, data: PortfolioRequest):
         return {"status": "asset ajouté"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
+
+
+
+# =========================
+# DELETE ASSET
+# =========================
+@router.delete("/portfolio/{asset_id}")
+@limiter.limit("10/minute")
+def delete_asset(request: Request, asset_id: int):
+
+    def _delete():
+
+        user_email = request.state.user_email
+
+        with engine.begin() as conn:
+
+            user = conn.execute(text("""
+                SELECT id FROM users WHERE email = :email
+            """), {"email": user_email}).fetchone()
+
+            if not user:
+                raise Exception("User not found")
+
+            # 🔥 DELETE SAFE (user-scoped)
+            result = conn.execute(text("""
+                DELETE FROM portfolio
+                WHERE id = :asset_id AND user_id = :user_id
+            """), {
+                "asset_id": asset_id,
+                "user_id": user.id
+            })
+
+            if result.rowcount == 0:
+                raise Exception("Asset not found or not owned by user")
+
+        return {"status": "deleted", "id": asset_id}
+
+    return safe_execute(_delete, module_name="PORTFOLIO")
