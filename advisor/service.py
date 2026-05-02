@@ -61,3 +61,18 @@ def get_advisor_auto(user_email):
     return {
         "message": "auto advisor not implemented yet"
     }
+
+
+def get_advisor_free(user_email, message):
+    # version simple (pas de market / business intelligence)
+    return advisor_logic(user_email, message)
+
+
+def get_advisor_premium(user_email, message):
+    # version enrichie (market + portfolio)
+    return advisor_logic(user_email, message)
+
+
+def get_advisor_elite(user_email, message):
+    # version full (tout activé)
+    return advisor_logic(user_email, message)
