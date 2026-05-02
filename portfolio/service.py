@@ -29,41 +29,13 @@ def get_cached(url):
 
 
 # =========================
-# 🔥 NORMALIZER (ANTI DOUBLONS)
-# =========================
-def normalize_portfolio(rows):
-    """
-    Merge assets by (asset + type)
-    """
-    merged = {}
-
-    for r in rows:
-        key = (r.asset, r.asset_type)
-
-        if key not in merged:
-            merged[key] = {
-                "asset": r.asset,
-                "asset_type": r.asset_type,
-                "quantity": 0,
-                "buy_price_total": 0,
-                "count": 0
-            }
-
-        merged[key]["quantity"] += float(r.quantity or 0)
-        merged[key]["buy_price_total"] += float(r.buy_price or 0)
-        merged[key]["count"] += 1
-
-    return merged.values()
-
-
-# =========================
 # MAIN PORTFOLIO SERVICE
 # =========================
 def get_user_portfolio(user_email):
 
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT asset, asset_type, quantity, buy_price
+            SELECT id, asset_name, category, quantity, purchase_price
             FROM portfolio
             WHERE user_email=:email
         """), {"email": user_email}).fetchall()
@@ -72,14 +44,12 @@ def get_user_portfolio(user_email):
     total_value = 0
     total_cost = 0
 
-    # 🔥 NORMALIZE FIRST
-    normalized_rows = normalize_portfolio(rows)
+    for r in rows:
 
-    for r in normalized_rows:
-
-        asset = r["asset"]
-        asset_type = r["asset_type"]
-        quantity = r["quantity"]
+        asset = r.asset_name
+        asset_type = r.category
+        quantity = float(r.quantity or 0)
+        purchase_price = float(r.purchase_price or 0)
 
         ticker = resolve_ticker(asset)
         stock_data = get_stock_data(ticker)
@@ -87,27 +57,27 @@ def get_user_portfolio(user_email):
         current_price = stock_data.get("price") if stock_data else None
 
         if not current_price:
-            current_price = r["buy_price_total"] / max(r["count"], 1)
+            current_price = purchase_price
 
         value = quantity * current_price
-        cost = r["buy_price_total"]
+        cost = quantity * purchase_price
         gain = value - cost
-
         gain_percent = (gain / cost * 100) if cost > 0 else 0
 
         total_value += value
         total_cost += cost
 
         portfolio.append({
-            "asset": asset,
-            "ticker": ticker,
-            "type": asset_type.lower(),
+            "id": r.id,  # 🔥 FIX CRUCIAL FRONTEND DELETE
+            "asset_name": asset,
+            "asset_type": asset_type,
             "quantity": quantity,
-            "buy_price": round(cost / max(r["count"], 1), 2),
+            "purchase_price": purchase_price,
             "current_price": current_price,
             "value": round(value, 2),
             "gain": round(gain, 2),
             "gain_percent": round(gain_percent, 2),
+            "ticker": ticker,
             "source": stock_data.get("source") if stock_data else "N/A"
         })
 
