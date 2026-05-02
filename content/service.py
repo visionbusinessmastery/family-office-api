@@ -1,6 +1,6 @@
 from portfolio.service import get_user_portfolio 
 from market.service import get_market
-from advisor.service import get_advisor
+from advisor.service import get_advisor_logic
 from sqlalchemy import text
 from database import engine
 
