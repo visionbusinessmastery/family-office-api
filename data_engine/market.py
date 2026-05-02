@@ -1,4 +1,4 @@
-from market.service import get_market_news, get_google_news
+from data_engine.news_service import get_market_news, get_google_news
 
 
 def get_news(query: str):
