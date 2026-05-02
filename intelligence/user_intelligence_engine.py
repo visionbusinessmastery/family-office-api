@@ -10,6 +10,15 @@ from intelligence.feature_engine import compute_feature_access
 from intelligence.opportunity_engine import compute_opportunities
 
 
+IntelligenceEngine = get_user_intelligence
+
+# =========================
+# PUBLIC CORE API (SINGLE SOURCE)
+# =========================
+def get_user_intelligence(user_email: str):
+    return compute_user_intelligence(user_email)
+
+
 # =========================
 # MAIN ENGINE
 # =========================
