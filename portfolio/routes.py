@@ -174,3 +174,31 @@ def delete_asset(request: Request, asset_id: int):
         return {"status": "deleted", "id": asset_id}
 
     return safe_execute(_delete, module_name="PORTFOLIO")
+
+
+# =========================
+# PORTFOLIO HISTORY
+# =========================
+@router.get("/portfolio/history")
+def portfolio_history(request: Request):
+
+    user_email = request.state.user_email
+
+    with engine.begin() as conn:
+        rows = conn.execute(text("""
+            SELECT total_value, created_at
+            FROM portfolio_history ph
+            JOIN users u ON u.id = ph.user_id
+            WHERE u.email = :email
+            ORDER BY created_at ASC
+        """), {"email": user_email}).fetchall()
+
+    return {
+        "history": [
+            {
+                "date": r.created_at,
+                "value": r.total_value
+            }
+            for r in rows
+        ]
+    }
