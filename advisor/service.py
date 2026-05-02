@@ -24,6 +24,72 @@ from advisor.engine import detect_risk, extract_budget
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
+# =========================
+# CORE ADVISOR ENGINE
+# =========================
+def advisor_logic(user_email, message, level="free"):
+
+    intelligence = get_user_intelligence(user_email)
+
+    portfolio = {}
+    market = {}
+    business = {}
+
+    if level in ["premium", "elite"]:
+        portfolio = get_user_portfolio(user_email)
+        market = get_market("global")
+
+    if level == "elite":
+        business = get_business_opportunities(user_email)
+
+    prompt = f"""
+    Tu es un conseiller financier IA.
+
+    === PROFIL ===
+    {json.dumps(intelligence, indent=2)}
+
+    === PORTFOLIO ===
+    {portfolio}
+
+    === MARCHÉ ===
+    {market}
+
+    === BUSINESS ===
+    {business}
+
+    === QUESTION ===
+    {message}
+
+    Donne une réponse stratégique et actionnable.
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return {
+        "level": level,
+        "advice": response.choices[0].message.content
+    }
+
+
+# =========================
+# LEVELS (IMPORTANT)
+# =========================
+
+def get_advisor_free(user_email, message):
+    return advisor_logic(user_email, message, level="free")
+
+
+def get_advisor_premium(user_email, message):
+    return advisor_logic(user_email, message, level="premium")
+
+
+def get_advisor_elite(user_email, message):
+    return advisor_logic(user_email, message, level="elite")
+    
+
 def portfolio_manager(user_email: str, message: str, level="free"):
 
     portfolio = get_user_portfolio(user_email)
