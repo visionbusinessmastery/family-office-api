@@ -1,6 +1,5 @@
 import re
 
-
 def extract_budget(message: str):
     match = re.search(r'(\d+)', message.replace(",", ""))
     return float(match.group(1)) if match else 1000
@@ -9,9 +8,9 @@ def extract_budget(message: str):
 def detect_risk(message: str):
     message = message.lower()
 
-    if any(x in message for x in ["safe", "sécur", "prudence"]):
+    if any(x in message for x in ["safe", "sécur", "prud"]):
         return "low"
-    if any(x in message for x in ["agressif", "risqué", "risk"]):
+    elif any(x in message for x in ["agressif", "risqué", "high"]):
         return "high"
     return "medium"
 
@@ -21,35 +20,37 @@ def detect_goal(message: str):
 
     if "revenu" in message:
         return "income"
-    if "rapide" in message:
+    elif "rapide" in message:
         return "short_term"
     return "long_term"
 
 
-def build_allocation(risk: str):
+def build_allocation(budget, risk):
 
-    allocations = {
-        "low": {
+    base = {
+        "real_estate": 25,
+        "stocks": 30,
+        "crypto": 15,
+        "business": 20,
+        "crowdfunding": 10
+    }
+
+    if risk == "low":
+        return {
             "real_estate": 40,
-            "stocks": 30,
+            "stocks": 35,
             "crypto": 5,
-            "business": 15,
+            "business": 10,
             "crowdfunding": 10
-        },
-        "medium": {
-            "real_estate": 25,
-            "stocks": 30,
-            "crypto": 15,
-            "business": 20,
-            "crowdfunding": 10
-        },
-        "high": {
+        }
+
+    if risk == "high":
+        return {
             "real_estate": 10,
-            "stocks": 30,
-            "crypto": 30,
+            "stocks": 25,
+            "crypto": 35,
             "business": 20,
             "crowdfunding": 10
         }
-    }
 
-    return allocations[risk]
+    return base
