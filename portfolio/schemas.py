@@ -3,36 +3,38 @@ from typing import Optional, List
 
 
 # =========================
-# REQUEST
+# REQUEST (FRONT → BACKEND)
 # =========================
 class PortfolioRequest(BaseModel):
-    asset: str
+    asset_name: str
     asset_type: str
     quantity: float = Field(gt=0)
-    buy_price: float = Field(gt=0)
+    purchase_price: float = Field(gt=0)
 
 
 # =========================
-# SINGLE ASSET RESPONSE
+# RESPONSE SINGLE ASSET (IMPORTANT FIX FRONTEND)
 # =========================
 class PortfolioAsset(BaseModel):
-    asset: str
-    ticker: Optional[str] = None
-    type: str
+    id: int  # 🔥 CRUCIAL POUR DELETE FRONTEND
+
+    asset_name: str
+    asset_type: str
 
     quantity: float
-    buy_price: float
-    current_price: float
+    purchase_price: float
 
     value: float
-    gain: float
-    gain_percent: float
+
+    ticker: Optional[str] = None
+    gain: Optional[float] = None
+    gain_percent: Optional[float] = None
 
     source: Optional[str] = None
 
 
 # =========================
-# FULL PORTFOLIO RESPONSE
+# FULL RESPONSE
 # =========================
 class PortfolioResponse(BaseModel):
     portfolio: List[PortfolioAsset]
@@ -44,7 +46,7 @@ class PortfolioResponse(BaseModel):
 
 
 # =========================
-# ANALYSIS (FUTURE AI LAYER)
+# ANALYSIS (FUTURE AI)
 # =========================
 class PortfolioAnalysis(BaseModel):
     total_value: float
