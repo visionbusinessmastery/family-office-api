@@ -52,3 +52,12 @@ def advisor_logic(user_email, message):
         "intelligence": intelligence,
         "advice": response.choices[0].message.content
     }
+
+
+def get_advisor_premium(user_email, message):
+    return advisor_logic(user_email, message)
+
+def get_advisor_auto(user_email):
+    return {
+        "message": "auto advisor not implemented yet"
+    }
