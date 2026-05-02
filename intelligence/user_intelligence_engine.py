@@ -5,13 +5,15 @@ from sqlalchemy import text
 from database import engine
 
 from intelligence.analyzers.family_office_score import compute_family_office_score
+from intelligence.analyzers.financial_overview import get_user_financial_overview
+
 from intelligence.upgrade_engine import compute_upgrade_decision
 from intelligence.feature_engine import compute_feature_access
 from intelligence.opportunity_engine import compute_opportunities
 
 
 # =========================
-# PUBLIC CORE API (SINGLE SOURCE)
+# PUBLIC API
 # =========================
 def get_user_intelligence(user_email: str):
     return compute_user_intelligence(user_email)
@@ -37,15 +39,12 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # 🛡️ STATE RECOVERY CHECK
+        # ONBOARDING CHECK
         # =========================
         if not user.profile_completed:
             return {
                 "state": "ONBOARDING_REQUIRED",
-                "score": {
-                    "score": 0,
-                    "status": "incomplete_profile"
-                },
+                "score": {"score": 0},
                 "level": "ONBOARDING",
                 "features": [],
                 "opportunities": [],
@@ -53,7 +52,7 @@ def compute_user_intelligence(user_email: str):
             }
 
         # =========================
-        # 2. PROFILE
+        # PROFILE
         # =========================
         profile = conn.execute(text("""
             SELECT *
@@ -61,21 +60,18 @@ def compute_user_intelligence(user_email: str):
             WHERE user_email = :email
         """), {"email": user_email}).fetchone()
 
-        if not profile:
-            profile_dict = {
-                "plan": user.plan,
-                "savings": 0,
-                "investments": 0,
-                "risk_profile": "medium"
-            }
-        else:
-            profile_dict = dict(profile._mapping)
+        profile_dict = dict(profile._mapping) if profile else {
+            "plan": user.plan,
+            "savings": 0,
+            "investments": 0,
+            "risk_profile": "medium"
+        }
 
         profile_dict["email"] = user.email
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO (FIXED & SAFE)
+        # PORTFOLIO
         # =========================
         portfolio = conn.execute(text("""
             SELECT asset_name, category, quantity, purchase_price
@@ -86,48 +82,52 @@ def compute_user_intelligence(user_email: str):
         portfolio_list = []
 
         for p in portfolio:
-
-            # 🔥 SAFE VALUE CALC (anti-bug)
             qty = float(p.quantity or 0)
             price = float(p.purchase_price or 0)
-
-            value = qty * price
 
             portfolio_list.append({
                 "asset_name": p.asset_name,
                 "type": (p.category or "").lower(),
-                "value": float(value)
+                "value": qty * price
             })
 
-        # 🔥 DEBUG PORTFOLIO
-        print("🔥 PORTFOLIO DEBUG:", portfolio_list)
+        # =========================
+        # FINANCIAL DATA (NEW LAYER)
+        # =========================
+        financial = get_user_financial_overview(user.id)
+
+        income = financial["totals"]["monthly_income"]
+        debt_payment = financial["totals"]["monthly_debt_payment"]
+        savings = financial["totals"]["total_savings"]
+        debt = financial["totals"]["total_debt"]
+        cashflow = financial["totals"]["net_cashflow"]
+
+        cashflow_score = max(min((cashflow / (income + 1)) * 100, 100), -100)
+        debt_risk_score = min((debt / (savings + 1)) * 100, 100)
+        savings_velocity = (savings / (income + 1)) * 100
+        income_stability_score = min(len(financial.get("income_sources", [])) * 25, 100)
+
+        financial_features = {
+            "cashflow_score": round(cashflow_score, 2),
+            "debt_risk_score": round(debt_risk_score, 2),
+            "savings_velocity_score": round(savings_velocity, 2),
+            "income_stability_score": round(income_stability_score, 2),
+            "raw": financial["totals"]
+        }
 
     # =========================
-    # 4. SCORE
+    # SCORE ENGINE (UPDATED)
     # =========================
-    score_result = compute_family_office_score(profile_dict, portfolio_list)
+    score_result = compute_family_office_score(
+        profile_dict,
+        portfolio_list,
+        financial_features
+    )
 
-    # 🔥 SAFE SCORE EXTRACTION (IMPORTANT FIX)
-    if isinstance(score_result, dict) and "score" in score_result:
-
-        # CAS 1: {"score": 62}
-        if isinstance(score_result["score"], (int, float)):
-            score = score_result["score"]
-
-        # CAS 2: {"score": {"score": 62}}
-        elif isinstance(score_result["score"], dict):
-            score = score_result["score"].get("score", 0)
-
-        else:
-            score = 0
-    else:
-        score = 0
-
-    print("🔥 SCORE DEBUG:", score_result)
-    print("🔥 FINAL SCORE:", score)
+    score = score_result.get("score", 0)
 
     # =========================
-    # 5. LEVEL
+    # LEVEL
     # =========================
     if score >= 80:
         level = "ELITE"
@@ -139,7 +139,7 @@ def compute_user_intelligence(user_email: str):
         level = "FREE"
 
     # =========================
-    # 6. ENGINE
+    # ENGINE LAYER
     # =========================
     upgrade = compute_upgrade_decision(user.plan, score)
     features = compute_feature_access(profile_dict, score_result)
@@ -151,17 +151,11 @@ def compute_user_intelligence(user_email: str):
         "score": {
             "score": score,
             "details": score_result.get("details", {}),
-            "advice": score_result.get("advice", [])
+            "advice": score_result.get("advice", []),
+            "financial": financial_features
         },
         "level": level,
         "upgrade": upgrade,
         "features": features,
         "opportunities": opportunities
     }
-
-
-# =========================
-# PUBLIC ALIAS (COMPAT ADVISOR)
-# =========================
-def get_user_intelligence(user_email: str):
-    return compute_user_intelligence(user_email)
