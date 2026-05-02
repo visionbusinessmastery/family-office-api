@@ -1,6 +1,4 @@
-from real_estate.service import get_real_estate_intelligence
-from crypto.service import get_crypto_intelligence
-from stocks.service import get_stock_intelligence
+
 
 from .analyzers.allocation import allocate_portfolio
 from .analyzers.ai_global import global_ai_analysis
