@@ -3,8 +3,7 @@ from core.utils import safe_execute
 from core.limiter import limiter
 
 from .schemas import AdvisorRequest, AdvisorPremiumRequest
-from .service import advisor_logic, get_advisor_premium, get_advisor_auto
-
+from .service import advisor_logic
 
 router = APIRouter()
 
@@ -15,7 +14,7 @@ def advisor(request: Request, data: AdvisorRequest):
     def _advisor():
         user_email = request.state.user_email
 
-        result = advisor_logic(data.message)
+        result = advisor_logic(user_email, data.message)
 
         return {
             "user": user_email,
