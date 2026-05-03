@@ -70,13 +70,19 @@ def compute_user_intelligence(user_email: str):
         profile_dict = dict(profile._mapping) if profile else {}
 
         # =========================
-        # 2.1 ONBOARDING (🔥 NEW)
+        # 2.1 ONBOARDING DATA (NEW)
         # =========================
-        onboarding_row = conn.execute(text("""
+        onboarding_data = conn.execute(text("""
             SELECT revenus_mensuels, dettes, epargne
             FROM users
             WHERE email = :email
         """), {"email": user_email}).fetchone()
+
+        onboarding_dict = {
+            "revenus": float(onboarding_data.revenus_mensuels or 0) if onboarding_data else 0,
+            "dettes": float(onboarding_data.dettes or 0) if onboarding_data else 0,
+            "epargne": float(onboarding_data.epargne or 0) if onboarding_data else 0,
+        }
 
         onboarding = dict(onboarding_row._mapping) if onboarding_row else {}
 
