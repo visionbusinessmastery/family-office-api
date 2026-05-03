@@ -9,14 +9,31 @@ from auth.utils import get_current_user
 router = APIRouter()
 
 # =========================
+# HELPER
+# =========================
+def get_user_id(conn, email):
+    user_row = conn.execute(text("""
+        SELECT id FROM users WHERE email = :email
+    """), {"email": email}).fetchone()
+
+    return user_row.id if user_row else None
+
+
+# =========================
 # POST FINANCE
 # =========================
 @router.post("/finance")
 def create_finance_item(data: dict, user=Depends(get_current_user)):
 
-    user_id = int(user)  # 🔥 FIX
+    user_email = user
 
     with engine.connect() as conn:
+
+        user_id = get_user_id(conn, user_email)
+
+        if not user_id:
+            return {"error": "User not found"}
+
         conn.execute(text("""
             INSERT INTO finance_items (user_id, type, label, amount)
             VALUES (:user_id, :type, :label, :amount)
@@ -38,9 +55,14 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
 @router.get("/finance")
 def get_finance(user=Depends(get_current_user)):
 
-    user_id = int(user)  # 🔥 FIX
+    user_email = user
 
     with engine.connect() as conn:
+
+        user_id = get_user_id(conn, user_email)
+
+        if not user_id:
+            return {"error": "User not found"}
 
         rows = conn.execute(text("""
             SELECT id, type, label, amount
@@ -79,14 +101,19 @@ def get_finance(user=Depends(get_current_user)):
 @router.put("/finance/{item_id}")
 def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 
-    user_id = int(user)  # 🔥 FIX
+    user_email = user
 
     with engine.connect() as conn:
+
+        user_id = get_user_id(conn, user_email)
+
+        if not user_id:
+            return {"error": "User not found"}
+
         conn.execute(text("""
             UPDATE finance_items
             SET label = :label,
-                amount = :amount,
-                updated_at = NOW()
+                amount = :amount
             WHERE id = :id AND user_id = :user_id
         """), {
             "id": item_id,
@@ -106,9 +133,15 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 @router.delete("/finance/{item_id}")
 def delete_finance(item_id: int, user=Depends(get_current_user)):
 
-    user_id = int(user)  # 🔥 FIX
+    user_email = user
 
     with engine.connect() as conn:
+
+        user_id = get_user_id(conn, user_email)
+
+        if not user_id:
+            return {"error": "User not found"}
+
         conn.execute(text("""
             DELETE FROM finance_items
             WHERE id = :id AND user_id = :user_id
@@ -119,5 +152,4 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
 
         conn.commit()
 
-    return {"status": "deleted"}  # 🔥 FIX
-
+    return {"status": "deleted"}
