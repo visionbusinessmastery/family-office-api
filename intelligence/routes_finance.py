@@ -1,9 +1,7 @@
 # =========================
 # IMPORT
 # =========================
-
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user 
@@ -16,12 +14,14 @@ router = APIRouter()
 @router.post("/finance")
 def create_finance_item(data: dict, user=Depends(get_current_user)):
 
+    user_id = int(user)  # 🔥 FIX
+
     with engine.connect() as conn:
         conn.execute(text("""
             INSERT INTO finance_items (user_id, type, label, amount)
             VALUES (:user_id, :type, :label, :amount)
         """), {
-            "user_id": user.id,
+            "user_id": user_id,
             "type": data["type"],
             "label": data["label"],
             "amount": data["amount"]
@@ -31,11 +31,14 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
 
     return {"status": "created"}
 
+
 # =========================
 # GET FINANCE
 # =========================
 @router.get("/finance")
 def get_finance(user=Depends(get_current_user)):
+
+    user_id = int(user)  # 🔥 FIX
 
     with engine.connect() as conn:
 
@@ -43,7 +46,7 @@ def get_finance(user=Depends(get_current_user)):
             SELECT id, type, label, amount
             FROM finance_items
             WHERE user_id = :user_id
-        """), {"user_id": user.id}).fetchall()
+        """), {"user_id": user_id}).fetchall()
 
     revenues = []
     debts = []
@@ -71,10 +74,12 @@ def get_finance(user=Depends(get_current_user)):
 
 
 # =========================
-# UP DATE FINANCE
+# UPDATE FINANCE
 # =========================
 @router.put("/finance/{item_id}")
 def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
+
+    user_id = int(user)  # 🔥 FIX
 
     with engine.connect() as conn:
         conn.execute(text("""
@@ -85,7 +90,7 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
             WHERE id = :id AND user_id = :user_id
         """), {
             "id": item_id,
-            "user_id": user.id,
+            "user_id": user_id,
             "label": data["label"],
             "amount": data["amount"]
         })
@@ -101,14 +106,20 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 @router.delete("/finance/{item_id}")
 def delete_finance(item_id: int, user=Depends(get_current_user)):
 
+    user_id = int(user)  # 🔥 FIX
+
     with engine.connect() as conn:
         conn.execute(text("""
             DELETE FROM finance_items
             WHERE id = :id AND user_id = :user_id
         """), {
             "id": item_id,
-            "user_id": user.id
+            "user_id": user_id
         })
+
+        conn.commit()
+
+    return {"status": "deleted"}  # 🔥 FIX
 
         conn.commit()
 
