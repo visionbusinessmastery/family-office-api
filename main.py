@@ -26,6 +26,10 @@ from stocks.routes import router as stocks_router
 from trading.routes import router as trading_router
 from billing.routes import router as billing_router
 
+from intelligence.routes_finance import router as finance_router
+
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -148,5 +152,6 @@ app.include_router(trading_router, prefix="/trading", tags=["TRADING"])
 app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 app.include_router(content_router)
+app.include_router(finance_router)
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 
