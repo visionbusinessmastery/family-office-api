@@ -121,6 +121,3 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
 
     return {"status": "deleted"}  # 🔥 FIX
 
-        conn.commit()
-
-    return {"status": "deleted"}
