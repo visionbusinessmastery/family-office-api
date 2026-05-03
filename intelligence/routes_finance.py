@@ -3,7 +3,8 @@
 # =========================
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session, Text
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user 
 
