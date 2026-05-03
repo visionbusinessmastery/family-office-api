@@ -52,7 +52,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         # =========================
         asset_types = set()
 
-       for asset in portfolio or []:
+        for asset in portfolio or []:
            if isinstance(asset, dict):
                t = (asset.get("type") or "").lower()
                if t:
