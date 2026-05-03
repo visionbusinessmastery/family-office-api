@@ -26,7 +26,7 @@ from stocks.routes import router as stocks_router
 from trading.routes import router as trading_router
 from billing.routes import router as billing_router
 
-from intelligence.routes_finance import router as finance_router
+from intelligence.analyzers.routes_finance import router as finance_router
 
 
 
