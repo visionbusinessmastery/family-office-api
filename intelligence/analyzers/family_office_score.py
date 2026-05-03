@@ -52,10 +52,12 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         # =========================
         asset_types = set()
 
-        for asset in portfolio or []:
-            if isinstance(asset, dict) and asset.get("type"):
-                asset_types.add(asset["type"])
-
+       for asset in portfolio or []:
+           if isinstance(asset, dict):
+               t = (asset.get("type") or "").lower()
+               if t:
+                   asset_types.add(t)
+    
         diversification = min(len(asset_types) * 25, 100)
 
         # =========================
@@ -71,7 +73,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             value = safe_get(asset, "value", 0)
             total_value += value
 
-            if asset.get("type") == "crypto":
+            if (asset.get("type") or "").lower() == "crypto":
                 crypto_exposure += value
 
         crypto_ratio = crypto_exposure / total_value if total_value > 0 else 0
