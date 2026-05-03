@@ -67,10 +67,12 @@ def compute_user_intelligence(user_email: str):
             WHERE user_email = :email
         """), {"email": user_email}).fetchone()
 
-        profile_dict = dict(profile._mapping) if profile else {
-            "savings": 0,
-            "investments": 0,
-            "risk_profile": "medium"
+        profile_dict = dict(profile._mapping) if profile else {}
+
+        profile_dict = {
+            "savings": float(profile_dict.get("savings") or 0),
+            "investments": float(profile_dict.get("investments") or 0),
+            "risk_profile": (profile_dict.get("risk_profile") or "medium").lower()
         }
 
         profile_dict["email"] = user.email
