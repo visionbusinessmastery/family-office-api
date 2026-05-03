@@ -218,7 +218,7 @@ def compute_user_intelligence(user_email: str):
                 "advice": score_result.get("advice", [])
             },
             "level": level,
-            "onboarding": onboarding_dict,
+            "onboarding": onboarding,
             "upgrade": upgrade,
             "features": features,
             "opportunities": opportunities
