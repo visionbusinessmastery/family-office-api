@@ -78,13 +78,11 @@ def compute_user_intelligence(user_email: str):
             WHERE email = :email
         """), {"email": user_email}).fetchone()
 
-        onboarding_dict = {
+        onboarding = {
             "revenus": float(onboarding_data.revenus_mensuels or 0) if onboarding_data else 0,
             "dettes": float(onboarding_data.dettes or 0) if onboarding_data else 0,
             "epargne": float(onboarding_data.epargne or 0) if onboarding_data else 0,
         }
-
-        onboarding = dict(onboarding_row._mapping) if onboarding_row else {}
 
         # =========================
         # 🔥 MERGE PROFILE + ONBOARDING
