@@ -69,10 +69,40 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict = dict(profile._mapping) if profile else {}
 
+        # =========================
+        # 2.1 ONBOARDING (🔥 NEW)
+        # =========================
+        onboarding_row = conn.execute(text("""
+            SELECT revenus_mensuels, dettes, epargne
+            FROM users
+            WHERE email = :email
+        """), {"email": user_email}).fetchone()
+
+        onboarding = dict(onboarding_row._mapping) if onboarding_row else {}
+
+        # =========================
+        # 🔥 MERGE PROFILE + ONBOARDING
+        # =========================
         profile_dict = {
-            "savings": float(profile_dict.get("savings") or 0),
+            # 💰 capital (épargne onboarding fallback)
+            "savings": float(
+                profile_dict.get("savings")
+                or onboarding.get("epargne")
+                or 0
+            ),
+
+            # 📈 investissements
             "investments": float(profile_dict.get("investments") or 0),
-            "risk_profile": (profile_dict.get("risk_profile") or "medium").lower()
+
+            # ⚖️ risque
+            "risk_profile": (
+                profile_dict.get("risk_profile")
+                or "medium"
+            ).lower(),
+
+            # 🔥 NEW DATA (utile pour futur)
+            "monthly_income": float(onboarding.get("revenus_mensuels") or 0),
+            "debt": float(onboarding.get("dettes") or 0),
         }
 
         profile_dict["email"] = user.email
@@ -99,13 +129,18 @@ def compute_user_intelligence(user_email: str):
                 "value": qty * price
             })
 
+        # 🔥 FIX : fallback investments depuis portfolio
+        if profile_dict["investments"] == 0 and portfolio_list:
+            profile_dict["investments"] = sum(
+                [a.get("value", 0) for a in portfolio_list]
+            )
+
         # =========================
         # 4. FINANCIAL DATA (SAFE)
         # =========================
         financial = get_user_financial_overview(user.id) or {}
 
         financial_features = None
-
         totals = financial.get("totals", {})
 
         if totals:
@@ -122,7 +157,6 @@ def compute_user_intelligence(user_email: str):
             savings_velocity = (savings / (income + 1)) * 100
 
             income_sources = financial.get("income_sources", [])
-
             income_stability_score = min(len(income_sources) * 25, 100)
 
             financial_features = {
@@ -143,7 +177,7 @@ def compute_user_intelligence(user_email: str):
         ) or {}
 
         # =========================
-        # SAFE SCORE EXTRACTION (FIXED)
+        # SAFE SCORE EXTRACTION
         # =========================
         score = safe_get(score_result, "score", 0)
 
