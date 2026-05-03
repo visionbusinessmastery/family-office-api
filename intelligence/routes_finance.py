@@ -2,7 +2,7 @@
 # IMPORT
 # =========================
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
