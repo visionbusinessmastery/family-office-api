@@ -177,3 +177,9 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
         )
 
     return {"status": "deleted"}
+
+
+print("USER EMAIL:", user_email)
+print("USER ID:", user_id)
+print("DATA:", data)
+
