@@ -39,9 +39,12 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
             VALUES (:user_id, :type, :label, :amount)
         """), {
             "user_id": user_id,
-            "type": data["type"],
-            "label": data["label"],
-            "amount": data["amount"]
+            type_ = data.get("type")
+            label = data.get("label")
+            amount = data.get("amount")
+
+           if not type_ or not label or amount is None:
+               return {"error": "missing fields"}
         })
 
         conn.commit()
