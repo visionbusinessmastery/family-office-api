@@ -1,60 +1,53 @@
 # =========================
-# IMPORT
+# IMPORTS
 # =========================
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
 
-router = APIRouter()
+router = APIRouter(prefix="/finance", tags=["Finance"])
 
 
 # =========================
-# HELPER
+# HELPERS
 # =========================
-def get_user_id(conn, email):
-    user_row = conn.execute(
+def get_user_id(conn, email: str):
+    row = conn.execute(
         text("SELECT id FROM users WHERE email = :email"),
         {"email": email}
     ).fetchone()
 
-    return user_row.id if user_row else None
+    return row.id if row else None
 
-
-from fastapi import APIRouter, Depends
-from sqlalchemy import text
-from database import engine
-from auth.utils import get_current_user
-
-router = APIRouter()
 
 # =========================
-# CREATE
+# CREATE ITEM
 # =========================
-@router.post("")
+@router.post("/")
 def create_finance_item(data: dict, user=Depends(get_current_user)):
 
-    user_email = user
+    email = user
 
     with engine.begin() as conn:
 
-        user_id = conn.execute(
-            text("SELECT id FROM users WHERE email = :email"),
-            {"email": user_email}
-        ).fetchone()
+        user_id = get_user_id(conn, email)
 
         if not user_id:
             return {"error": "User not found"}
 
-        conn.execute(text("""
-            INSERT INTO finance_items (user_id, type, label, amount)
-            VALUES (:user_id, :type, :label, :amount)
-        """), {
-            "user_id": user_id.id,
-            "type": data.get("type"),
-            "label": data.get("label"),
-            "amount": data.get("amount"),
-        })
+        conn.execute(
+            text("""
+                INSERT INTO finance_items (user_id, type, label, amount)
+                VALUES (:user_id, :type, :label, :amount)
+            """),
+            {
+                "user_id": user_id,
+                "type": data.get("type"),
+                "label": data.get("label"),
+                "amount": data.get("amount", 0),
+            }
+        )
 
     return {"status": "created"}
 
@@ -62,14 +55,14 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
 # =========================
 # GET FINANCE
 # =========================
-@router.get("")
+@router.get("/")
 def get_finance(user=Depends(get_current_user)):
 
-    user_email = user
+    email = user
 
     with engine.connect() as conn:
 
-        user_id = get_user_id(conn, user_email)
+        user_id = get_user_id(conn, email)
 
         if not user_id:
             return {"error": "User not found"}
@@ -88,6 +81,7 @@ def get_finance(user=Depends(get_current_user)):
     savings = []
 
     for r in rows:
+
         item = {
             "id": r.id,
             "label": r.label,
@@ -96,8 +90,10 @@ def get_finance(user=Depends(get_current_user)):
 
         if r.type == "revenus":
             revenues.append(item)
+
         elif r.type == "dettes":
             debts.append(item)
+
         elif r.type == "epargne":
             savings.append(item)
 
@@ -109,16 +105,16 @@ def get_finance(user=Depends(get_current_user)):
 
 
 # =========================
-# UPDATE FINANCE
+# UPDATE ITEM
 # =========================
 @router.put("/{item_id}")
 def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 
-    user_email = user
+    email = user
 
     with engine.begin() as conn:
 
-        user_id = get_user_id(conn, user_email)
+        user_id = get_user_id(conn, email)
 
         if not user_id:
             return {"error": "User not found"}
@@ -134,7 +130,7 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
                 "id": item_id,
                 "user_id": user_id,
                 "label": data.get("label"),
-                "amount": data.get("amount")
+                "amount": data.get("amount", 0)
             }
         )
 
@@ -142,16 +138,16 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 
 
 # =========================
-# DELETE FINANCE
+# DELETE ITEM
 # =========================
 @router.delete("/{item_id}")
 def delete_finance(item_id: int, user=Depends(get_current_user)):
 
-    user_email = user
+    email = user
 
     with engine.begin() as conn:
 
-        user_id = get_user_id(conn, user_email)
+        user_id = get_user_id(conn, email)
 
         if not user_id:
             return {"error": "User not found"}
