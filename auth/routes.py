@@ -258,3 +258,28 @@ def update_plan(plan: str, email: str = Depends(get_current_user)):
         """), {"plan": plan, "email": email})
 
     return {"status": "updated"}
+
+
+# =========================
+# UPDATE ONBOARDING
+# =========================
+@router.put("/onboarding")
+def update_onboarding(data: dict, user=Depends(get_current_user)):
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE users
+            SET revenus_mensuels = :revenus,
+                dettes = :dettes,
+                epargne = :epargne
+            WHERE email = :email
+        """), {
+            "revenus": data.get("revenus", 0),
+            "dettes": data.get("dettes", 0),
+            "epargne": data.get("epargne", 0),
+            "email": user
+        })
+
+    return {"status": "updated"}
+
+
