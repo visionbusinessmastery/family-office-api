@@ -21,49 +21,40 @@ def get_user_id(conn, email):
     return user_row.id if user_row else None
 
 
+from fastapi import APIRouter, Depends
+from sqlalchemy import text
+from database import engine
+from auth.utils import get_current_user
+
+router = APIRouter()
+
 # =========================
-# POST FINANCE
+# CREATE
 # =========================
-@router.post("/finance")
+@router.post("")
 def create_finance_item(data: dict, user=Depends(get_current_user)):
 
     user_email = user
 
-    with engine.begin() as conn:  # ✔ auto commit safe
+    with engine.begin() as conn:
 
-        user_id = get_user_id(conn, user_email)
+        user_id = conn.execute(
+            text("SELECT id FROM users WHERE email = :email"),
+            {"email": user_email}
+        ).fetchone()
 
         if not user_id:
             return {"error": "User not found"}
 
-        # =========================
-        # VALIDATION
-        # =========================
-        type_ = data.get("type")
-        label = data.get("label")
-        amount = data.get("amount")
-
-        if not type_ or not label or amount is None:
-            return {"error": "missing fields"}
-
-        if type_ not in ["revenus", "dettes", "epargne"]:
-            return {"error": "invalid type"}
-
-        # =========================
-        # INSERT
-        # =========================
-        conn.execute(
-            text("""
-                INSERT INTO finance_items (user_id, type, label, amount)
-                VALUES (:user_id, :type, :label, :amount)
-            """),
-            {
-                "user_id": user_id,
-                "type": type_,
-                "label": label,
-                "amount": amount
-            }
-        )
+        conn.execute(text("""
+            INSERT INTO finance_items (user_id, type, label, amount)
+            VALUES (:user_id, :type, :label, :amount)
+        """), {
+            "user_id": user_id.id,
+            "type": data.get("type"),
+            "label": data.get("label"),
+            "amount": data.get("amount"),
+        })
 
     return {"status": "created"}
 
@@ -71,7 +62,7 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
 # =========================
 # GET FINANCE
 # =========================
-@router.get("/finance")
+@router.get("")
 def get_finance(user=Depends(get_current_user)):
 
     user_email = user
@@ -120,7 +111,7 @@ def get_finance(user=Depends(get_current_user)):
 # =========================
 # UPDATE FINANCE
 # =========================
-@router.put("/finance/{item_id}")
+@router.put("/{item_id}")
 def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 
     user_email = user
@@ -153,7 +144,7 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
 # =========================
 # DELETE FINANCE
 # =========================
-@router.delete("/finance/{item_id}")
+@router.delete("/{item_id}")
 def delete_finance(item_id: int, user=Depends(get_current_user)):
 
     user_email = user
