@@ -1,9 +1,6 @@
 # =========================
 # IMPORTS
 # =========================
-# =========================
-# IMPORTS
-# =========================
 from sqlalchemy import text
 from database import engine
 
@@ -13,7 +10,8 @@ from database import engine
 # =========================
 def safe_fetchall(conn, query, params):
     try:
-        return conn.execute(text(query), params).fetchall()
+        result = conn.execute(text(query), params)
+        return result.mappings().all()  # ✅ FIX IMPORTANT SQLAlchemy 2.x
     except Exception as e:
         print(f"[FINANCIAL ENGINE WARNING] {e}")
         return []
@@ -36,13 +34,13 @@ def get_user_financial_overview(user_id: int):
         """, {"user_id": user_id})
 
         income_sources = []
-        total_income = 0
+        total_income = 0.0
 
         for r in income_rows:
-            amount = float(r.amount or 0)
+            amount = float(r.get("amount") or 0)
 
             income_sources.append({
-                "type": r.type or "unknown",
+                "type": r.get("type") or "unknown",
                 "amount": amount
             })
 
@@ -58,15 +56,15 @@ def get_user_financial_overview(user_id: int):
         """, {"user_id": user_id})
 
         debts = []
-        total_debt = 0
-        monthly_debt_payment = 0
+        total_debt = 0.0
+        monthly_debt_payment = 0.0
 
         for r in debt_rows:
-            monthly = float(r.monthly_payment or 0)
-            total = float(r.total_debt or 0)
+            monthly = float(r.get("monthly_payment") or 0)
+            total = float(r.get("total_debt") or 0)
 
             debts.append({
-                "name": r.name or "debt",
+                "name": r.get("name") or "debt",
                 "monthly_payment": monthly,
                 "total_debt": total
             })
@@ -84,13 +82,13 @@ def get_user_financial_overview(user_id: int):
         """, {"user_id": user_id})
 
         savings_accounts = []
-        total_savings = 0
+        total_savings = 0.0
 
         for r in savings_rows:
-            balance = float(r.balance or 0)
+            balance = float(r.get("balance") or 0)
 
             savings_accounts.append({
-                "account": r.account_name or "account",
+                "account": r.get("account_name") or "account",
                 "balance": balance
             })
 
@@ -112,4 +110,5 @@ def get_user_financial_overview(user_id: int):
             "income_sources": income_sources,
             "debts": debts,
             "savings_accounts": savings_accounts
+        }
         }
