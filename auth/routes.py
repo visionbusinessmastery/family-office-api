@@ -227,8 +227,7 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
                 age = :age,
                 situation_pro = :situation_pro,
                 revenus_mensuels = :revenus,
-                dettes = :dettes,
-                epargne = :epargne,
+                charges_mensuelles = :charges,
                 profile_completed = TRUE
             WHERE email = :email
         """), {
@@ -236,8 +235,7 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
             "revenus": data.get("revenus_mensuels"),
-            "dettes": data.get("dettes"),
-            "epargne": data.get("epargne"),
+            "charges": data.get("charges_mensuelles"),
         })
 
         if result.rowcount == 0:
@@ -274,17 +272,15 @@ def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
                 age = :age,
                 situation_pro = :situation_pro,
                 revenus_mensuels = :revenus,
-                dettes = :dettes,
-                epargne = :epargne,
+                charges_mensuelles = :charges,
                 profile_completed = TRUE
             WHERE email = :email
         """), {
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus": data.get("revenus"),
-            "dettes": data.get("dettes"),
-            "epargne": data.get("epargne"),
+            "revenus": data.get("revenus_mensuels"),
+            "charges": data.get("charges_mensuelles"),
         })
 
         if result.rowcount == 0:
@@ -304,14 +300,12 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
         conn.execute(text("""
             UPDATE users
             SET revenus_mensuels = :revenus,
-                dettes = :dettes,
-                epargne = :epargne
+                charges_mensuelles = :charges
             WHERE email = :email
         """), {
             "email": email,
             "revenus": data.get("revenus"),
-            "dettes": data.get("dettes"),
-            "epargne": data.get("epargne"),
+            "charges": data.get("charges"),
         })
 
     return {"status": "updated"}
