@@ -1,5 +1,7 @@
 # =========================
-# COMPUTE FAMILY OFFICE
+# COMPUTE FAMILY OFFICE SCORE
+# =========================
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,6 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
     financial = financial or {}
 
     try:
-
         # =========================
         # SAFE VALUES
         # =========================
@@ -52,12 +53,12 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         # =========================
         asset_types = set()
 
-        for asset in portfolio or []:
-           if isinstance(asset, dict):
-               t = (asset.get("type") or "").lower()
-               if t:
-                   asset_types.add(t)
-    
+        for asset in (portfolio or []):
+            if isinstance(asset, dict):
+                t = (asset.get("type") or "").lower()
+                if t:
+                    asset_types.add(t)
+
         diversification = min(len(asset_types) * 25, 100)
 
         # =========================
@@ -66,7 +67,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         crypto_exposure = 0
         total_value = 0
 
-        for asset in portfolio or []:
+        for asset in (portfolio or []):
             if not isinstance(asset, dict):
                 continue
 
@@ -78,7 +79,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
 
         crypto_ratio = crypto_exposure / total_value if total_value > 0 else 0
 
-        risk_score = 70  # default SAFE baseline
+        risk_score = 70  # default safe baseline
 
         if risk_profile == "low":
             risk_score = 100 if crypto_ratio <= 0.1 else 60
@@ -93,13 +94,12 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         activity = 100 if profile else 30
 
         # =========================
-        # 5. FINANCIAL SCORE (SAFE)
+        # 5. FINANCIAL SCORE
         # =========================
-        financial_score = 50  # fallback intelligent default
+        financial_score = 50
 
         try:
             if financial:
-
                 cashflow = safe_get(financial, "cashflow_score", 0)
                 debt_risk = safe_get(financial, "debt_risk_score", 50)
                 savings_velocity = safe_get(financial, "savings_velocity_score", 0)
@@ -126,8 +126,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             (financial_score * 0.30)
         )
 
-        # SAFE CLAMP
-        score = max(5, min(score, 100))  # 🔥 NEVER 0
+        score = max(5, min(score, 100))  # clamp safe
 
         # =========================
         # 7. LEVEL
@@ -159,7 +158,7 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             advice.append("Améliore ton cashflow")
 
         # =========================
-        # 9. DEBUG PAYLOAD (IMPORTANT)
+        # 9. DEBUG PAYLOAD
         # =========================
         debug = {
             "wealth": wealth,
@@ -167,17 +166,14 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             "risk_score": risk_score,
             "activity": activity,
             "financial_score": round(financial_score, 2),
-            "crypto_ratio": round(crypto_ratio, 3)
+            "crypto_ratio": round(crypto_ratio, 3),
         }
 
-        # =========================
-        # RETURN
-        # =========================
         return {
             "score": score,
             "level": level,
             "details": debug,
-            "advice": advice
+            "advice": advice,
         }
 
     except Exception as e:
@@ -187,5 +183,5 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             "score": 10,
             "level": "BEGINNER",
             "details": {},
-            "advice": ["Erreur de calcul, données incomplètes"]
+            "advice": ["Erreur de calcul, données incomplètes"],
         }
