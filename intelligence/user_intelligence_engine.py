@@ -70,27 +70,30 @@ def compute_user_intelligence(user_email: str):
         profile_dict = dict(profile._mapping) if profile else {}
 
         # =========================
-        # 2.1 ONBOARDING DATA (NEW)
+        # 2.1 ONBOARDING DATA (FIXED)
         # =========================
         onboarding_data = conn.execute(text("""
-            SELECT revenus_mensuels, dettes, epargne
+            SELECT revenus_mensuels, charges_mensuelles
             FROM users
             WHERE email = :email
         """), {"email": user_email}).fetchone()
 
         onboarding = {
             "revenus": float(onboarding_data.revenus_mensuels or 0) if onboarding_data else 0,
-            "dettes": float(onboarding_data.dettes or 0) if onboarding_data else 0,
-            "epargne": float(onboarding_data.epargne or 0) if onboarding_data else 0,
+            "charges": float(onboarding_data.charges_mensuelles or 0) if onboarding_data else 0,
+            "epargne": float(profile_dict.get("savings") or 0),
+            "dettes": 0  # ⚠️ temporaire tant que table dettes absente            
         }
 
         # =========================
         # 🔥 MERGE PROFILE + ONBOARDING
         # =========================
+        profile_dict = dict(profile._mapping) if profile else {}
+        
         profile_dict = {
             # 💰 capital (épargne onboarding fallback)
-            "savings": float(
-                profile_dict.get("savings")
+            "epargne": float(
+                profile_dict.get("epargne")
                 or onboarding.get("epargne")
                 or 0
             ),
@@ -105,7 +108,8 @@ def compute_user_intelligence(user_email: str):
             ).lower(),
 
             # 🔥 NEW DATA (utile pour futur)
-            "monthly_income": float(onboarding.get("revenus_mensuels") or 0),
+            "monthly_income": float(onboarding.get("revenus") or 0),
+            
             "debt": float(onboarding.get("dettes") or 0),
         }
 
