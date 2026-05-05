@@ -234,8 +234,8 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus": data.get("revenus"),
-            "charges": data.get("charges_mensuelles"),
+            "revenus_mensuels": data.get("revenus"),
+            "charges_mensuelles": data.get("charges"),
         })
 
         if result.rowcount == 0:
@@ -279,8 +279,8 @@ def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus": data.get("revenus"),
-            "charges": data.get("charges_mensuelles"),
+            "revenus_mensuels": data.get("revenus"),
+            "charges_mensuelles": data.get("charges"),
         })
 
         if result.rowcount == 0:
