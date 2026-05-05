@@ -13,20 +13,20 @@ from intelligence.analyzers.financial_overview import get_user_financial_overvie
 
 
 # =========================
-# PUBLIC CORE API
-# =========================
-def get_user_intelligence(user_email: str):
-    return compute_user_intelligence(user_email)
-
-
-# =========================
-# SAFE HELPERS
+# SAFE GETTER
 # =========================
 def safe_get(obj, key, default=0):
     try:
         return obj.get(key, default) if isinstance(obj, dict) else default
     except:
         return default
+
+
+# =========================
+# PUBLIC API
+# =========================
+def get_user_intelligence(user_email: str):
+    return compute_user_intelligence(user_email)
 
 
 # =========================
@@ -37,7 +37,7 @@ def compute_user_intelligence(user_email: str):
     with engine.begin() as conn:
 
         # =========================
-        # 1. USER
+        # USER FETCH
         # =========================
         user = conn.execute(text("""
             SELECT id, email, plan, profile_completed
@@ -48,7 +48,9 @@ def compute_user_intelligence(user_email: str):
         if not user:
             return {"error": "user not found"}
 
-        if not user.profile_completed:
+        profile_completed = getattr(user, "profile_completed", False)
+
+        if not profile_completed:
             return {
                 "state": "ONBOARDING_REQUIRED",
                 "score": {"score": 0},
@@ -59,7 +61,7 @@ def compute_user_intelligence(user_email: str):
             }
 
         # =========================
-        # 2. PROFILE
+        # PROFILE FETCH
         # =========================
         profile = conn.execute(text("""
             SELECT *
@@ -70,7 +72,7 @@ def compute_user_intelligence(user_email: str):
         profile_dict = dict(profile._mapping) if profile else {}
 
         # =========================
-        # 2.1 ONBOARDING DATA (FIXED)
+        # ONBOARDING DATA
         # =========================
         onboarding_data = conn.execute(text("""
             SELECT revenus_mensuels, charges_mensuelles
@@ -79,47 +81,40 @@ def compute_user_intelligence(user_email: str):
         """), {"email": user_email}).fetchone()
 
         onboarding = {
-            "revenus": float(onboarding_data.revenus_mensuels or 0) if onboarding_data else 0,
-            "charges": float(onboarding_data.charges_mensuelles or 0) if onboarding_data else 0,
+            "revenus": float(getattr(onboarding_data, "revenus_mensuels", 0) or 0),
+            "charges": float(getattr(onboarding_data, "charges_mensuelles", 0) or 0),
             "epargne": float(profile_dict.get("savings") or 0),
-            "dettes": 0  # ⚠️ temporaire tant que table dettes absente            
+            "dettes": 0
         }
 
         # =========================
-        # 🔥 MERGE PROFILE + ONBOARDING
+        # MERGE PROFILE SAFE
         # =========================
-        profile_dict = dict(profile._mapping) if profile else {}
-        
         profile_dict = {
-            # 💰 capital (épargne onboarding fallback)
             "epargne": float(
                 profile_dict.get("epargne")
-                or onboarding.get("epargne")
+                or onboarding["epargne"]
                 or 0
             ),
 
-            # 📈 investissements
             "investments": float(profile_dict.get("investments") or 0),
 
-            # ⚖️ risque
             "risk_profile": (
-                profile_dict.get("risk_profile")
-                or "medium"
+                profile_dict.get("risk_profile") or "medium"
             ).lower(),
 
-            # 🔥 NEW DATA (utile pour futur)
-            "monthly_income": float(onboarding.get("revenus") or 0),
-            
-            "debt": float(onboarding.get("dettes") or 0),
+            "monthly_income": float(onboarding["revenus"] or 0),
+
+            "debt": float(onboarding["dettes"] or 0),
         }
 
         profile_dict["email"] = user.email
         profile_dict["plan"] = user.plan
 
         # =========================
-        # 3. PORTFOLIO
+        # PORTFOLIO
         # =========================
-        portfolio = conn.execute(text("""
+        rows = conn.execute(text("""
             SELECT asset_name, category, quantity, purchase_price
             FROM portfolio
             WHERE user_id = :user_id
@@ -127,29 +122,27 @@ def compute_user_intelligence(user_email: str):
 
         portfolio_list = []
 
-        for p in portfolio:
-            qty = float(p.quantity or 0)
-            price = float(p.purchase_price or 0)
+        for p in rows:
+            qty = float(getattr(p, "quantity", 0) or 0)
+            price = float(getattr(p, "purchase_price", 0) or 0)
 
             portfolio_list.append({
-                "asset_name": p.asset_name,
-                "type": (p.category or "").lower(),
+                "asset_name": getattr(p, "asset_name", ""),
+                "type": (getattr(p, "category", "") or "").lower(),
                 "value": qty * price
             })
 
-        # 🔥 FIX : fallback investments depuis portfolio
+        # fallback investments
         if profile_dict["investments"] == 0 and portfolio_list:
-            profile_dict["investments"] = sum(
-                [a.get("value", 0) for a in portfolio_list]
-            )
+            profile_dict["investments"] = sum(x["value"] for x in portfolio_list)
 
         # =========================
-        # 4. FINANCIAL DATA (SAFE)
+        # FINANCIAL OVERVIEW
         # =========================
         financial = get_user_financial_overview(user.id) or {}
 
         financial_features = None
-        totals = financial.get("totals", {})
+        totals = financial.get("totals", {}) if isinstance(financial, dict) else {}
 
         if totals:
 
@@ -165,6 +158,7 @@ def compute_user_intelligence(user_email: str):
             savings_velocity = (savings / (income + 1)) * 100
 
             income_sources = financial.get("income_sources", [])
+
             income_stability_score = min(len(income_sources) * 25, 100)
 
             financial_features = {
@@ -176,7 +170,7 @@ def compute_user_intelligence(user_email: str):
             }
 
         # =========================
-        # 5. FAMILY OFFICE SCORE
+        # SCORE ENGINE
         # =========================
         score_result = compute_family_office_score(
             profile_dict,
@@ -184,45 +178,49 @@ def compute_user_intelligence(user_email: str):
             financial_features
         ) or {}
 
-        # =========================
-        # SAFE SCORE EXTRACTION
-        # =========================
-        score = safe_get(score_result, "score", 0)
+        score_value = safe_get(score_result, "score", 0)
 
-        if isinstance(score, dict):
-            score = safe_get(score, "score", 0)
+        if isinstance(score_value, dict):
+            score_value = safe_get(score_value, "score", 0)
 
-        score = int(score or 0)
+        score_value = int(score_value or 0)
 
         # =========================
-        # 6. LEVEL
+        # LEVEL
         # =========================
-        if score >= 80:
+        if score_value >= 80:
             level = "ELITE"
-        elif score >= 60:
+        elif score_value >= 60:
             level = "GOLD"
-        elif score >= 40:
+        elif score_value >= 40:
             level = "SILVER"
         else:
             level = "FREE"
 
         # =========================
-        # 7. AI ENGINE
+        # AI MODULES
         # =========================
-        upgrade = compute_upgrade_decision(user.plan, score)
+        upgrade = compute_upgrade_decision(user.plan, score_value)
         features = compute_feature_access(profile_dict, score_result)
         opportunities = compute_opportunities(profile_dict, portfolio_list)
 
+        # =========================
+        # RETURN FINAL INTELLIGENCE
+        # =========================
         return {
             "user": user.email,
             "plan": user.plan,
+
             "score": {
-                "score": score,
+                "score": score_value,
                 "details": score_result.get("details", {}),
                 "advice": score_result.get("advice", [])
             },
+
             "level": level,
+
             "onboarding": onboarding,
+
             "upgrade": upgrade,
             "features": features,
             "opportunities": opportunities
