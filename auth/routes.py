@@ -261,12 +261,46 @@ def update_plan(plan: str, email: str = Depends(get_current_user)):
 
 
 # =========================
-# UPDATE ONBOARDING
+# ONBOARDING COMPLETE
 # =========================
-@router.put("/onboarding")
-def update_onboarding(data: dict, user=Depends(get_current_user)):
+@router.post("/onboarding/complete")
+def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
+
+        result = conn.execute(text("""
+            UPDATE users
+            SET
+                age = :age,
+                situation_pro = :situation_pro,
+                revenus_mensuels = :revenus,
+                dettes = :dettes,
+                epargne = :epargne,
+                profile_completed = TRUE
+            WHERE email = :email
+        """), {
+            "email": email,
+            "age": data.get("age"),
+            "situation_pro": data.get("situation_pro"),
+            "revenus": data.get("revenus"),
+            "dettes": data.get("dettes"),
+            "epargne": data.get("epargne"),
+        })
+
+        if result.rowcount == 0:
+            return {"error": "onboarding failed"}
+
+    return {"status": "completed"}
+
+
+# =========================
+# UPDATE ONBOARDING (CLEAN FINAL VERSION)
+# =========================
+@router.put("/onboarding/update")
+def update_onboarding(data: dict, email: str = Depends(get_current_user)):
+
+    with engine.begin() as conn:
+
         conn.execute(text("""
             UPDATE users
             SET revenus_mensuels = :revenus,
@@ -274,12 +308,16 @@ def update_onboarding(data: dict, user=Depends(get_current_user)):
                 epargne = :epargne
             WHERE email = :email
         """), {
-            "revenus": data.get("revenus", 0),
-            "dettes": data.get("dettes", 0),
-            "epargne": data.get("epargne", 0),
-            "email": user
+            "email": email,
+            "revenus": data.get("revenus"),
+            "dettes": data.get("dettes"),
+            "epargne": data.get("epargne"),
         })
 
     return {"status": "updated"}
 
 
+# alias sécurité (transition safe)
+@router.put("/onboarding")
+def onboarding_alias(data: dict, email: str = Depends(get_current_user)):
+    return update_onboarding(data, email)
