@@ -4,10 +4,11 @@
 from fastapi import APIRouter, Depends
 from auth.utils import get_current_user
 
-# 🔥 MOTEUR CENTRAL UNIQUE
+# 🔥 MOTEUR CENTRAL UNIQUE (source de vérité)
 from intelligence.user_intelligence_engine import compute_user_intelligence
 
-router = APIRouter()
+router = APIRouter(prefix="/intelligence", tags=["Score"])
+
 
 # =========================
 # RECALCULATE SCORE
@@ -15,18 +16,39 @@ router = APIRouter()
 @router.post("/score/recalculate")
 def recalculate_score(user=Depends(get_current_user)):
 
-    user_email = user
+    email = user
 
-    # 🔥 SOURCE UNIQUE DE VÉRITÉ
-    intel = compute_user_intelligence(user_email)
+    try:
+        # =========================
+        # ENGINE CALL
+        # =========================
+        intel = compute_user_intelligence(email)
 
-    if not intel or "score" not in intel:
-        return {"error": "Impossible de recalculer"}
+        if not intel:
+            return {
+                "error": "Impossible de recalculer",
+                "score": 0,
+                "details": {},
+                "advice": [],
+                "level": "UNKNOWN"
+            }
 
-    return {
-        "score": intel.get("score", {}).get("score", 0),
-        "details": intel.get("score", {}).get("details", {}),
-        "advice": intel.get("score", {}).get("advice", []),
-        "level": intel.get("level"),
-        "plan": intel.get("plan")
-    }
+        score_data = intel.get("score", {}) or {}
+
+        return {
+            "score": score_data.get("score", 0),
+            "details": score_data.get("details", {}),
+            "advice": score_data.get("advice", []),
+            "level": intel.get("level", "UNKNOWN"),
+            "plan": intel.get("plan", {})
+        }
+
+    except Exception as e:
+        return {
+            "error": "Score engine failure",
+            "message": str(e),
+            "score": 0,
+            "details": {},
+            "advice": [],
+            "level": "UNKNOWN"
+        }
