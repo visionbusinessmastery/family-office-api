@@ -111,4 +111,4 @@ def get_user_financial_overview(user_id: int):
             "debts": debts,
             "savings_accounts": savings_accounts
         }
-        }
+ 
