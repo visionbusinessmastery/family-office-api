@@ -152,6 +152,6 @@ app.include_router(ai_router, prefix="/ai", tags=["AI"])
 app.include_router(crm_router, prefix="/crm", tags=["CRM"])
 app.include_router(content_router, prefix="/content")
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
-app.include_router(finance_router, prefix="/intelligence")
+app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(score_router, prefix="/intelligence")
 
