@@ -7,7 +7,7 @@ from auth.utils import get_current_user
 # 🔥 MOTEUR CENTRAL UNIQUE (source de vérité)
 from intelligence.user_intelligence_engine import compute_user_intelligence
 
-router = APIRouter(prefix="/intelligence", tags=["Score"])
+router = APIRouter()
 
 
 # =========================
