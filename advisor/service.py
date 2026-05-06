@@ -8,7 +8,6 @@ from market.service import get_market
 
 from advisor.autopilot_v4_engine import get_autopilot_v4
 
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
@@ -87,6 +86,18 @@ def portfolio_manager(user_email, message):
         "user": user_email
     }
 
+
+def portfolio_autopilot(user_email, message):
+    engine = get_autopilot_v4()
+
+    return engine.run(
+        user_email=user_email,
+        portfolio=get_user_portfolio(user_email),
+        market=get_market("global"),
+        context={},
+        llm_analysis=message,
+        level="free"
+    )
 
 # =========================
 # PUBLIC API
