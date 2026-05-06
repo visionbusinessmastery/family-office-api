@@ -23,17 +23,25 @@ PERFORMANCE_LOG = []
 class AutopilotV4:
 
     # =========================
-    # MAIN ENTRY
+    # MAIN ENTRY POINT
     # =========================
-    def run(self, portfolio, market_signal, symbol="BTC", price=100):
+    def run(self, user_email=None, portfolio=None, market=None, context=None, llm_analysis=None, level="free"):
+
+        # fallback compatibility (ancien appel simplifié)
+        market_signal = context.get("score", 0.5) if context else 0.5
 
         risk_level = detect_risk(str(market_signal))
         target_alloc = optimal_allocation(risk_level)
 
         # =========================
-        # SIMULATE TRADE DECISION
+        # TRADE GENERATION
         # =========================
-        trade = self._generate_trade(symbol, price, market_signal, risk_level)
+        trade = self._generate_trade(
+            symbol="BTC",
+            price=100,
+            signal=market_signal,
+            risk=risk_level
+        )
 
         # =========================
         # EXECUTION SIMULATION
@@ -41,20 +49,21 @@ class AutopilotV4:
         execution = self._execute_trade_simulation(trade, portfolio)
 
         # =========================
-        # PERFORMANCE CALC
+        # PERFORMANCE
         # =========================
         performance = self._compute_performance(execution)
 
         # =========================
-        # JOURNAL ENTRY
+        # JOURNALING
         # =========================
-        journal_entry = self._log_decision(trade, execution, performance)
+        journal_entry = self._log_decision(trade, execution, performance, llm_analysis)
 
         return {
             "analysis": {
                 "risk_level": risk_level,
                 "market_signal": market_signal,
-                "target_allocation": target_alloc
+                "target_allocation": target_alloc,
+                "llm_summary": llm_analysis
             },
             "trade": trade,
             "execution": execution,
@@ -93,8 +102,10 @@ class AutopilotV4:
 
         entry_price = trade["price"]
 
-        # fake market movement simulation
-        exit_price = entry_price * (1.02 if trade["direction"] == "BUY" else 0.98)
+        # simulation marché
+        exit_price = entry_price * (
+            1.02 if trade["direction"] == "BUY" else 0.98
+        )
 
         pnl = (exit_price - entry_price) * (trade["size"] / entry_price)
 
@@ -128,14 +139,15 @@ class AutopilotV4:
         }
 
     # =========================
-    # JOURNAL AI
+    # JOURNAL ENGINE
     # =========================
-    def _log_decision(self, trade, execution, performance):
+    def _log_decision(self, trade, execution, performance, llm_analysis=None):
 
         entry = {
             "trade": trade,
             "execution": execution,
             "performance_snapshot": performance,
+            "ai_summary": llm_analysis,
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -145,7 +157,7 @@ class AutopilotV4:
 
 
 # =========================
-# FACTORY
+# FACTORY FUNCTION
 # =========================
 def get_autopilot_v4():
     return AutopilotV4()
