@@ -1,5 +1,5 @@
 # =========================
-# UNIFIED USER CONTEXT ENGINE V3
+# UNIFIED USER CONTEXT ENGINE V4 (PRODUCTION READY)
 # =========================
 
 from sqlalchemy import text
@@ -25,7 +25,7 @@ def safe_float(value):
 
 
 # =========================
-# FETCH USER
+# USER FETCH
 # =========================
 def get_user(conn, email: str):
     return conn.execute(
@@ -39,7 +39,7 @@ def get_user(conn, email: str):
 
 
 # =========================
-# FETCH PROFILE
+# PROFILE FETCH
 # =========================
 def get_profile(conn, email: str):
     row = conn.execute(
@@ -55,7 +55,7 @@ def get_profile(conn, email: str):
 
 
 # =========================
-# FETCH PORTFOLIO
+# PORTFOLIO FETCH
 # =========================
 def get_portfolio(conn, user_id: int):
 
@@ -84,7 +84,7 @@ def get_portfolio(conn, user_id: int):
 
 
 # =========================
-# NORMALIZE PROFILE
+# PROFILE NORMALIZATION
 # =========================
 def normalize_profile(profile: dict, portfolio: list):
 
@@ -104,7 +104,7 @@ def normalize_profile(profile: dict, portfolio: list):
 
 
 # =========================
-# MAIN ENGINE V3
+# MAIN ENGINE V4
 # =========================
 def run_user_context(user_email: str):
 
@@ -118,11 +118,21 @@ def run_user_context(user_email: str):
         if not user:
             return {"error": "USER_NOT_FOUND"}
 
+        # =========================
+        # ONBOARDING STATE
+        # =========================
         if not user.profile_completed:
             return {
                 "state": "ONBOARDING_REQUIRED",
                 "score": {"score": 0},
-                "level": "ONBOARDING"
+                "level": "ONBOARDING",
+                "features": [],
+                "opportunities": [],
+                "dashboard": {
+                    "hero": True,
+                    "score_card": False,
+                    "upgrade_banner": True
+                }
             }
 
         # =========================
@@ -139,7 +149,7 @@ def run_user_context(user_email: str):
         profile["plan"] = user.plan
 
         # =========================
-        # SCORE
+        # SCORE ENGINE
         # =========================
         score_data = compute_family_office_score(
             profile,
@@ -147,7 +157,19 @@ def run_user_context(user_email: str):
             financial
         )
 
-        score = score_data.get("score", 0)
+        score = int(score_data.get("score", 0))
+
+        # =========================
+        # SAFE LEVEL (FIX)
+        # =========================
+        if score >= 80:
+            level = "ELITE"
+        elif score >= 60:
+            level = "GOLD"
+        elif score >= 40:
+            level = "SILVER"
+        else:
+            level = "FREE"
 
         # =========================
         # BUSINESS ENGINES
@@ -163,18 +185,20 @@ def run_user_context(user_email: str):
             {"plan": user.plan},
             {
                 "score": score_data,
-                "level": score_data.get("level", "BEGINNER")
+                "level": level
             }
         )
 
         # =========================
-        # FINAL PAYLOAD
+        # FINAL RESPONSE
         # =========================
         return {
             "user": user.email,
             "plan": user.plan,
 
             "score": score_data,
+            "level": level,
+
             "upgrade": upgrade,
             "features": features,
             "opportunities": opportunities,
