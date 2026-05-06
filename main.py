@@ -106,8 +106,8 @@ async def auth_middleware(request: Request, call_next):
 # =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
-app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
-app.include_router(finance_router, prefix="/finance", tags=["Finance"])
+app.include_router(score_router, prefix="/intelligence")
+app.include_router(finance_router, prefix="/finance")
 app.include_router(score_router, prefix="/score", tags=["Score"])
 
 app.include_router(market_router, prefix="/market", tags=["Market"])
