@@ -29,6 +29,8 @@ from billing.routes import router as billing_router
 from intelligence.routes_finance import router as finance_router
 from intelligence.routes_score import router as score_router
 
+from intelligence.routes_intelligence import router as intelligence_router
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -154,4 +156,6 @@ app.include_router(content_router, prefix="/content")
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(score_router, prefix="/intelligence")
+
+app.include_router(intelligence_router)
 
