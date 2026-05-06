@@ -2,141 +2,60 @@ from openai import OpenAI
 import os
 import json
 
-from business.service import get_business_intelligence
+from intelligence.orchestrator import run_orchestrator
+
 from portfolio.service import get_user_portfolio
 from market.service import get_market
 
-from advisor.engine import (
-    detect_risk,
-    extract_budget
-)
-
-from advisor.portfolio_ai import (
-    score_portfolio,
-    generate_actions,
-    optimal_allocation
-)
-
-from advisor.autopilot import autopilot_engine
 from advisor.engine import detect_risk, extract_budget
+from advisor.autopilot import autopilot_engine
+
+from advisor.decision_engine import (
+    extract_decision,
+    validate_decision,
+    build_execution_plan
+)
+
+from advisor.execution_engine import execute_autopilot_actions
+from advisor.log_engine import log_autopilot_event
+from advisor.performance_engine import compute_performance
+from advisor.decision_scoring import score_decision
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # =========================
-# CORE ADVISOR ENGINE
+# SMART ADVISOR + AUTOPILOT
 # =========================
 def advisor_logic(user_email, message, level="free"):
 
-    intelligence = get_user_intelligence(user_email)
-
-    portfolio = {}
-    market = {}
-    business = {}
-
-    if level in ["premium", "elite"]:
-        portfolio = get_user_portfolio(user_email)
-        market = get_market("global")
-
-    if level == "elite":
-        business = get_business_opportunities(user_email)
-
-    prompt = f"""
-    Tu es un conseiller financier IA.
-
-    === PROFIL ===
-    {json.dumps(intelligence, indent=2)}
-
-    === PORTFOLIO ===
-    {portfolio}
-
-    === MARCHÉ ===
-    {market}
-
-    === BUSINESS ===
-    {business}
-
-    === QUESTION ===
-    {message}
-
-    Donne une réponse stratégique et actionnable.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return {
-        "level": level,
-        "advice": response.choices[0].message.content
-    }
-
-
-# =========================
-# LEVELS (IMPORTANT)
-# =========================
-
-def get_advisor_free(user_email, message):
-    return advisor_logic(user_email, message, level="free")
-
-
-def get_advisor_premium(user_email, message):
-    return advisor_logic(user_email, message, level="premium")
-
-
-def get_advisor_elite(user_email, message):
-    return advisor_logic(user_email, message, level="elite")
-    
-
-def portfolio_manager(user_email: str, message: str, level="free"):
+    context = run_orchestrator(user_email)
 
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
-    intelligence = get_business_intelligence(user_email)
-
-    budget = extract_budget(message)
-    risk = detect_risk(message)
 
     # =========================
-    # 1. SCORING ENGINE
-    # =========================
-    score = score_portfolio(portfolio, market)
-
-    # =========================
-    # 2. ACTION ENGINE
-    # =========================
-    actions = generate_actions(score)
-
-    # =========================
-    # 3. TARGET ALLOCATION
-    # =========================
-    allocation = optimal_allocation(risk)
-
-    # =========================
-    # 4. AI STRATEGY LAYER
+    # 1. GPT DECISION
     # =========================
     prompt = f"""
-    Tu es un Portfolio Manager quant institutionnel.
+    Tu es un AI Family Office.
 
-    SCORE PORTFOLIO:
-    {json.dumps(score, indent=2)}
+    OBJECTIF :
+    - comprendre l'intention utilisateur
+    - proposer une stratégie
+    - suggérer une action claire
 
-    ACTIONS:
-    {actions}
+    CONTEXTE :
+    {json.dumps(context, indent=2)}
 
-    ALLOCATION CIBLE:
-    {json.dumps(allocation, indent=2)}
-
-    USER MESSAGE:
+    MESSAGE :
     {message}
 
-    Donne :
-    - analyse portefeuille
-    - risques majeurs
-    - plan d'action
-    - recommandation précise
+    Réponds avec :
+    - analyse
+    - stratégie
+    - action recommandée
     """
 
     response = client.chat.completions.create(
@@ -144,21 +63,70 @@ def portfolio_manager(user_email: str, message: str, level="free"):
         messages=[{"role": "user", "content": prompt}]
     )
 
+    llm_text = response.choices[0].message.content
+
+    # =========================
+    # 2. DECISION ENGINE
+    # =========================
+    decision = extract_decision(llm_text)
+    decision = validate_decision(decision, context)
+    execution_plan = build_execution_plan(decision)
+
+    # =========================
+    # 3. AUTOPILOT EXECUTION
+    # =========================
+    autopilot_result = None
+
+    if execution_plan["execute"]:
+        autopilot_result = autopilot_engine(
+            user_email=user_email,
+            portfolio=portfolio,
+            market=market,
+            risk_level=execution_plan["risk_level"]
+        )
+
+    # =========================
+    # 4. FINAL OUTPUT
+    # =========================
     return {
-        "score": score,
-        "actions": actions,
-        "allocation": allocation,
-        "advice": response.choices[0].message.content
+        "analysis": llm_text,
+        "decision": decision,
+        "execution": execution_plan,
+        "autopilot": autopilot_result,
+        "context_score": context.get("score")
     }
+
+
+# =========================
+# PUBLIC ENDPOINTS
+# =========================
+def get_advisor_free(user_email, message):
+    return advisor_logic(user_email, message, "free")
+
+
+def get_advisor_premium(user_email, message):
+    return advisor_logic(user_email, message, "premium")
+
+
+def get_advisor_elite(user_email, message):
+    return advisor_logic(user_email, message, "elite")
+
 
 
 def portfolio_autopilot(user_email, message):
 
+    from intelligence.orchestrator import run_orchestrator
+
+    context = run_orchestrator(user_email)
+
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
 
     risk = detect_risk(message)
 
+    # =========================
+    # 1. CORE AUTOPILOT
+    # =========================
     system = autopilot_engine(
         user_email,
         portfolio,
@@ -166,4 +134,41 @@ def portfolio_autopilot(user_email, message):
         risk
     )
 
-    return system
+    actions = system.get("actions", [])
+    strategy = system.get("strategy", [])
+
+    # =========================
+    # 2. EXECUTION
+    # =========================
+    trades = execute_actions(user_email, actions, market)
+
+    # =========================
+    # 3. PERFORMANCE
+    # =========================
+    performance = compute_performance(user_email)
+
+    # =========================
+    # 4. DECISION SCORE
+    # =========================
+    decision_score = score_decision(actions, performance)
+
+    # =========================
+    # 5. LOGGING
+    # =========================
+    log_event(
+        user_email,
+        actions,
+        strategy,
+        system.get("score", {})
+    )
+
+    # =========================
+    # FINAL OUTPUT
+    # =========================
+    return {
+        "context": context.get("score"),
+        "autopilot": system,
+        "trades": trades,
+        "performance": performance,
+        "decision_score": decision_score
+    }
