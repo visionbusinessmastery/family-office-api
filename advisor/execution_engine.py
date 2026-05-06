@@ -6,7 +6,39 @@ from sqlalchemy import text
 from database import engine
 import random
 
+# =========================
+# EXECUTION ENGINE V4
+# =========================
 
+from advisor.autopilot_v4_engine import AutopilotV4
+
+# =========================
+# SINGLETON ENGINE
+# =========================
+_autopilot = AutopilotV4()
+
+
+# =========================
+# MAIN EXECUTION WRAPPER
+# =========================
+def execute_autopilot_actions(
+    portfolio,
+    market_signal=0.5,
+    symbol="BTC",
+    price=100
+):
+
+    """
+    Bridge compatible avec service.py
+    """
+
+    return _autopilot.run(
+        portfolio=portfolio,
+        market_signal=market_signal,
+        symbol=symbol,
+        price=price
+    )
+    
 def get_price(asset, market):
     return float(market.get(asset, random.uniform(100, 50000)))
 
