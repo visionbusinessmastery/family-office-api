@@ -8,7 +8,7 @@ from portfolio.service import get_user_portfolio
 from market.service import get_market
 
 from advisor.engine import detect_risk, extract_budget
-from advisor.autopilot import autopilot_engine
+from advisor.autopilot_v4_engine import AutopilotV4
 
 from advisor.decision_engine import (
     extract_decision,
@@ -123,6 +123,8 @@ def portfolio_autopilot(user_email, message):
     market = get_market("global")
 
     risk = detect_risk(message)
+
+    engine = AutopilotV4()
 
     # =========================
     # 1. CORE AUTOPILOT
