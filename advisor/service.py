@@ -17,24 +17,36 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # =========================
 def advisor_logic(user_email, message, level="free"):
 
+    # =========================
+    # CONTEXT ENGINE (GLOBAL STATE)
+    # =========================
     context = run_orchestrator(user_email)
 
+    # =========================
+    # DATA SOURCES
+    # =========================
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
 
+    # =========================
+    # LLM ANALYSIS (GPT)
+    # =========================
     prompt = f"""
-    Tu es un AI Family Office.
+    Tu es un AI Family Office intelligent.
 
-    CONTEXTE:
+    CONTEXTE GLOBAL:
     {json.dumps(context, indent=2)}
 
-    MESSAGE:
+    PORTEFEUILLE:
+    {json.dumps(portfolio, indent=2)}
+
+    MESSAGE UTILISATEUR:
     {message}
 
-    Donne:
+    Réponds clairement avec :
     - analyse
     - stratégie
-    - action
+    - action recommandée
     """
 
     response = client.chat.completions.create(
@@ -44,12 +56,33 @@ def advisor_logic(user_email, message, level="free"):
 
     llm_text = response.choices[0].message.content
 
+    # =========================
+    # AUTOPILOT V4 ENGINE 🔥
+    # =========================
+    autopilot_engine = get_autopilot_v4()
+
+    autopilot_result = autopilot_engine.run(
+        user_email=user_email,
+        portfolio=portfolio,
+        market=market,
+        context=context,
+        llm_analysis=llm_text,
+        level=level
+    )
+
+    # =========================
+    # FINAL OUTPUT
+    # =========================
     return {
         "analysis": llm_text,
-        "context_score": context.get("score")
+        "context_score": context.get("score"),
+        "autopilot": autopilot_result
     }
 
 
+# =========================
+# PUBLIC API
+# =========================
 def get_advisor_free(user_email, message):
     return advisor_logic(user_email, message, "free")
 
