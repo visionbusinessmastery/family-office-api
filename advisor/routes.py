@@ -62,13 +62,6 @@ def advisor_portfolio(request: Request, data: AdvisorRequest):
     return safe_execute(_run, module_name="PORTFOLIO_MANAGER")
 
 
-def portfolio_manager(user_email, message):
-    return {
-        "status": "ok",
-        "message": "Portfolio manager not implemented yet",
-        "user": user_email
-    }
-    
 # =========================
 # 3. AUTOPILOT ENGINE (SIMULATION / DECISION)
 # =========================
