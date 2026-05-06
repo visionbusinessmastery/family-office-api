@@ -80,6 +80,14 @@ def advisor_logic(user_email, message, level="free"):
     }
 
 
+def portfolio_manager(user_email, message):
+    return {
+        "status": "ok",
+        "message": "Portfolio manager not implemented yet",
+        "user": user_email
+    }
+
+
 # =========================
 # PUBLIC API
 # =========================
