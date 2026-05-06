@@ -11,7 +11,6 @@ from .schemas import AdvisorRequest
 from .service import (
     get_advisor_free,
     portfolio_manager,
-    portfolio_autopilot
 )
 
 router = APIRouter()
