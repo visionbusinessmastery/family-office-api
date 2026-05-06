@@ -1,24 +1,33 @@
 # =========================
-# ORCHESTRATOR V3 - CORE ENGINE
+# UNIFIED USER CONTEXT ENGINE V3
 # =========================
 
 from sqlalchemy import text
 from database import engine
 
-from intelligence.user_intelligence_engine import compute_user_intelligence
-from intelligence.dashboard_engine import build_dashboard
 from intelligence.analyzers.family_office_score import compute_family_office_score
+from intelligence.analyzers.financial_overview import get_user_financial_overview
+
 from intelligence.upgrade_engine import compute_upgrade_decision
 from intelligence.feature_engine import compute_feature_access
 from intelligence.opportunity_engine import compute_opportunities
-
-from intelligence.analyzers.financial_overview import get_user_financial_overview
+from intelligence.dashboard_engine import build_dashboard
 
 
 # =========================
-# SAFE FETCH USER
+# SAFE HELPERS
 # =========================
-def get_user_by_email(conn, email: str):
+def safe_float(value):
+    try:
+        return float(value or 0)
+    except:
+        return 0.0
+
+
+# =========================
+# FETCH USER
+# =========================
+def get_user(conn, email: str):
     return conn.execute(
         text("""
             SELECT id, email, plan, profile_completed
@@ -62,8 +71,8 @@ def get_portfolio(conn, user_id: int):
     portfolio = []
 
     for r in rows:
-        qty = float(r.quantity or 0)
-        price = float(r.purchase_price or 0)
+        qty = safe_float(r.quantity)
+        price = safe_float(r.purchase_price)
 
         portfolio.append({
             "asset_name": r.asset_name,
@@ -75,30 +84,62 @@ def get_portfolio(conn, user_id: int):
 
 
 # =========================
-# MAIN ORCHESTRATION ENGINE
+# NORMALIZE PROFILE
 # =========================
-def run_orchestrator(user_email: str):
+def normalize_profile(profile: dict, portfolio: list):
+
+    savings = safe_float(profile.get("savings") or profile.get("epargne"))
+    investments = safe_float(profile.get("investments"))
+
+    # fallback intelligent
+    if investments == 0 and portfolio:
+        investments = sum([a.get("value", 0) for a in portfolio])
+
+    return {
+        "savings": savings,
+        "investments": investments,
+        "risk_profile": (profile.get("risk_profile") or "medium").lower(),
+        "plan": profile.get("plan", "FREE")
+    }
+
+
+# =========================
+# MAIN ENGINE V3
+# =========================
+def run_user_context(user_email: str):
 
     with engine.begin() as conn:
 
         # =========================
         # USER
         # =========================
-        user = get_user_by_email(conn, user_email)
+        user = get_user(conn, user_email)
 
         if not user:
             return {"error": "USER_NOT_FOUND"}
 
-        # =========================
-        # PROFILE + PORTFOLIO
-        # =========================
-        profile = get_profile(conn, user_email)
-        portfolio = get_portfolio(conn, user.id)
+        if not user.profile_completed:
+            return {
+                "state": "ONBOARDING_REQUIRED",
+                "score": {"score": 0},
+                "level": "ONBOARDING"
+            }
 
+        # =========================
+        # DATA FETCH
+        # =========================
+        raw_profile = get_profile(conn, user_email)
+        portfolio = get_portfolio(conn, user.id)
         financial = get_user_financial_overview(user.id) or {}
 
         # =========================
-        # SCORE ENGINE
+        # NORMALIZATION
+        # =========================
+        profile = normalize_profile(raw_profile, portfolio)
+        profile["plan"] = user.plan
+
+        # =========================
+        # SCORE
         # =========================
         score_data = compute_family_office_score(
             profile,
@@ -109,35 +150,25 @@ def run_orchestrator(user_email: str):
         score = score_data.get("score", 0)
 
         # =========================
-        # UPGRADE ENGINE
+        # BUSINESS ENGINES
         # =========================
         upgrade = compute_upgrade_decision(user.plan, score)
-
-        # =========================
-        # FEATURES ENGINE
-        # =========================
         features = compute_feature_access(profile, score_data)
-
-        # =========================
-        # OPPORTUNITIES ENGINE
-        # =========================
         opportunities = compute_opportunities(profile, portfolio)
 
         # =========================
-        # DASHBOARD ENGINE
+        # DASHBOARD
         # =========================
         dashboard = build_dashboard(
-            {
-                "plan": user.plan
-            },
+            {"plan": user.plan},
             {
                 "score": score_data,
-                "level": upgrade.get("recommended_plan", "FREE")
+                "level": score_data.get("level", "BEGINNER")
             }
         )
 
         # =========================
-        # RETURN MASTER PAYLOAD
+        # FINAL PAYLOAD
         # =========================
         return {
             "user": user.email,
