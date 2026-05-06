@@ -6,10 +6,6 @@
 from datetime import datetime
 import uuid
 
-from advisor.engine import detect_risk
-from advisor.portfolio_ai import optimal_allocation
-
-
 # =========================
 # MEMORY STORE (SIMPLIFIED)
 # =========================
@@ -155,6 +151,19 @@ class AutopilotV4:
 
         return entry
 
+
+def detect_risk(signal: str):
+    try:
+        s = float(signal)
+    except:
+        s = 0.5
+
+    if s < 0.3:
+        return "low"
+    elif s < 0.7:
+        return "medium"
+    else:
+        return "high"
 
 # =========================
 # FACTORY FUNCTION
