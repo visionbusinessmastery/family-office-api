@@ -1,26 +1,24 @@
+# =========================
+# ADVISOR ROUTES V4 CLEAN
+# =========================
+
 from fastapi import APIRouter, Request
 from core.utils import safe_execute
 from core.limiter import limiter
 
-from .schemas import (
-    AdvisorRequest,
-    AdvisorPremiumRequest,
-    AdvisorEliteRequest
-)
+from .schemas import AdvisorRequest
 
 from .service import (
     get_advisor_free,
-    get_advisor_premium,
-    get_advisor_elite
+    portfolio_manager,
+    portfolio_autopilot
 )
-
-
-from .service import portfolio_manager
 
 router = APIRouter()
 
+
 # =========================
-# FREE
+# 1. CHAT ADVISOR (IA CONSEIL)
 # =========================
 @router.post("/advisor")
 @limiter.limit("10/minute")
@@ -33,92 +31,55 @@ def advisor(request: Request, data: AdvisorRequest):
 
         return {
             "user": user_email,
+            "system": "ADVISOR_CHAT_V4",
             "tier": "free",
             "input": data.message,
             "result": result
         }
 
-    return safe_execute(_run, module_name="ADVISOR_FREE")
+    return safe_execute(_run, module_name="ADVISOR_CHAT")
 
 
 # =========================
-# PREMIUM
+# 2. PORTFOLIO ANALYSIS (READ ONLY)
 # =========================
-@router.post("/advisor/premium")
+@router.post("/advisor/portfolio")
 @limiter.limit("10/minute")
-def advisor_premium(request: Request, data: AdvisorPremiumRequest):
+def advisor_portfolio(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
 
-        result = get_advisor_premium(user_email, data.message)
+        result = portfolio_manager(user_email, data.message)
 
         return {
             "user": user_email,
-            "tier": "premium",
+            "system": "PORTFOLIO_ANALYSIS_V4",
             "input": data.message,
             "result": result
         }
 
-    return safe_execute(_run, module_name="ADVISOR_PREMIUM")
+    return safe_execute(_run, module_name="PORTFOLIO_MANAGER")
 
 
 # =========================
-# ELITE (HEDGE FUND MODE)
+# 3. AUTOPILOT ENGINE (SIMULATION / DECISION)
 # =========================
-@router.post("/advisor/elite")
+@router.post("/advisor/autopilot")
 @limiter.limit("10/minute")
-def advisor_elite(request: Request, data: AdvisorEliteRequest):
+def advisor_autopilot(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
 
-        result = get_advisor_elite(user_email, data.message)
+        result = portfolio_autopilot(user_email, data.message)
 
         return {
             "user": user_email,
-            "tier": "elite",
+            "system": "AUTOPILOT_ENGINE_V4",
+            "mode": "SIMULATION",
             "input": data.message,
             "result": result
         }
 
-    return safe_execute(_run, module_name="ADVISOR_ELITE")
-
-
-@router.post("/portfolio/manager")
-@limiter.limit("10/minute")
-def portfolio_ai(request: Request, data: dict):
-
-    def _run():
-        user_email = request.state.user_email
-
-        result = portfolio_manager(user_email, data["message"])
-
-        return {
-            "user": user_email,
-            "system": "AI_PORTFOLIO_MANAGER_V6",
-            "input": data["message"],
-            "result": result
-        }
-
-    return safe_execute(_run, module_name="PORTFOLIO_AI")
-
-
-@router.post("/portfolio/autopilot")
-@limiter.limit("10/minute")
-def autopilot(request: Request, data: dict):
-
-    def _run():
-        user_email = request.state.user_email
-
-        result = portfolio_autopilot(user_email, data["message"])
-
-        return {
-            "user": user_email,
-            "system": "AI_AUTOPILOT_V7",
-            "result": result
-        }
-
-    return safe_execute(_run, module_name="AUTOPILOT")
-
-
+    return safe_execute(_run, module_name="AUTOPILOT_ENGINE")
