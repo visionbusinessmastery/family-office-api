@@ -1,23 +1,28 @@
 # =========================
-# INTELLIGENCE MODULE ENGINE
+# MODULE ENGINE
 # =========================
+
 from intelligence.module_registry import MODULES
 
 
+# =========================
+# GET ALL OPPORTUNITIES
+# =========================
 def get_all_opportunities(user_profile):
 
-    results = {}
+    all_opportunities = []
 
     for module_name, engine in MODULES.items():
 
         try:
 
-            results[module_name] = engine(user_profile)
+            results = engine(user_profile)
+
+            if results:
+                all_opportunities.extend(results)
 
         except Exception as e:
 
-            results[module_name] = {
-                "error": str(e)
-            }
+            print(f"MODULE ERROR {module_name}: {e}")
 
-    return results
+    return all_opportunities
