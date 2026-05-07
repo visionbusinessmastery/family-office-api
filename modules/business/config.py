@@ -1,8 +1,11 @@
+# =========================
+# CONFIG BUSINESS
+# =========================
 MODULE_NAME = "business"
 
 DESCRIPTION = """
-Business opportunities, entrepreneurship,
-online business and acquisitions.
+Entrepreneuriat, business en ligne,
+rachat d'entreprise et cashflow business.
 """
 
 ENABLED = True
