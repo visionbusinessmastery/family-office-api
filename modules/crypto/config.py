@@ -1,7 +1,11 @@
+# =========================
+# CONFIG CRYPTO
+# =========================
 MODULE_NAME = "crypto"
 
 DESCRIPTION = """
-Crypto investing and digital assets.
+Crypto assets, blockchain,
+DeFi and AI narratives.
 """
 
 ENABLED = True
