@@ -114,6 +114,9 @@ app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
+app.include_router(advisor_router)
+app.include_router(intelligence_router)
+
 # =========================
 # HEALTH
 # =========================
