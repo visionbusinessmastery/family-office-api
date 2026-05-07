@@ -26,6 +26,7 @@ def advisor_logic(user_email, message, level="free"):
     # =========================
     portfolio = get_user_portfolio(user_email)
     market = get_market("global")
+    opportunities = context.get("opportunities", {})
 
     # =========================
     # LLM ANALYSIS (GPT)
@@ -39,13 +40,18 @@ def advisor_logic(user_email, message, level="free"):
     PORTEFEUILLE:
     {json.dumps(portfolio, indent=2)}
 
+    OPPORTUNITÉS DÉTECTÉES:
+    {json.dumps(opportunities, indent=2)}
+    
     MESSAGE UTILISATEUR:
     {message}
 
     Réponds clairement avec :
     - analyse
-    - stratégie
-    - action recommandée
+    - stratégie patrimoniale
+    - opportunités pertinentes
+    - recommandations
+    - plan d'action
     """
 
     response = client.chat.completions.create(
