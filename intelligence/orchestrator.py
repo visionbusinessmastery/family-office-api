@@ -10,12 +10,10 @@ from intelligence.analyzers.financial_overview import get_user_financial_overvie
 
 from intelligence.upgrade_engine import compute_upgrade_decision
 from intelligence.feature_engine import compute_feature_access
-from intelligence.opportunity_engine import compute_opportunities
 from intelligence.dashboard_engine import build_dashboard
 
 from intelligence.module_engine import get_all_opportunities
 
-opportunities = get_all_opportunities(user_profile)
 
 # =========================
 # CORE ORCHESTRATOR
@@ -66,6 +64,7 @@ def run_orchestrator(user_email: str):
         portfolio = []
 
         for p in portfolio_rows:
+
             qty = float(p.quantity or 0)
             price = float(p.purchase_price or 0)
 
@@ -77,6 +76,9 @@ def run_orchestrator(user_email: str):
 
         financial = get_user_financial_overview(user.id) or {}
 
+        # =========================
+        # SCORE ENGINE
+        # =========================
         score_data = compute_family_office_score(
             profile_dict,
             portfolio,
@@ -85,26 +87,64 @@ def run_orchestrator(user_email: str):
 
         score = score_data.get("score", 0)
 
-        upgrade = compute_upgrade_decision(user.plan, score)
-        features = compute_feature_access(profile_dict, score_data)
-        opportunities = compute_opportunities(profile_dict, portfolio)
+        # =========================
+        # MODULE OPPORTUNITIES
+        # =========================
+        user_profile = {
+            **profile_dict,
+            "portfolio": portfolio,
+            "financial": financial,
+            "score": score
+        }
 
+        opportunities = get_all_opportunities(user_profile)
+
+        # =========================
+        # UPGRADE ENGINE
+        # =========================
+        upgrade = compute_upgrade_decision(
+            user.plan,
+            score
+        )
+
+        # =========================
+        # FEATURE ACCESS
+        # =========================
+        features = compute_feature_access(
+            profile_dict,
+            score_data
+        )
+
+        # =========================
+        # DASHBOARD
+        # =========================
         dashboard = build_dashboard(
             {"plan": user.plan},
             {
                 "score": score_data,
-                "level": upgrade.get("recommended_plan", "FREE")
+                "level": upgrade.get(
+                    "recommended_plan",
+                    "FREE"
+                )
             }
         )
 
+        # =========================
+        # FINAL RESPONSE
+        # =========================
         return {
+
             "user": user.email,
             "plan": user.plan,
 
             "score": score_data,
+
             "upgrade": upgrade,
+
             "features": features,
+
             "opportunities": opportunities,
+
             "dashboard": dashboard,
 
             "portfolio_size": len(portfolio)
@@ -112,6 +152,6 @@ def run_orchestrator(user_email: str):
 
 
 # =========================
-# 🔥 CRITICAL FIX COMPATIBILITY LAYER
+# COMPATIBILITY LAYER
 # =========================
 orchestrator = run_orchestrator
