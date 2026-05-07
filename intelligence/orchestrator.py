@@ -13,6 +13,9 @@ from intelligence.feature_engine import compute_feature_access
 from intelligence.opportunity_engine import compute_opportunities
 from intelligence.dashboard_engine import build_dashboard
 
+from intelligence.module_engine import get_all_opportunities
+
+opportunities = get_all_opportunities(user_profile)
 
 # =========================
 # CORE ORCHESTRATOR
