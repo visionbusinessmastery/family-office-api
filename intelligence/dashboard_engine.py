@@ -1,3 +1,6 @@
+from fastapi import APIRouter
+
+router = APIRouter()
 
 # =========================
 # BUILD DASHBOARD USER (UI LAYER ONLY - CLEAN ARCHITECTURE)
