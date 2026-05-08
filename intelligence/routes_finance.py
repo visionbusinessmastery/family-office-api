@@ -165,3 +165,49 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
 
     return {"status": "deleted"}
 
+
+def add_xp(conn, user_id: int, xp_amount: int):
+
+    row = conn.execute(
+        text("""
+            SELECT xp
+            FROM user_gamification
+            WHERE user_id = :user_id
+        """),
+        {"user_id": user_id}
+    ).fetchone()
+
+    if not row:
+
+        conn.execute(
+            text("""
+                INSERT INTO user_gamification
+                (user_id, xp, level)
+                VALUES (:user_id, :xp, :level)
+            """),
+            {
+                "user_id": user_id,
+                "xp": xp_amount,
+                "level": 1
+            }
+        )
+
+    else:
+
+        new_xp = row.xp + xp_amount
+        level = int(new_xp / 100) + 1
+
+        conn.execute(
+            text("""
+                UPDATE user_gamification
+                SET xp = :xp,
+                    level = :level
+                WHERE user_id = :user_id
+            """),
+            {
+                "xp": new_xp,
+                "level": level,
+                "user_id": user_id
+            }
+        )
+
