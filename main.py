@@ -17,7 +17,7 @@ from advisor.routes import router as advisor_router
 
 from intelligence.routes import router as intelligence_router
 from intelligence.routes_finance import router as finance_router
-from intelligence.routes_score import router as score_router
+from intelligence.routes_score import router as intelligence_router
 
 from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
@@ -137,9 +137,9 @@ app.include_router(
 )
 
 app.include_router(
-    score_router,
-    prefix="/intelligence/score",
-    tags=["Score"]
+    intelligence_router,
+    prefix="/intelligence",
+    tags=["Intelligence"]
 )
 
 app.include_router(
