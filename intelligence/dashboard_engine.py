@@ -1,12 +1,8 @@
 # =========================
-# BUILD DASHBOARD USER (PRODUCTION READY)
+# BUILD DASHBOARD USER (UI LAYER ONLY - CLEAN ARCHITECTURE)
 # =========================
 
 def build_dashboard(user, intelligence):
-    """
-    Génère la structure du dashboard utilisateur
-    basée sur le plan + intelligence + score IA.
-    """
 
     # =========================
     # SAFE INPUTS
@@ -20,7 +16,7 @@ def build_dashboard(user, intelligence):
     plan = (user.get("plan") or "FREE").upper()
 
     # =========================
-    # SAFE INTELLIGENCE PARSING
+    # SAFE SCORE PARSING
     # =========================
     score_data = intelligence.get("score")
 
@@ -32,7 +28,7 @@ def build_dashboard(user, intelligence):
     level = intelligence.get("level") or "BEGINNER"
 
     # =========================
-    # BASE DASHBOARD STRUCTURE
+    # DASHBOARD BASE STRUCTURE (UI ONLY)
     # =========================
     dashboard = {
         "hero": True,
@@ -43,13 +39,16 @@ def build_dashboard(user, intelligence):
         "score": score,
         "features": [],
         "ai_blocks": [],
-        "locked_blocks": []
+        "locked_blocks": [],
+        "mode": "STANDARD"
     }
 
     # =========================
-    # 1. PLAN-BASED DASHBOARD
+    # 🧱 PLAN SYSTEM (UI ONLY)
     # =========================
+
     if plan == "FREE":
+
         dashboard["features"] = [
             "basic_portfolio",
             "education_content"
@@ -58,10 +57,12 @@ def build_dashboard(user, intelligence):
         dashboard["locked_blocks"] = [
             "ai_analysis",
             "advanced_portfolio",
-            "wealth_optimizer"
+            "wealth_optimizer",
+            "ai_advisor"
         ]
 
     elif plan == "SILVER":
+
         dashboard["features"] = [
             "portfolio_view",
             "basic_insights",
@@ -74,45 +75,81 @@ def build_dashboard(user, intelligence):
         ]
 
     elif plan == "GOLD":
+
         dashboard["features"] = [
             "full_portfolio",
             "market_insights",
             "ai_recommendations"
         ]
 
-    elif plan == "ELITE":
-        dashboard["features"] = [
-            "everything",
-            "private_deals_access",
-            "full_ai_suite"
+        dashboard["ai_blocks"] = [
+            "market_ai",
+            "recommendation_engine"
         ]
 
-        dashboard["ai_blocks"] = [
-            "full_ai_advisor",
-            "predictive_engine",
+    elif plan == "ELITE":
+
+        dashboard["features"] = [
+            "full_ai_suite",
+            "private_deals_access",
             "family_office_mode"
         ]
 
+        dashboard["ai_blocks"] = [
+            "predictive_engine",
+            "elite_ai_coach",
+            "family_office_ai"
+        ]
+
+    elif plan == "LIBERTY":
+
+        dashboard["features"] = [
+            "wealth_os",
+            "autopilot_engine",
+            "private_deals",
+            "full_ai_coach",
+            "family_office_mode"
+        ]
+
+        dashboard["ai_blocks"] = [
+            "liberty_ai_coach",
+            "autonomous_portfolio_engine",
+            "wealth_prediction_engine",
+            "family_office_ai"
+        ]
+
+        dashboard["mode"] = "LIBERTY_OPERATING_SYSTEM"
+        dashboard["unlock_all"] = True
+
+        dashboard["ai_blocks"].append("autopilot_wealth_engine")
+
     # =========================
-    # 2. SCORE-BASED ENHANCEMENTS
+    # 📈 SCORE BOOST (UI ENRICHMENT ONLY)
     # =========================
+
     if score >= 50:
         dashboard["ai_blocks"].append("smart_insights")
 
     if score >= 70:
         dashboard["ai_blocks"].append("opportunity_engine")
 
-    if score >= 80:
-        dashboard["ai_blocks"].append("elite_insight_banner")
+    if score >= 1000:
+        dashboard["ai_blocks"].append("xp_engine_boost")
 
-    if score >= 90:
-        dashboard["ai_blocks"].append("wealth_mastery_mode")
+    if score >= 3000:
+        dashboard["ai_blocks"].append("advanced_ai_coach")
+
+    if score >= 7000:
+        dashboard["ai_blocks"].append("elite_mode")
+
+    if score >= 15000:
+        dashboard["ai_blocks"].append("liberty_overdrive")
 
     # =========================
-    # 3. CLEAN OUTPUT (NO DUPLICATES)
+    # CLEAN OUTPUT
     # =========================
-    dashboard["ai_blocks"] = list(set(dashboard["ai_blocks"]))
     dashboard["features"] = list(set(dashboard["features"]))
+    dashboard["ai_blocks"] = list(set(dashboard["ai_blocks"]))
     dashboard["locked_blocks"] = list(set(dashboard["locked_blocks"]))
 
     return dashboard
