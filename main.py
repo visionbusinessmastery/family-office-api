@@ -12,14 +12,13 @@ from auth.utils import decode_token
 # =========================
 # ROUTES CORE V4 ONLY
 # =========================
-from auth.routes import router as auth_router
-from advisor.routes import router as advisor_router
-from intelligence.routes import router as intelligence_router
-from intelligence.routes_finance import router as finance_router
-from intelligence.routes_score import router as score_router
-from market.routes import router as market_router
-from portfolio.routes import router as portfolio_router
-from stocks.routes import router as stocks_router
+app.include_router(auth_router)
+app.include_router(advisor_router)
+app.include_router(intelligence_router)
+app.include_router(finance_router)
+app.include_router(score_router)
+app.include_router(market_router)
+app.include_router(portfolio_router)
 
 # =========================
 # LOGGING
@@ -104,18 +103,13 @@ async def auth_middleware(request: Request, call_next):
 # =========================
 # ROUTES V4 CLEAN
 # =========================
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
-app.include_router(score_router, prefix="/intelligence")
-app.include_router(finance_router, prefix="/finance")
-app.include_router(score_router, prefix="/score", tags=["Score"])
-
-app.include_router(market_router, prefix="/market", tags=["Market"])
-app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
-app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
-
+app.include_router(auth_router)
 app.include_router(advisor_router)
 app.include_router(intelligence_router)
+app.include_router(finance_router)
+app.include_router(score_router)
+app.include_router(market_router)
+app.include_router(portfolio_router)
 
 # =========================
 # HEALTH
