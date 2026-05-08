@@ -84,7 +84,7 @@ def compute_user_intelligence(user_email: str):
             "revenus": float(getattr(onboarding_data, "revenus_mensuels", 0) or 0),
             "charges": float(getattr(onboarding_data, "charges_mensuelles", 0) or 0),
             "epargne": float(profile_dict.get("savings") or 0),
-            "dettes": 0
+            "dettes": float(profile_dict.get("debts") or 0),
         }
 
         # =========================
