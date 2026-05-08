@@ -23,6 +23,36 @@ def safe_get(obj, key, default=0):
 
 
 # =========================
+# LEVEL SYSTEM (UNIFIED)
+# =========================
+def compute_level(score_value: int, plan: str = "FREE"):
+
+    plan = (plan or "FREE").upper()
+
+    # PREMIUM OVERRIDE
+    if plan == "LIBERTY":
+        return "LIBERTY"
+
+    # SCORE LEVELS
+    if score_value >= 15000:
+        return "LIBERTY"
+    elif score_value >= 7000:
+        return "ELITE"
+    elif score_value >= 3000:
+        return "ELITE"
+    elif score_value >= 1000:
+        return "GOLD"
+    elif score_value >= 80:
+        return "ELITE"
+    elif score_value >= 60:
+        return "GOLD"
+    elif score_value >= 40:
+        return "SILVER"
+    else:
+        return "FREE"
+
+
+# =========================
 # PUBLIC API
 # =========================
 def get_user_intelligence(user_email: str):
@@ -186,16 +216,9 @@ def compute_user_intelligence(user_email: str):
         score_value = int(score_value or 0)
 
         # =========================
-        # LEVEL
+        # LEVEL (FIXED + UNIFIED)
         # =========================
-        if score_value >= 80:
-            level = "ELITE"
-        elif score_value >= 60:
-            level = "GOLD"
-        elif score_value >= 40:
-            level = "SILVER"
-        else:
-            level = "FREE"
+        level = compute_level(score_value, user.plan)
 
         # =========================
         # AI MODULES
