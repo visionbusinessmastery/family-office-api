@@ -1,12 +1,12 @@
 # =========================
 # IMPORTS
 # =========================
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
 
-router = APIRouter(prefix="/finance", tags=["Finance"])
+router = APIRouter(tags=["Finance"])
 
 
 # =========================
