@@ -1,50 +1,58 @@
 # =========================
-# PLAN FROM SCORE
+# IMPORTS (SAFE EXTENSION)
+# =========================
+from sqlalchemy import text
+from intelligence.constants.tiers import PLAN_HIERARCHY
+
+
+# =========================
+# PLAN FROM SCORE (XP SYSTEM)
 # =========================
 def get_plan_from_score(score: int):
 
-    if score >= 85:
+    # 🔥 LIBERTY MODE (END GAME)
+    if score >= 15000:
+        return "LIBERTY"
+
+    # ELITE
+    elif score >= 7000:
         return "ELITE"
-    elif score >= 70:
+
+    # GOLD
+    elif score >= 3000:
         return "GOLD"
-    elif score >= 50:
+
+    # SILVER
+    elif score >= 1000:
         return "SILVER"
-    else:
-        return "FREE"
+
+    # FREE
+    return "FREE"
 
 
 # =========================
-# UPGRADE DECISION ENGINE
+# UPGRADE DECISION ENGINE (XP-BASED)
 # =========================
 def compute_upgrade_decision(current_plan: str, score: int):
 
     recommended_plan = get_plan_from_score(score)
 
-    hierarchy = {
-        "FREE": 0,
-        "SILVER": 1,
-        "GOLD": 2,
-        "ELITE": 3
-    }
+    current_level = PLAN_HIERARCHY.get(
+        (current_plan or "FREE").upper(), 0
+    )
 
-    current_level = hierarchy.get((current_plan or "FREE").upper(), 0)
-    recommended_level = hierarchy.get(recommended_plan, 0)
+    recommended_level = PLAN_HIERARCHY.get(
+        recommended_plan, 0
+    )
 
-    if recommended_level > current_level:
-        return {
-            "upgrade": True,
-            "from": current_plan or "FREE",
-            "to": recommended_plan,
-            "recommended_plan": recommended_plan,
-            "reason": "score_threshold_reached"
-        }
+    upgrade = recommended_level > current_level
 
     return {
-        "upgrade": False,
-        "from": current_plan or "FREE",
-        "to": current_plan or "FREE",
+        "upgrade": upgrade,
+        "from": (current_plan or "FREE").upper(),
+        "to": recommended_plan,
         "recommended_plan": recommended_plan,
-        "reason": None
+        "reason": "xp_threshold_reached" if upgrade else None
     }
 
 
@@ -64,7 +72,7 @@ def process_user_intelligence(user_email, profile, portfolio, conn):
         portfolio = portfolio or []
 
         # =========================
-        # SCORE COMPUTATION
+        # SCORE COMPUTATION (XP CORE)
         # =========================
         score_data = compute_family_office_score(profile, portfolio)
 
@@ -83,7 +91,7 @@ def process_user_intelligence(user_email, profile, portfolio, conn):
         )
 
         # =========================
-        # DB UPDATE SAFE
+        # DB UPDATE SAFE (PLAN EVOLUTION)
         # =========================
         if upgrade.get("upgrade"):
 
@@ -119,12 +127,16 @@ def process_user_intelligence(user_email, profile, portfolio, conn):
                 "score": score_value
             })
 
+        # =========================
+        # RESPONSE
+        # =========================
         return {
             "score": score_data,
             "upgrade": upgrade
         }
 
     except Exception as e:
+
         return {
             "error": str(e),
             "score": {
