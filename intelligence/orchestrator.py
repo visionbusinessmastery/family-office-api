@@ -14,6 +14,9 @@ from intelligence.dashboard_engine import build_dashboard
 
 from intelligence.module_engine import get_all_opportunities
 
+# ✅ AJOUT UNIQUE (SAFE)
+from intelligence.gamification.orchestrator import build_gamification
+
 
 # =========================
 # CORE ORCHESTRATOR
@@ -64,7 +67,6 @@ def run_orchestrator(user_email: str):
         portfolio = []
 
         for p in portfolio_rows:
-
             qty = float(p.quantity or 0)
             price = float(p.purchase_price or 0)
 
@@ -122,30 +124,37 @@ def run_orchestrator(user_email: str):
             {"plan": user.plan},
             {
                 "score": score_data,
-                "level": upgrade.get(
-                    "recommended_plan",
-                    "FREE"
-                )
+                "level": upgrade.get("recommended_plan", "FREE")
             }
+        )
+
+        # =========================
+        # 🧠 GAMIFICATION (AJOUT SAFE)
+        # =========================
+        streak = profile_dict.get("streak", 0) if isinstance(profile_dict, dict) else 0
+
+        gamification = build_gamification(
+            user,
+            score,
+            user.plan,
+            streak
         )
 
         # =========================
         # FINAL RESPONSE
         # =========================
         return {
-
             "user": user.email,
             "plan": user.plan,
 
             "score": score_data,
-
             "upgrade": upgrade,
-
             "features": features,
-
             "opportunities": opportunities,
-
             "dashboard": dashboard,
+
+            # 🔥 AJOUT SAFE
+            "gamification": gamification,
 
             "portfolio_size": len(portfolio)
         }
