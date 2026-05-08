@@ -138,7 +138,7 @@ app.include_router(
 
 app.include_router(
     score_router,
-    prefix="/score",
+    prefix="/intelligence/score",
     tags=["Score"]
 )
 
