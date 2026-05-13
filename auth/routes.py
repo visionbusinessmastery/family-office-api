@@ -304,7 +304,7 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
             WHERE email = :email
         """), {
             "email": email,
-            "revenus": data.get("revenus"),
+            "revenus": data.get("revenus_mensuels"),
             "charges": data.get("charges_mensuelles"),
         })
 
