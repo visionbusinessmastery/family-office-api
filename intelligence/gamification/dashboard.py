@@ -1,6 +1,9 @@
+# =========================
+# IMPORTS
+# =========================
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
-from auth.utils import get_current_user
+from auth.utils import get_user_id
 from database import engine
 
 router = APIRouter()
