@@ -72,11 +72,13 @@ def get_finance(user=Depends(get_current_user)):
                 SELECT id, type, label, amount
                 FROM finance_items
                 WHERE user_id = :user_id
+                ORDER BY id DESC
             """),
             {"user_id": user_id}
         ).fetchall()
 
     revenues = []
+    charges = []
     debts = []
     savings = []
 
@@ -91,6 +93,9 @@ def get_finance(user=Depends(get_current_user)):
         if r.type == "revenus":
             revenues.append(item)
 
+        elif r.type == "charges":
+            charges.append(item)
+
         elif r.type == "dettes":
             debts.append(item)
 
@@ -99,6 +104,7 @@ def get_finance(user=Depends(get_current_user)):
 
     return {
         "revenus": revenues,
+        "charges": charges,
         "dettes": debts,
         "epargne": savings
     }
