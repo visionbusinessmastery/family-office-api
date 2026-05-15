@@ -10,11 +10,15 @@ router = APIRouter(tags=["Finance"])
 
 
 # =========================
-# HELPERS
+# HELPER
 # =========================
 def get_user_id(conn, email: str):
     row = conn.execute(
-        text("SELECT id FROM users WHERE email = :email"),
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """),
         {"email": email}
     ).fetchone()
 
@@ -172,6 +176,9 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
     return {"status": "deleted"}
 
 
+# =========================
+# ADD XP
+# =========================
 def add_xp(conn, user_id: int, xp_amount: int):
 
     row = conn.execute(
@@ -216,4 +223,42 @@ def add_xp(conn, user_id: int, xp_amount: int):
                 "user_id": user_id
             }
         )
+
+
+# =========================
+# GAMIFICATION ENDPOINT
+# =========================
+@router.get("/gamification")
+def get_gamification(user=Depends(get_current_user)):
+
+    email = user
+
+    with engine.connect() as conn:
+
+        user_id = get_user_id(conn, email)
+
+        row = conn.execute(
+            text("""
+                SELECT xp, level, streak, badges
+                FROM user_gamification
+                WHERE user_id = :user_id
+            """),
+            {"user_id": user_id}
+        ).fetchone()
+
+        if not row:
+            return {
+                "xp": 0,
+                "level": 1,
+                "streak": 0,
+                "badges": []
+            }
+
+        return {
+            "xp": row.xp or 0,
+            "level": row.level or 1,
+            "streak": row.streak or 0,
+            "badges": row.badges.split(",") if row.badges else []
+        }
+
 
