@@ -3,9 +3,24 @@ from sqlalchemy import text
 from auth.utils import get_current_user
 
 from database import engine
-from users.utils import get_user_id
 
 router = APIRouter()
+
+# =========================
+# GET USER ID
+# =========================
+def get_user_id(conn, email: str):
+
+    row = conn.execute(
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """),
+        {"email": email}
+    ).fetchone()
+
+    return row.id if row else None
 
 
 # =========================
@@ -81,3 +96,5 @@ def unlock_badges(conn, user_id):
             "user_id": user_id
         }
     )
+
+
