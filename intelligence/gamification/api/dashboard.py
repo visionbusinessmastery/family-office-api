@@ -23,7 +23,7 @@ def get_user_id(conn, email: str):
 
 
 # =========================
-# READ GAMIFICATION ONLY
+# READ ONLY GAMIFICATION API
 # =========================
 @router.get("/gamification")
 def get_gamification(user=Depends(get_current_user)):
