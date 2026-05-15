@@ -24,6 +24,8 @@ from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
+from intelligence.api.global_command_center import router as global_command_center_router
+
 
 # =========================
 # LOGGING
@@ -165,6 +167,8 @@ app.include_router(
     prefix="/stocks",
     tags=["Stocks"]
 )
+
+app.include_router(global_command_center_router)
 
 # =========================
 # HEALTH
