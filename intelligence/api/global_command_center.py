@@ -1,26 +1,38 @@
 # =========================
-# GLOBAL FINANCIAL COMMAND CENTER
+# GLOBAL FINANCIAL COMMAND CENTER API V2
 # =========================
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
+
 from database import engine
 from auth.utils import get_current_user
 
-from intelligence.analyzers.family_office_score import compute_family_office_score
-from intelligence.analyzers.financial_overview import get_user_financial_overview
+from intelligence.engines.global_financial_command_center import (
+    compute_global_command_center
+)
 
-from intelligence.scoring_registry import SCORING_ENGINES
+from intelligence.analyzers.financial_overview import (
+    get_user_financial_overview
+)
 
-router = APIRouter(prefix="/intelligence", tags=["Global Command Center"])
+router = APIRouter(
+    prefix="/intelligence",
+    tags=["Global Command Center"]
+)
 
 
 # =========================
 # GET USER ID
 # =========================
 def get_user_id(conn, email: str):
+
     row = conn.execute(
-        text("SELECT id FROM users WHERE email = :email"),
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """),
         {"email": email}
     ).fetchone()
 
@@ -28,106 +40,178 @@ def get_user_id(conn, email: str):
 
 
 # =========================
+# LOAD PORTFOLIO
+# =========================
+def load_portfolio(conn, user_id: int):
+
+    rows = conn.execute(text("""
+        SELECT
+            id,
+            category,
+            quantity,
+            purchase_price
+        FROM portfolio
+        WHERE user_id = :user_id
+    """), {
+        "user_id": user_id
+    }).mappings().all()
+
+    portfolio = []
+
+    for r in rows:
+
+        quantity = float(r["quantity"] or 0)
+        purchase_price = float(r["purchase_price"] or 0)
+
+        portfolio.append({
+            "id": r["id"],
+            "type": r["category"],
+            "quantity": quantity,
+            "purchase_price": purchase_price,
+            "value": quantity * purchase_price,
+        })
+
+    return portfolio
+
+
+# =========================
+# LOAD ONBOARDING
+# =========================
+def load_onboarding(conn, user_id: int):
+
+    row = conn.execute(text("""
+        SELECT
+            revenus_mensuels,
+            charges_mensuelles,
+            risk_profile
+        FROM onboarding
+        WHERE user_id = :user_id
+    """), {
+        "user_id": user_id
+    }).mappings().fetchone()
+
+    if not row:
+        return {}
+
+    return {
+        "revenus_mensuels": float(
+            row.get("revenus_mensuels") or 0
+        ),
+
+        "charges_mensuelles": float(
+            row.get("charges_mensuelles") or 0
+        ),
+
+        "risk_profile": (
+            row.get("risk_profile") or "medium"
+        )
+    }
+
+
+# =========================
 # GLOBAL COMMAND CENTER
 # =========================
 @router.get("/global-command-center")
-def global_command_center(user=Depends(get_current_user)):
+def global_command_center(
+    user=Depends(get_current_user)
+):
 
-    email = user
+    try:
 
-    with engine.connect() as conn:
+        email = user
 
-        user_id = get_user_id(conn, email)
+        with engine.connect() as conn:
 
-        if not user_id:
-            return {"error": "User not found"}
+            # =========================
+            # USER ID
+            # =========================
+            user_id = get_user_id(conn, email)
 
-        # =========================
-        # PROFILE
-        # =========================
-        profile = {
-            "user_id": user_id
-        }
-
-        # =========================
-        # PORTFOLIO
-        # =========================
-        portfolio_rows = conn.execute(text("""
-            SELECT id, category, quantity, purchase_price
-            FROM portfolio
-            WHERE user_id = :user_id
-        """), {"user_id": user_id}).mappings().all()
-
-        portfolio = [
-            {
-                "id": r["id"],
-                "type": r["category"],
-                "quantity": float(r["quantity"] or 0),
-                "purchase_price": float(r["purchase_price"] or 0),
-                "value": float((r["quantity"] or 0) * (r["purchase_price"] or 0))
-            }
-            for r in portfolio_rows
-        ]
-
-        # =========================
-        # FINANCIAL OVERVIEW
-        # =========================
-        financial = get_user_financial_overview(user_id)
-
-        # =========================
-        # MODULE SCORES
-        # =========================
-        module_results = {}
-
-        for module_name, engine_fn in SCORING_ENGINES.items():
-
-            try:
-                module_results[module_name] = engine_fn(
-                    profile=profile,
-                    portfolio=portfolio,
-                    financial=financial
-                )
-
-            except Exception as e:
-                module_results[module_name] = {
-                    "score": 0,
-                    "error": str(e)
+            if not user_id:
+                return {
+                    "error": "User not found"
                 }
 
-        # =========================
-        # GLOBAL SCORE
-        # =========================
-        module_scores = [
-            v.get("score", 0)
-            for v in module_results.values()
-            if isinstance(v, dict)
-        ]
+            # =========================
+            # USER OBJECT
+            # =========================
+            user_object = {
+                "id": user_id,
+                "email": email,
+            }
 
-        global_score = int(sum(module_scores) / len(module_scores)) if module_scores else 0
+            # =========================
+            # LOAD DATA
+            # =========================
+            onboarding = load_onboarding(
+                conn,
+                user_id
+            )
 
-        # =========================
-        # FINANCIAL FAMILY SCORE (EXISTING CORE)
-        # =========================
-        family_score = compute_family_office_score(
-            profile=profile,
-            portfolio=portfolio,
-            financial=financial.get("totals", {})
-        )
+            portfolio = load_portfolio(
+                conn,
+                user_id
+            )
 
-        # =========================
-        # FINAL RESPONSE
-        # =========================
+            financial_overview = (
+                get_user_financial_overview(
+                    user_id
+                )
+            )
+
+            # =========================
+            # GLOBAL ENGINE
+            # =========================
+            result = compute_global_command_center(
+                user=user_object,
+                onboarding=onboarding,
+                portfolio=portfolio,
+                financial_overview=financial_overview,
+            )
+
+            # =========================
+            # FRONTEND READY
+            # =========================
+            return {
+                "success": True,
+
+                "global_score": result.get(
+                    "global_score",
+                    0
+                ),
+
+                "level": result.get(
+                    "level",
+                    "BEGINNER"
+                ),
+
+                "modules": result.get(
+                    "modules",
+                    {}
+                ),
+
+                "advice": result.get(
+                    "advice",
+                    []
+                ),
+
+                "context": result.get(
+                    "context",
+                    {}
+                ),
+
+                "portfolio": portfolio,
+
+                "financial_overview": (
+                    financial_overview
+                ),
+
+                "onboarding": onboarding,
+            }
+
+    except Exception as e:
+
         return {
-            "global_score": global_score,
-            "level": family_score["level"],
-
-            "family_office_score": family_score,
-
-            "modules": module_results,
-
-            "financial_overview": financial,
-
-            "portfolio": portfolio,
-
-            "advice": family_score.get("advice", [])
+            "success": False,
+            "error": str(e),
         }
