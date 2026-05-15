@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from auth.utils import get_current_user
 
-from db import engine
+from database import engine
 from users.utils import get_user_id
 
 router = APIRouter()
