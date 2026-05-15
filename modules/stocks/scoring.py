@@ -1,14 +1,17 @@
 # =========================
 # SCORING ENGINE STOCKS
 # =========================
-def stock_score(user_profile):
+
+def stocks_score(user_profile: dict):
 
     score = 0
 
     capital = user_profile.get("capital", 0)
+    risk = (user_profile.get("risk_profile", "medium") or "medium").lower()
 
-    risk = user_profile.get("risk_profile", "medium")
-
+    # =========================
+    # CAPITAL SCORE
+    # =========================
     if capital > 1000:
         score += 20
 
@@ -18,6 +21,9 @@ def stock_score(user_profile):
     if capital > 50000:
         score += 60
 
+    # =========================
+    # RISK BONUS
+    # =========================
     if risk == "high":
         score += 20
 
