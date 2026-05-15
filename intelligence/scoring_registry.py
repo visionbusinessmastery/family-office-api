@@ -8,7 +8,7 @@ from modules.real_estate.scoring import real_estate_score
 from modules.banking.scoring import banking_score
 from modules.market.scoring import market_score
 
-from modules.stocks.scoring import stock_score
+from modules.stocks.scoring import stocks_score
 from modules.startup.scoring import startup_score
 from modules.private_equity.scoring import private_equity_score
 from modules.franchise.scoring import franchise_score
@@ -25,7 +25,7 @@ SCORING_ENGINES = {
     "banking": banking_score,
     "market": market_score,
 
-    "stocks": stock_score,
+    "stocks": stocks_score,
 
     "startup": startup_score,
     "private_equity": private_equity_score,
