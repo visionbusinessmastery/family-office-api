@@ -1,17 +1,11 @@
-from fastapi import APIRouter, Depends
-from auth.utils import get_current_user
-
+from fastapi import APIRouter
 router = APIRouter()
 
 # =========================
-# BUILD DASHBOARD USER (UI LAYER ONLY - CLEAN ARCHITECTURE)
+# BUILD DASHBOARD (UI ONLY)
 # =========================
-
 def build_dashboard(user, intelligence):
 
-    # =========================
-    # SAFE INPUTS
-    # =========================
     if not isinstance(user, dict):
         user = {}
 
@@ -20,9 +14,6 @@ def build_dashboard(user, intelligence):
 
     plan = (user.get("plan") or "FREE").upper()
 
-    # =========================
-    # SAFE SCORE PARSING
-    # =========================
     score_data = intelligence.get("score")
 
     if isinstance(score_data, dict):
@@ -32,9 +23,6 @@ def build_dashboard(user, intelligence):
 
     level = intelligence.get("level") or "BEGINNER"
 
-    # =========================
-    # DASHBOARD BASE STRUCTURE (UI ONLY)
-    # =========================
     dashboard = {
         "hero": True,
         "score_card": True,
@@ -48,17 +36,8 @@ def build_dashboard(user, intelligence):
         "mode": "STANDARD"
     }
 
-    # =========================
-    # 🧱 PLAN SYSTEM (UI ONLY)
-    # =========================
-
     if plan == "FREE":
-
-        dashboard["features"] = [
-            "basic_portfolio",
-            "education_content"
-        ]
-
+        dashboard["features"] = ["basic_portfolio", "education_content"]
         dashboard["locked_blocks"] = [
             "ai_analysis",
             "advanced_portfolio",
@@ -67,39 +46,29 @@ def build_dashboard(user, intelligence):
         ]
 
     elif plan == "SILVER":
-
         dashboard["features"] = [
             "portfolio_view",
             "basic_insights",
             "market_overview"
         ]
 
-        dashboard["locked_blocks"] = [
-            "ai_advisor",
-            "advanced_strategies"
-        ]
-
     elif plan == "GOLD":
-
         dashboard["features"] = [
             "full_portfolio",
             "market_insights",
             "ai_recommendations"
         ]
-
         dashboard["ai_blocks"] = [
             "market_ai",
             "recommendation_engine"
         ]
 
     elif plan == "ELITE":
-
         dashboard["features"] = [
             "full_ai_suite",
             "private_deals_access",
             "family_office_mode"
         ]
-
         dashboard["ai_blocks"] = [
             "predictive_engine",
             "elite_ai_coach",
@@ -107,7 +76,6 @@ def build_dashboard(user, intelligence):
         ]
 
     elif plan == "LIBERTY":
-
         dashboard["features"] = [
             "wealth_os",
             "autopilot_engine",
@@ -115,7 +83,6 @@ def build_dashboard(user, intelligence):
             "full_ai_coach",
             "family_office_mode"
         ]
-
         dashboard["ai_blocks"] = [
             "liberty_ai_coach",
             "autonomous_portfolio_engine",
@@ -125,12 +92,6 @@ def build_dashboard(user, intelligence):
 
         dashboard["mode"] = "LIBERTY_OPERATING_SYSTEM"
         dashboard["unlock_all"] = True
-
-        dashboard["ai_blocks"].append("autopilot_wealth_engine")
-
-    # =========================
-    # 📈 SCORE BOOST (UI ENRICHMENT ONLY)
-    # =========================
 
     if score >= 50:
         dashboard["ai_blocks"].append("smart_insights")
@@ -150,9 +111,6 @@ def build_dashboard(user, intelligence):
     if score >= 15000:
         dashboard["ai_blocks"].append("liberty_overdrive")
 
-    # =========================
-    # CLEAN OUTPUT
-    # =========================
     dashboard["features"] = list(set(dashboard["features"]))
     dashboard["ai_blocks"] = list(set(dashboard["ai_blocks"]))
     dashboard["locked_blocks"] = list(set(dashboard["locked_blocks"]))
