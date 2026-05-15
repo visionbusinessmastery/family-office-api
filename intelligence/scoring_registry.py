@@ -1,5 +1,5 @@
 # =========================
-# SCORING REGISTRY (CLEAN)
+# SCORING REGISTRY (SOURCE OF TRUTH)
 # =========================
 
 from modules.business.scoring import business_score
