@@ -1,13 +1,12 @@
 # =========================
 # IMPORTS
 # =========================
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
-from auth.utils import get_user_id
 
-router = APIRouter(tags=["Finance"])
+router = APIRouter
 
 
 # =========================
@@ -39,8 +38,10 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
         user_id = get_user_id(conn, email)
 
         if not user_id:
-            return {"error": "User not found"}
-
+            raise HTTPException(
+              status_code=404,
+              detail="User not found"
+            )
         conn.execute(
             text("""
                 INSERT INTO finance_items (user_id, type, label, amount)
