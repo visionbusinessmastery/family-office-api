@@ -111,14 +111,13 @@ def build_unlocks(plan: str, level: str):
 # =========================
 def get_user_id(conn, email: str):
 
-row = conn.execute(
-    text("""
-        SELECT id
-        FROM users
-        WHERE email = :email
-    """),
-    {"email": email}
-).fetchone()
+    row = conn.execute(
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """),
+        {"email": email}
+    ).fetchone()
 
-return row.id if row else None
-
+    return row.id if row else None
