@@ -1,6 +1,10 @@
+# =========================
+# IMPORTS
+# =========================
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from sqlalchemy import text
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -100,4 +104,21 @@ def build_unlocks(plan: str, level: str):
         base.append("family_office_ai")
 
     return base
+
+
+# =========================
+# GET USER ID
+# =========================
+    def get_user_id(conn, email: str):
+
+    row = conn.execute(
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """),
+        {"email": email}
+    ).fetchone()
+
+    return row.id if row else None
 
