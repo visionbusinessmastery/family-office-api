@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from auth.utils import get_current_user
-
 from database import engine
 
 router = APIRouter()
 
 # =========================
-# GET USER ID
+# GET USER ID (LOCAL - CLEAN)
 # =========================
 def get_user_id(conn, email: str):
 
@@ -24,7 +23,7 @@ def get_user_id(conn, email: str):
 
 
 # =========================
-# GAMIFICATION ENDPOINT
+# GAMIFICATION ENDPOINT (READ ONLY)
 # =========================
 @router.get("/gamification")
 def get_gamification(user=Depends(get_current_user)):
@@ -34,6 +33,14 @@ def get_gamification(user=Depends(get_current_user)):
     with engine.connect() as conn:
 
         user_id = get_user_id(conn, email)
+
+        if not user_id:
+            return {
+                "xp": 0,
+                "level": 1,
+                "streak": 0,
+                "badges": []
+            }
 
         row = conn.execute(
             text("""
@@ -61,9 +68,9 @@ def get_gamification(user=Depends(get_current_user)):
 
 
 # =========================
-# BADGES ENGINE
+# BADGES ENGINE (PURE LOGIC)
 # =========================
-def unlock_badges(conn, user_id):
+def unlock_badges(conn, user_id: int):
 
     rows = conn.execute(
         text("""
@@ -74,15 +81,17 @@ def unlock_badges(conn, user_id):
         {"user_id": user_id}
     ).fetchone()
 
+    total = rows.total if rows else 0
+
     badges = []
 
-    if rows.total >= 1:
+    if total >= 1:
         badges.append("Premier revenu")
 
-    if rows.total >= 10:
+    if total >= 10:
         badges.append("Analyste")
 
-    if rows.total >= 50:
+    if total >= 50:
         badges.append("Investisseur actif")
 
     conn.execute(
@@ -96,5 +105,4 @@ def unlock_badges(conn, user_id):
             "user_id": user_id
         }
     )
-
 
