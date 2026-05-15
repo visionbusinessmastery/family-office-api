@@ -23,6 +23,8 @@ from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
+from intelligence.gamification.dashboard import router as gamification_router
+
 # =========================
 # LOGGING
 # =========================
@@ -134,6 +136,11 @@ app.include_router(
     finance_router,
     prefix="/finance",
     tags=["Finance"]
+)
+
+app.include_router(
+    gamification_router,
+    tags=["Gamification"]
 )
 
 app.include_router(
