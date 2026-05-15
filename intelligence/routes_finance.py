@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from database import engine
-from auth.utils import get_current_user
+from auth.utils import get_user_id
 
 router = APIRouter(tags=["Finance"])
 
