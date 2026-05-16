@@ -6,7 +6,7 @@ from intelligence.engines.allocation_engine import compute_allocation_strategy
 from intelligence.engines.diversification_engine import compute_diversification
 from intelligence.engines.prediction_engine import compute_predictions
 from intelligence.engines.macro_engine import compute_macro_exposure
-from intelligence.engines.recommendation_engine import compute_recommendations
+from intelligence.engines.recommendation_engine import generate_recommendations
 
 
 def compute_strategic_layer(context: dict, modules: dict):
