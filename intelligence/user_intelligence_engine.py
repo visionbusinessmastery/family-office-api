@@ -4,14 +4,11 @@
 from sqlalchemy import text
 from database import engine
 
-from intelligence.analyzers.family_office_score import compute_family_office_score
-from intelligence.upgrade_engine import compute_upgrade_decision
-from intelligence.feature_engine import compute_feature_access
-from intelligence.opportunity_engine import compute_opportunities
+from intelligence.core.upgrade_engine import compute_upgrade_decision
+from intelligence.strategic.feature_engine import compute_feature_access
+from intelligence.strategic.opportunity_engine import compute_opportunities
 
-from intelligence.analyzers.financial_overview import get_user_financial_overview
-
-from strategic.strategic_layer import compute_strategic_layer
+from intelligence.strategic.strategic_layer import compute_strategic_layer
 
 
 # =========================
