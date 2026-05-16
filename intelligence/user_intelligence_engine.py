@@ -20,7 +20,7 @@ from intelligence.strategic.strategic_layer import (
     compute_strategic_layer
 )
 
-from finance.services.financial_service import (
+from intelligence.scoring.financial_overview import (
     get_user_financial_overview
 )
 
