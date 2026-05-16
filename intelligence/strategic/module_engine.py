@@ -2,7 +2,7 @@
 # MODULE ENGINE
 # =========================
 
-from intelligence.module_registry import MODULES
+from intelligence.scoring.module_registry import MODULES
 
 
 # =========================
