@@ -11,6 +11,8 @@ from intelligence.opportunity_engine import compute_opportunities
 
 from intelligence.analyzers.financial_overview import get_user_financial_overview
 
+from strategic.strategic_layer import compute_strategic_layer
+
 
 # =========================
 # SAFE GETTER
@@ -233,6 +235,7 @@ def compute_user_intelligence(user_email: str):
         return {
             "user": user.email,
             "plan": user.plan,
+            "strategic_intelligence = compute_strategic_layer(context, modules)
 
             "score": {
                 "score": score_value,
