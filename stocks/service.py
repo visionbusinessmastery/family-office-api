@@ -5,9 +5,22 @@ import os
 import yfinance as yf
 from difflib import get_close_matches
 
+from core.cache import redis_client
+import json
+
+
+# =========================
+# CONFIG
+# =========================
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
+REQUEST_TIMEOUT = 8
+
+
+# =========================
+# STATIC MAPPING
+# =========================
 COMPANY_TO_TICKER = {
     "nvidia": "NVDA",
     "tesla": "TSLA",
@@ -20,55 +33,83 @@ COMPANY_TO_TICKER = {
     "facebook": "META",
     "netflix": "NFLX",
     "phunware": "PHUN",
-    "nike": "NKE",  # 🔥 AJOUT IMPORTANT
+    "nike": "NKE",
 }
 
+
 # =========================
-# SMART SEARCH (AMÉLIORÉ)
+# CACHE HELPERS (REDIS)
+# =========================
+def get_cache(key):
+    try:
+        if redis_client:
+            data = redis_client.get(key)
+            if data:
+                return json.loads(data)
+    except:
+        pass
+    return None
+
+
+def set_cache(key, value, ttl=300):
+    try:
+        if redis_client:
+            redis_client.setex(key, ttl, json.dumps(value))
+    except:
+        pass
+
+
+# =========================
+# RESOLVE TICKER
 # =========================
 def resolve_ticker(query: str):
+
     query_clean = query.lower().strip()
 
-    # 1️⃣ mapping direct
+    # 1️⃣ direct mapping
     if query_clean in COMPANY_TO_TICKER:
         return COMPANY_TO_TICKER[query_clean]
 
-    # 2️⃣ fuzzy match (tolérance fautes)
+    # 2️⃣ fuzzy match
     match = get_close_matches(query_clean, COMPANY_TO_TICKER.keys(), n=1, cutoff=0.6)
     if match:
         return COMPANY_TO_TICKER[match[0]]
 
-    # 3️⃣ 🔥 fallback FMP search (NOUVEAU)
-    try:
-        results = search_stock_cached(query_clean)
+    # 3️⃣ fallback search API
+    results = search_stock(query_clean)
 
-        if results and len(results) > 0:
-            return results[0].get("symbol", query_clean.upper())
-    except Exception:
-        pass
+    if results and len(results) > 0:
+        return results[0].get("symbol", query.upper())
 
-    # 4️⃣ fallback final
     return query.upper()
 
 
 # =========================
-# GET STOCK DATA
+# STOCK DATA (🔥 REDIS CACHE)
 # =========================
 def get_stock_data(query: str):
 
     ticker = resolve_ticker(query)
+    cache_key = f"stock:{ticker}"
+
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+
+    data = None
 
     # ===== FMP =====
     if FMP_API_KEY:
         try:
             url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={FMP_API_KEY}"
-            data = requests.get(url).json()
+            r = requests.get(url, timeout=REQUEST_TIMEOUT)
+            raw = r.json()
 
-            if data and len(data) > 0:
-                stock = data[0]
+            if raw and isinstance(raw, list):
+                stock = raw[0]
 
                 if stock.get("price"):
-                    return {
+                    data = {
                         "name": stock.get("name"),
                         "ticker": stock.get("symbol"),
                         "price": stock.get("price"),
@@ -76,71 +117,94 @@ def get_stock_data(query: str):
                         "market_cap": stock.get("marketCap"),
                         "source": "FMP"
                     }
-        except Exception:
+        except:
             pass
 
     # ===== ALPHA VANTAGE =====
-    if ALPHA_VANTAGE_API_KEY:
+    if not data and ALPHA_VANTAGE_API_KEY:
         try:
             url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-            data = requests.get(url).json()
+            r = requests.get(url, timeout=REQUEST_TIMEOUT)
+            quote = r.json().get("Global Quote", {})
 
-            quote = data.get("Global Quote", {})
             price = quote.get("05. price")
 
             if price:
-                return {
+                data = {
                     "ticker": ticker,
                     "price": float(price),
                     "change_percent": quote.get("10. change percent"),
                     "source": "Alpha Vantage"
                 }
-        except Exception:
+        except:
             pass
 
     # ===== YAHOO =====
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
+    if not data:
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
 
-        price = info.get("currentPrice") or info.get("regularMarketPrice")
+            price = info.get("currentPrice") or info.get("regularMarketPrice")
 
-        if price:
-            return {
-                "name": info.get("shortName"),
-                "ticker": ticker,
-                "price": price,
-                "market_cap": info.get("marketCap"),
-                "pe": info.get("trailingPE"),
-                "sector": info.get("sector"),
-                "source": "Yahoo Finance"
-            }
+            if price:
+                data = {
+                    "name": info.get("shortName"),
+                    "ticker": ticker,
+                    "price": price,
+                    "market_cap": info.get("marketCap"),
+                    "sector": info.get("sector"),
+                    "source": "Yahoo Finance"
+                }
+        except:
+            pass
 
-    except Exception as e:
-        return {"error": str(e)}
+    if not data:
+        data = {"error": "Aucune donnée disponible", "ticker": ticker}
 
-    return {"error": "Aucune donnée disponible"}
+    # cache 5 min (market data)
+    set_cache(cache_key, data, ttl=300)
 
+    return data
 
 
 # =========================
-# SEARCH (CACHE)
+# SEARCH STOCKS (CACHE)
 # =========================
-@lru_cache(maxsize=100)
-def search_stock_cached(query: str):
+def search_stock(query: str):
+
+    cache_key = f"search:{query}"
+
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
 
     if not FMP_API_KEY:
         return []
 
-    url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=5&apikey={FMP_API_KEY}"
-    
-    for attempt in range(3):
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            return response.json()
-        
-        elif response.status_code == 429:
-            time.sleep(2)
-        
+    try:
+        url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=5&apikey={FMP_API_KEY}"
+
+        for attempt in range(3):
+            r = requests.get(url, timeout=REQUEST_TIMEOUT)
+
+            if r.status_code == 200:
+                data = r.json()
+                set_cache(cache_key, data, ttl=3600)
+                return data
+
+            if r.status_code == 429:
+                time.sleep(2)
+
+    except:
+        pass
+
     return []
+
+
+# =========================
+# FAST LRU CACHE (OPTIONAL LOCAL SPEED)
+# =========================
+@lru_cache(maxsize=100)
+def search_stock_local(query: str):
+    return search_stock(query)
