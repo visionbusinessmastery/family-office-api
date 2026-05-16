@@ -23,9 +23,9 @@ from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
-from intelligence.gamification.api.dashboard import router as gamification_router
-from intelligence.api.global_command_center import router as global_command_center_router
-
+from intelligence.gamification.api.dashboard import (
+    router as gamification_router
+)
 
 # =========================
 # LOGGING
@@ -64,7 +64,10 @@ app.add_middleware(
 # ERROR HANDLERS
 # =========================
 @app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+async def rate_limit_handler(
+    request: Request,
+    exc: RateLimitExceeded
+):
     return JSONResponse(
         status_code=429,
         content={
@@ -74,7 +77,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 @app.exception_handler(Exception)
-async def global_error_handler(request: Request, exc: Exception):
+async def global_error_handler(
+    request: Request,
+    exc: Exception
+):
 
     logging.error(f"ERROR: {str(exc)}")
 
@@ -91,42 +97,71 @@ async def global_error_handler(request: Request, exc: Exception):
 # =========================
 @app.on_event("startup")
 def startup():
+
     Base.metadata.create_all(bind=engine)
 
 # =========================
 # AUTH MIDDLEWARE
 # =========================
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next):
+async def auth_middleware(
+    request: Request,
+    call_next
+):
 
     try:
 
-        token = request.headers.get("Authorization")
+        token = request.headers.get(
+            "Authorization"
+        )
 
         if token:
 
-            token = token.replace("Bearer ", "")
+            token = token.replace(
+                "Bearer ",
+                ""
+            )
 
             try:
-                request.state.user_email = decode_token(token)
+
+                request.state.user_email = (
+                    decode_token(token)
+                )
 
             except Exception:
-                request.state.user_email = "anonymous"
+
+                request.state.user_email = (
+                    "anonymous"
+                )
 
         else:
-            request.state.user_email = "anonymous"
+
+            request.state.user_email = (
+                "anonymous"
+            )
 
     except Exception:
-        request.state.user_email = "anonymous"
+
+        request.state.user_email = (
+            "anonymous"
+        )
 
     return await call_next(request)
 
 # =========================
 # ROUTES
 # =========================
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["Auth"]
+)
 
-app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
+app.include_router(
+    advisor_router,
+    prefix="/advisor",
+    tags=["Advisor"]
+)
 
 app.include_router(
     intelligence_router,
@@ -168,8 +203,6 @@ app.include_router(
     tags=["Stocks"]
 )
 
-app.include_router(global_command_center_router)
-
 # =========================
 # HEALTH
 # =========================
@@ -206,13 +239,11 @@ def info():
         "status": "production_ready"
     }
 
-print("APP STARTING 1")
+print("APP STARTING")
 
-from database import Base, engine
 print("DB IMPORT OK")
 
-from core.limiter import limiter
 print("LIMITER OK")
 
-from auth.utils import decode_token
+print("AUTH OK")
 print("AUTH OK")
