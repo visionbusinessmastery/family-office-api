@@ -229,7 +229,7 @@ def add_xp(conn, user_id: int, xp_amount: int):
 # =========================
 # GAMIFICATION ENDPOINT
 # =========================
-@router.get("/gamification")
+@router.get("/")
 def get_gamification(user=Depends(get_current_user)):
 
     email = user
