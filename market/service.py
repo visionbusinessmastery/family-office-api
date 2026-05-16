@@ -51,3 +51,34 @@ def get_market_intelligence(query: str):
         "sentiment": sentiment,
         "sentiment_score": sentiment_score
     }
+
+
+def get_market(query="stock market"):
+
+    insights = {
+        "sentiment": "neutral",
+        "trend": "stable",
+        "news": [],
+        "confidence": 50
+    }
+
+    try:
+        news = get_google_news(query) or []
+        insights["news"] = [n.get("title") for n in news[:5]]
+
+    except Exception:
+        pass
+
+    q = query.lower()
+
+    if "crash" in q:
+        insights["sentiment"] = "bearish"
+        insights["trend"] = "downtrend"
+        insights["confidence"] = 80
+
+    elif "bull" in q:
+        insights["sentiment"] = "bullish"
+        insights["trend"] = "uptrend"
+        insights["confidence"] = 80
+
+    return insights
