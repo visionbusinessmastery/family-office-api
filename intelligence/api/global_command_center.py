@@ -40,7 +40,7 @@ from intelligence.engines.macro_engine import (
 )
 
 from intelligence.engines.recommendation_engine import (
-    generate_recommendationss
+    generate_recommendations
 )
 
 # =========================
