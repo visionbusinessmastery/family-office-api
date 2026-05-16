@@ -16,7 +16,7 @@ from core.cache import redis_client
 
 
 # =========================
-# CACHE HELPERS
+# CACHE HELPERS (SAFE)
 # =========================
 def get_cache(key):
     try:
@@ -72,7 +72,7 @@ def compute_level(score_value: int, plan: str = "FREE"):
 
 
 # =========================
-# MAIN ENGINE
+# MAIN ENGINE (CACHE OPTIMIZED SAFE)
 # =========================
 def compute_user_intelligence(user_email: str):
 
@@ -80,7 +80,7 @@ def compute_user_intelligence(user_email: str):
     context_cache_key = f"context:{user_email}"
 
     # =========================
-    # CACHE INTELLIGENCE GLOBAL
+    # GLOBAL CACHE (FULL RESULT)
     # =========================
     cached = get_cache(cache_key)
     if cached:
@@ -102,7 +102,7 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # ONBOARDING REQUIRED
+        # ONBOARDING REQUIRED (FAST EXIT)
         # =========================
         if not user.profile_completed:
             result = {
@@ -118,15 +118,15 @@ def compute_user_intelligence(user_email: str):
             return result
 
         # =========================
-        # CONTEXT CACHE (PROFILE + ONBOARDING)
+        # CONTEXT CACHE (SAFE PROFILE + ONBOARDING)
         # =========================
         context = get_cache(context_cache_key)
 
-        if context:
-            profile_dict = context["profile"]
-            onboarding = context["onboarding"]
-
+        if context and isinstance(context, dict):
+            profile_dict = context.get("profile", {})
+            onboarding = context.get("onboarding", {})
         else:
+
             profile = conn.execute(text("""
                 SELECT *
                 FROM user_profiles
@@ -158,7 +158,7 @@ def compute_user_intelligence(user_email: str):
             }, ttl=300)
 
         # =========================
-        # PORTFOLIO
+        # PORTFOLIO VALUE (INLINE SAFE)
         # =========================
         rows = conn.execute(text("""
             SELECT asset_name, category, quantity, purchase_price
@@ -184,7 +184,7 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict["portfolio_value"] = total_portfolio_value
 
-        if profile_dict["investments"] == 0:
+        if profile_dict.get("investments", 0) == 0:
             profile_dict["investments"] = total_portfolio_value
 
         # =========================
@@ -229,7 +229,7 @@ def compute_user_intelligence(user_email: str):
         )
 
         # =========================
-        # RESULT
+        # FINAL RESULT
         # =========================
         result = {
             "user": user.email,
