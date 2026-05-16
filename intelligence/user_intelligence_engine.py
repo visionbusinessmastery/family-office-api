@@ -16,7 +16,7 @@ from core.cache import redis_client
 
 
 # =========================
-# CACHE HELPERS (SAFE)
+# CACHE HELPERS
 # =========================
 def get_cache(key):
     try:
@@ -72,7 +72,7 @@ def compute_level(score_value: int, plan: str = "FREE"):
 
 
 # =========================
-# MAIN ENGINE (CACHE OPTIMIZED SAFE)
+# MAIN ENGINE
 # =========================
 def compute_user_intelligence(user_email: str):
 
@@ -80,7 +80,7 @@ def compute_user_intelligence(user_email: str):
     context_cache_key = f"context:{user_email}"
 
     # =========================
-    # GLOBAL CACHE (FULL RESULT)
+    # GLOBAL CACHE (FAST RETURN)
     # =========================
     cached = get_cache(cache_key)
     if cached:
@@ -102,9 +102,10 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # ONBOARDING REQUIRED (FAST EXIT)
+        # ONBOARDING CHECK
         # =========================
         if not user.profile_completed:
+
             result = {
                 "state": "ONBOARDING_REQUIRED",
                 "score": {"score": 0},
@@ -118,15 +119,15 @@ def compute_user_intelligence(user_email: str):
             return result
 
         # =========================
-        # CONTEXT CACHE (SAFE PROFILE + ONBOARDING)
+        # CONTEXT CACHE (PROFILE + ONBOARDING)
         # =========================
         context = get_cache(context_cache_key)
 
-        if context and isinstance(context, dict):
-            profile_dict = context.get("profile", {})
-            onboarding = context.get("onboarding", {})
-        else:
+        if context:
+            profile_dict = context["profile"]
+            onboarding = context["onboarding"]
 
+        else:
             profile = conn.execute(text("""
                 SELECT *
                 FROM user_profiles
@@ -138,16 +139,16 @@ def compute_user_intelligence(user_email: str):
             onboarding = {
                 "monthly_income": float(user.revenus_mensuels or 0),
                 "monthly_expenses": float(user.charges_mensuelles or 0),
-                "epargne": float(profile_dict_raw.get("savings") or 0),
-                "dettes": float(profile_dict_raw.get("debts") or 0),
+                "savings": float(profile_dict_raw.get("savings") or 0),
+                "debts": float(profile_dict_raw.get("debts") or 0),
             }
 
             profile_dict = {
-                "epargne": onboarding["epargne"],
+                "savings": onboarding["savings"],
                 "investments": float(profile_dict_raw.get("investments") or 0),
                 "risk_profile": (profile_dict_raw.get("risk_profile") or "medium").lower(),
                 "monthly_income": onboarding["monthly_income"],
-                "debt": onboarding["dettes"],
+                "debt": onboarding["debts"],
                 "email": user.email,
                 "plan": user.plan,
             }
@@ -158,7 +159,7 @@ def compute_user_intelligence(user_email: str):
             }, ttl=300)
 
         # =========================
-        # PORTFOLIO VALUE (INLINE SAFE)
+        # PORTFOLIO
         # =========================
         rows = conn.execute(text("""
             SELECT asset_name, category, quantity, purchase_price
@@ -184,7 +185,7 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict["portfolio_value"] = total_portfolio_value
 
-        if profile_dict.get("investments", 0) == 0:
+        if profile_dict["investments"] == 0:
             profile_dict["investments"] = total_portfolio_value
 
         # =========================
@@ -229,7 +230,7 @@ def compute_user_intelligence(user_email: str):
         )
 
         # =========================
-        # FINAL RESULT
+        # RESULT
         # =========================
         result = {
             "user": user.email,
