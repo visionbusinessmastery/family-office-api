@@ -39,6 +39,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+print("APP STARTING")
+
 # =========================
 # APP INIT
 # =========================
@@ -48,6 +50,8 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+print("LIMITER OK")
 
 # =========================
 # CORS
@@ -102,7 +106,11 @@ async def global_error_handler(
 @app.on_event("startup")
 def startup():
 
+    print("DB INIT START")
+
     Base.metadata.create_all(bind=engine)
+
+    print("DB INIT OK")
 
 # =========================
 # AUTH MIDDLEWARE
@@ -132,7 +140,11 @@ async def auth_middleware(
                     decode_token(token)
                 )
 
-            except Exception:
+            except Exception as e:
+
+                logging.error(
+                    f"TOKEN ERROR: {str(e)}"
+                )
 
                 request.state.user_email = (
                     "anonymous"
@@ -144,13 +156,21 @@ async def auth_middleware(
                 "anonymous"
             )
 
-    except Exception:
+    except Exception as e:
+
+        logging.error(
+            f"MIDDLEWARE ERROR: {str(e)}"
+        )
 
         request.state.user_email = (
             "anonymous"
         )
 
-    return await call_next(request)
+    response = await call_next(request)
+
+    return response
+
+print("AUTH OK")
 
 # =========================
 # ROUTES
@@ -180,13 +200,14 @@ app.include_router(
 )
 
 app.include_router(
-    gamification_router,
-    tags=["Gamification"]
+    intelligence_score_router,
+    prefix="/intelligence",
+    tags=["Score"]
 )
 
 app.include_router(
-    intelligence_score_router,
-    prefix="/intelligence"
+    gamification_router,
+    tags=["Gamification"]
 )
 
 app.include_router(
@@ -207,9 +228,16 @@ app.include_router(
     tags=["Stocks"]
 )
 
+# =========================
+# GLOBAL COMMAND CENTER
+# =========================
 app.include_router(
-    global_command_center_router
+    global_command_center_router,
+    prefix="/global",
+    tags=["Global AI"]
 )
+
+print("ROUTERS OK")
 
 # =========================
 # HEALTH
@@ -234,7 +262,9 @@ def health():
             "score",
             "market",
             "portfolio",
-            "stocks"
+            "stocks",
+            "global_ai",
+            "gamification"
         ]
     }
 
@@ -247,11 +277,4 @@ def info():
         "status": "production_ready"
     }
 
-print("APP STARTING")
-
-print("DB IMPORT OK")
-
-print("LIMITER OK")
-
-print("AUTH OK")
-print("AUTH OK")
+print("MAIN LOADED SUCCESSFULLY")
