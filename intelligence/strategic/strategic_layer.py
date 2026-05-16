@@ -1,11 +1,11 @@
 # strategic/strategic_layer.py
 
-from intelligence.engines.risk_engine import compute_risk_engine
-from intelligence.engines.wealth_engine import compute_wealth_engine
-from intelligence.engines.allocation_engine import compute_allocation_engine
-from intelligence.engines.diversification_engine import compute_diversification_engine
-from intelligence.engines.prediction_engine import compute_prediction_engine
-from intelligence.engines.macro_engine import compute_macro_engine
+from intelligence.engines.risk_engine import compute_risk_profile
+from intelligence.engines.wealth_engine import compute_wealth_projection
+from intelligence.engines.allocation_engine import compute_allocation_strategy
+from intelligence.engines.diversification_engine import compute_diversification
+from intelligence.engines.prediction_engine import compute_prediction
+from intelligence.engines.macro_engine import compute_macro_exposure
 from intelligence.engines.recommendation_engine import compute_recommendations
 
 
