@@ -4,12 +4,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from contextlib import asynccontextmanager
 
 from database import Base, engine
 from core.limiter import limiter
 from auth.utils import decode_token
-
-from contextlib import asynccontextmanager 
 
 # =========================
 # ROUTERS IMPORT
@@ -26,7 +25,6 @@ from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
-
 from intelligence.api.global_command_center import router as global_command_center_router
 
 
@@ -41,11 +39,23 @@ logging.basicConfig(
 print("APP STARTING")
 
 # =========================
-# APP INIT
+# LIFESPAN
+# =========================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("DB INIT START")
+    Base.metadata.create_all(bind=engine)
+    print("DB INIT OK")
+    yield
+
+
+# =========================
+# APP INIT (SINGLE SOURCE OF TRUTH)
 # =========================
 app = FastAPI(
     title="AI Family Office V4",
-    version="4.0.0"
+    version="4.0.0",
+    lifespan=lifespan
 )
 
 app.state.limiter = limiter
@@ -53,12 +63,13 @@ app.state.limiter = limiter
 print("LIMITER OK")
 
 # =========================
-# CORS
+# CORS (FIX IMPORTANT)
 # =========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "https://family-office-api-n4sv.onrender.com",
         "https://vision-business.com",
     ],
@@ -87,21 +98,6 @@ async def global_error_handler(request: Request, exc: Exception):
     )
 
 # =========================
-# STARTUP
-# =========================
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("DB INIT START")
-    Base.metadata.create_all(bind=engine)
-    print("DB INIT OK")
-    yield
-
-app = FastAPI(
-    title="AI Family Office V4",
-    version="4.0.0",
-    lifespan=lifespan
-)
-# =========================
 # AUTH MIDDLEWARE
 # =========================
 @app.middleware("http")
@@ -112,7 +108,6 @@ async def auth_middleware(request: Request, call_next):
 
         if token:
             token = token.replace("Bearer ", "")
-
             try:
                 request.state.user_email = decode_token(token)
             except Exception as e:
@@ -147,8 +142,11 @@ app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
-# FIX IMPORTANT : PAS de double prefix global
-app.include_router(global_command_center_router, prefix="/global-command-center", tags=["Global AI"])
+app.include_router(
+    global_command_center_router,
+    prefix="/global-command-center",
+    tags=["Global AI"]
+)
 
 print("ROUTERS OK")
 
