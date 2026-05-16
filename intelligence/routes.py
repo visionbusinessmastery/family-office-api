@@ -89,3 +89,35 @@ def run_intelligence(request: Request):
         }
 
     return safe_execute(_run, module_name="USER_INTELLIGENCE_PIPELINE")
+
+
+# =========================
+# GLOBAL COMMAND CENTER
+# =========================
+@router.get("/global-command-center")
+def global_command_center(request: Request):
+
+    def _run():
+        user_email = request.state.user_email
+
+        intelligence = compute_user_intelligence(user_email)
+
+        return {
+            "global_score": intelligence.get("global_score", 0),
+            "level": intelligence.get("level", "Starter"),
+            "modules": intelligence.get("modules", {}),
+            "advice": intelligence.get("advice", []),
+            "family_office_score": intelligence.get(
+                "family_office_score",
+                {}
+            ),
+            "gamification": intelligence.get(
+                "gamification",
+                {}
+            ),
+        }
+
+    return safe_execute(
+        _run,
+        module_name="GLOBAL_COMMAND_CENTER"
+    )
