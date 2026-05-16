@@ -10,7 +10,7 @@ import json
 
 
 # =========================
-# SAFE CACHE HELPERS
+# CACHE HELPERS
 # =========================
 def get_cache(key):
     try:
@@ -32,11 +32,29 @@ def set_cache(key, value, ttl=900):
 
 
 # =========================
+# STOCK CACHE (🔥 NEW - IMPORTANT)
+# =========================
+def get_stock_cached(ticker: str):
+    cache_key = f"stock:{ticker}"
+
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+
+    data = get_stock_data(ticker) or {}
+
+    # cache prix 5 min (market data change souvent)
+    set_cache(cache_key, data, ttl=300)
+
+    return data
+
+
+# =========================
 # PORTFOLIO ENGINE (OPTIMIZED + CACHE)
 # =========================
-def get_user_portfolio(user_email: str):
+def get_user_portfolio(user_id: int):
 
-    cache_key = f"portfolio:{user_email}"
+    cache_key = f"portfolio:{user_id}"
 
     # =========================
     # CACHE CHECK
@@ -50,8 +68,8 @@ def get_user_portfolio(user_email: str):
         rows = conn.execute(text("""
             SELECT id, asset_name, category, quantity, purchase_price
             FROM portfolio
-            WHERE user_email = :email
-        """), {"email": user_email}).fetchall()
+            WHERE user_id = :user_id
+        """), {"user_id": user_id}).fetchall()
 
         portfolio = []
         total_value = 0
@@ -67,9 +85,9 @@ def get_user_portfolio(user_email: str):
             ticker = resolve_ticker(asset)
 
             # =========================
-            # STOCK DATA SAFE CALL
+            # STOCK DATA (CACHE SAFE)
             # =========================
-            stock_data = get_stock_data(ticker) or {}
+            stock_data = get_stock_cached(ticker)
 
             current_price = stock_data.get("price") or purchase_price
 
@@ -77,13 +95,7 @@ def get_user_portfolio(user_email: str):
             cost = quantity * purchase_price
             gain = value - cost
 
-            # =========================
-            # SAFE DIVISION
-            # =========================
-            if cost > 0:
-                gain_percent = (gain / cost) * 100
-            else:
-                gain_percent = 0
+            gain_percent = (gain / cost * 100) if cost > 0 else 0
 
             total_value += value
             total_cost += cost
