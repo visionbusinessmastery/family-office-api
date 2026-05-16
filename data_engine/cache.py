@@ -1,48 +1,61 @@
 import time
-import requests
 import json
+import hashlib
+import requests
 
 from core.cache import redis_client
+
 
 CACHE = {}
 CACHE_DURATION = 900  # 15 min
 
 
 # =========================
-# LOCAL + REDIS GET
+# CACHE KEY NORMALIZER
+# =========================
+def make_cache_key(url: str):
+    return "http:" + hashlib.md5(url.encode()).hexdigest()
+
+
+# =========================
+# SAFE REQUEST WITH CACHE
 # =========================
 def get(url):
-    cache_key = f"http:{url}"
+    cache_key = make_cache_key(url)
 
     # =========================
-    # 1. REDIS CHECK (GLOBAL CACHE)
+    # 1. REDIS CACHE (GLOBAL)
     # =========================
-    try:
-        if redis_client:
+    if redis_client:
+        try:
             cached = redis_client.get(cache_key)
             if cached:
                 return json.loads(cached)
-    except:
-        pass
+        except Exception as e:
+            print("Redis read error:", e)
 
     # =========================
     # 2. LOCAL CACHE (FAST LAYER)
     # =========================
-    if cache_key in CACHE and time.time() - CACHE[cache_key]["time"] < CACHE_DURATION:
-        return CACHE[cache_key]["data"]
+    cached_local = CACHE.get(cache_key)
+
+    if cached_local:
+        if time.time() - cached_local["time"] < CACHE_DURATION:
+            return cached_local["data"]
 
     # =========================
     # 3. API CALL
     # =========================
     try:
-        r = requests.get(url, timeout=10)
-        if r.status_code != 200:
+        response = requests.get(url, timeout=10)
+
+        if not response.ok:
             return None
 
-        data = r.json()
+        data = response.json()
 
         # =========================
-        # SAVE LOCAL CACHE
+        # LOCAL CACHE STORE
         # =========================
         CACHE[cache_key] = {
             "data": data,
@@ -50,15 +63,20 @@ def get(url):
         }
 
         # =========================
-        # SAVE REDIS CACHE (GLOBAL)
+        # REDIS STORE
         # =========================
-        try:
-            if redis_client:
-                redis_client.setex(cache_key, CACHE_DURATION, json.dumps(data))
-        except:
-            pass
+        if redis_client:
+            try:
+                redis_client.setex(
+                    cache_key,
+                    CACHE_DURATION,
+                    json.dumps(data)
+                )
+            except Exception as e:
+                print("Redis write error:", e)
 
         return data
 
-    except Exception:
+    except requests.RequestException as e:
+        print("HTTP error:", e)
         return None
