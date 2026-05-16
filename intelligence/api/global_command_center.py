@@ -1,217 +1,352 @@
 # =========================
-# GLOBAL FINANCIAL COMMAND CENTER API V2
+# GLOBAL FINANCIAL COMMAND CENTER V3
 # =========================
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import text
+import logging
 
-from database import engine
-from auth.utils import get_current_user
-
-from intelligence.engines.global_financial_command_center import (
-    compute_global_command_center
+from intelligence.scoring.compute_module_score import (
+    compute_module_score
 )
 
-from intelligence.analyzers.financial_overview import (
-    get_user_financial_overview
+from intelligence.scoring.scoring_context_builder import (
+    build_scoring_context
 )
 
-router = APIRouter(
-    prefix="/intelligence",
-    tags=["Global Command Center"]
+# =========================
+# AI ENGINES
+# =========================
+from intelligence.ai.risk_engine import (
+    compute_risk_engine
 )
 
+from intelligence.ai.wealth_engine import (
+    compute_wealth_engine
+)
+
+from intelligence.ai.allocation_engine import (
+    compute_allocation_engine
+)
+
+from intelligence.ai.diversification_engine import (
+    compute_diversification_engine
+)
+
+from intelligence.ai.prediction_engine import (
+    compute_prediction_engine
+)
+
+from intelligence.ai.macro_engine import (
+    compute_macro_engine
+)
+
+from intelligence.ai.asset_recommendation_engine import (
+    compute_asset_recommendations
+)
 
 # =========================
-# GET USER ID
+# STRATEGIC LAYER
 # =========================
-def get_user_id(conn, email: str):
+from intelligence.strategic.strategic_layer import (
+    compute_strategic_intelligence
+)
 
-    row = conn.execute(
-        text("""
-            SELECT id
-            FROM users
-            WHERE email = :email
-        """),
-        {"email": email}
-    ).fetchone()
-
-    return row.id if row else None
-
+logger = logging.getLogger(__name__)
 
 # =========================
-# LOAD PORTFOLIO
+# MODULE WEIGHTS
 # =========================
-def load_portfolio(conn, user_id: int):
+MODULE_WEIGHTS = {
 
-    rows = conn.execute(text("""
-        SELECT
-            id,
-            category,
-            quantity,
-            purchase_price
-        FROM portfolio
-        WHERE user_id = :user_id
-    """), {
-        "user_id": user_id
-    }).mappings().all()
+    "business": 1.2,
+    "crypto": 0.9,
+    "real_estate": 1.3,
+    "banking": 1.0,
+    "market": 1.0,
+    "stocks": 1.1,
 
-    portfolio = []
-
-    for r in rows:
-
-        quantity = float(r["quantity"] or 0)
-        purchase_price = float(r["purchase_price"] or 0)
-
-        portfolio.append({
-            "id": r["id"],
-            "type": r["category"],
-            "quantity": quantity,
-            "purchase_price": purchase_price,
-            "value": quantity * purchase_price,
-        })
-
-    return portfolio
-
-
-# =========================
-# LOAD ONBOARDING
-# =========================
-def load_onboarding(conn, user_id: int):
-
-    row = conn.execute(text("""
-        SELECT
-            revenus_mensuels,
-            charges_mensuelles,
-            risk_profile
-        FROM onboarding
-        WHERE user_id = :user_id
-    """), {
-        "user_id": user_id
-    }).mappings().fetchone()
-
-    if not row:
-        return {}
-
-    return {
-        "revenus_mensuels": float(
-            row.get("revenus_mensuels") or 0
-        ),
-
-        "charges_mensuelles": float(
-            row.get("charges_mensuelles") or 0
-        ),
-
-        "risk_profile": (
-            row.get("risk_profile") or "medium"
-        )
-    }
+    "startup": 0.8,
+    "private_equity": 1.4,
+    "franchise": 0.9,
+    "etf": 1.1,
+    "entrepreneurship": 1.2,
+    "crowdfunding": 0.6,
+    "commodities": 0.8,
+    "ai_business": 1.0,
+}
 
 
 # =========================
-# GLOBAL COMMAND CENTER
+# LEVEL ENGINE
 # =========================
-@router.get("/global-command-center")
-def global_command_center(
-    user=Depends(get_current_user)
+def compute_level(score: int):
+
+    if score >= 90:
+        return "LEGEND"
+
+    if score >= 80:
+        return "ELITE"
+
+    if score >= 70:
+        return "ADVANCED"
+
+    if score >= 50:
+        return "INTERMEDIATE"
+
+    return "BEGINNER"
+
+
+# =========================
+# MAIN ENGINE
+# =========================
+def compute_global_command_center(
+    user,
+    onboarding=None,
+    portfolio=None,
+    financial_overview=None,
 ):
 
     try:
 
-        email = user
+        # =========================
+        # BUILD CONTEXT
+        # =========================
+        context = build_scoring_context(
+            user=user,
+            onboarding=onboarding,
+            portfolio=portfolio,
+            financial_overview=financial_overview,
+        )
 
-        with engine.connect() as conn:
+        # =========================
+        # MODULE SCORING
+        # =========================
+        modules = {}
 
-            # =========================
-            # USER ID
-            # =========================
-            user_id = get_user_id(conn, email)
+        weighted_total = 0
+        total_weight = 0
 
-            if not user_id:
-                return {
-                    "error": "User not found"
-                }
+        for module_name, weight in MODULE_WEIGHTS.items():
 
-            # =========================
-            # USER OBJECT
-            # =========================
-            user_object = {
-                "id": user_id,
-                "email": email,
+            result = compute_module_score(
+                module_name,
+                context
+            )
+
+            module_score = result.get("score", 0)
+
+            modules[module_name] = {
+                "score": module_score,
+                "weight": weight,
             }
 
-            # =========================
-            # LOAD DATA
-            # =========================
-            onboarding = load_onboarding(
-                conn,
-                user_id
+            weighted_total += module_score * weight
+            total_weight += weight
+
+        # =========================
+        # GLOBAL SCORE
+        # =========================
+        global_score = int(
+            weighted_total / total_weight
+        ) if total_weight > 0 else 0
+
+        global_score = max(
+            0,
+            min(global_score, 100)
+        )
+
+        # =========================
+        # LEVEL
+        # =========================
+        level = compute_level(global_score)
+
+        # =========================
+        # AI ENGINES
+        # =========================
+        risk_engine = compute_risk_engine(context)
+
+        wealth_engine = compute_wealth_engine(context)
+
+        allocation_engine = compute_allocation_engine(
+            context
+        )
+
+        diversification_engine = (
+            compute_diversification_engine(
+                context
+            )
+        )
+
+        prediction_engine = compute_prediction_engine(
+            context
+        )
+
+        macro_engine = compute_macro_engine(
+            context
+        )
+
+        recommendations = (
+            compute_asset_recommendations(
+                context
+            )
+        )
+
+        # =========================
+        # STRATEGIC INTELLIGENCE
+        # =========================
+        strategic_intelligence = (
+            compute_strategic_intelligence(
+                context=context,
+                modules=modules,
+                risk_engine=risk_engine,
+                wealth_engine=wealth_engine,
+                allocation_engine=allocation_engine,
+                diversification_engine=diversification_engine,
+                prediction_engine=prediction_engine,
+                macro_engine=macro_engine,
+            )
+        )
+
+        # =========================
+        # AI ADVICE
+        # =========================
+        advice = []
+
+        if risk_engine.get("risk_level") == "HIGH":
+            advice.append(
+                "Réduire l’exposition aux actifs volatils"
             )
 
-            portfolio = load_portfolio(
-                conn,
-                user_id
+        if wealth_engine.get("wealth_level") == "LOW":
+            advice.append(
+                "Augmenter les revenus et l’épargne"
             )
 
-            financial_overview = (
-                get_user_financial_overview(
-                    user_id
-                )
+        if diversification_engine.get(
+            "diversification_score",
+            0
+        ) < 40:
+            advice.append(
+                "Diversifier davantage le portefeuille"
             )
 
-            # =========================
-            # GLOBAL ENGINE
-            # =========================
-            result = compute_global_command_center(
-                user=user_object,
-                onboarding=onboarding,
-                portfolio=portfolio,
-                financial_overview=financial_overview,
-            )
+        # =========================
+        # FINAL PAYLOAD
+        # =========================
+        return {
 
             # =========================
-            # FRONTEND READY
+            # CORE
             # =========================
-            return {
-                "success": True,
+            "global_score": global_score,
+            "level": level,
 
-                "global_score": result.get(
-                    "global_score",
-                    0
-                ),
+            # =========================
+            # MODULES
+            # =========================
+            "modules": modules,
 
-                "level": result.get(
-                    "level",
-                    "BEGINNER"
-                ),
+            # =========================
+            # AI ENGINES
+            # =========================
+            "risk_engine": risk_engine,
 
-                "modules": result.get(
-                    "modules",
-                    {}
-                ),
+            "wealth_engine": wealth_engine,
 
-                "advice": result.get(
-                    "advice",
-                    []
-                ),
+            "allocation_engine": allocation_engine,
 
-                "context": result.get(
-                    "context",
-                    {}
-                ),
+            "diversification_engine":
+                diversification_engine,
 
-                "portfolio": portfolio,
+            "prediction_engine":
+                prediction_engine,
 
-                "financial_overview": (
-                    financial_overview
-                ),
+            "macro_engine":
+                macro_engine,
 
-                "onboarding": onboarding,
+            # =========================
+            # RECOMMENDATIONS
+            # =========================
+            "recommendations":
+                recommendations,
+
+            # =========================
+            # STRATEGIC AI
+            # =========================
+            "strategic_intelligence":
+                strategic_intelligence,
+
+            # =========================
+            # AI ADVICE
+            # =========================
+            "advice": advice,
+
+            # =========================
+            # RAW CONTEXT
+            # =========================
+            "context": {
+
+                "monthly_income":
+                    context.get(
+                        "monthly_income",
+                        0
+                    ),
+
+                "savings":
+                    context.get(
+                        "savings",
+                        0
+                    ),
+
+                "capital":
+                    context.get(
+                        "capital",
+                        0
+                    ),
+
+                "risk_profile":
+                    context.get(
+                        "risk_profile"
+                    ),
+
+                "portfolio_value":
+                    context.get(
+                        "portfolio_value",
+                        0
+                    ),
             }
+        }
 
     except Exception as e:
 
+        logger.error(
+            f"[GLOBAL COMMAND CENTER ERROR] {e}"
+        )
+
         return {
-            "success": False,
+
+            "global_score": 0,
+
+            "level": "BEGINNER",
+
+            "modules": {},
+
+            "risk_engine": {},
+
+            "wealth_engine": {},
+
+            "allocation_engine": {},
+
+            "diversification_engine": {},
+
+            "prediction_engine": {},
+
+            "macro_engine": {},
+
+            "recommendations": [],
+
+            "strategic_intelligence": {},
+
+            "advice": [],
+
             "error": str(e),
         }
