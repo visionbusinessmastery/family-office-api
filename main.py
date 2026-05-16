@@ -147,7 +147,7 @@ app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
 app.include_router(
     global_command_center_router,
-    prefix="/intelligence/global-command-center",
+    prefix="/global-command-center",
     tags=["Global AI"]
 )
 
