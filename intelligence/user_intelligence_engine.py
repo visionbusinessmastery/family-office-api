@@ -3,6 +3,7 @@
 # =========================
 from sqlalchemy import text
 from database import engine
+import json
 
 from intelligence.core.upgrade_engine import compute_upgrade_decision
 from intelligence.strategic.feature_engine import compute_feature_access
@@ -10,6 +11,8 @@ from intelligence.strategic.opportunity_engine import compute_opportunities
 from intelligence.strategic.strategic_layer import compute_strategic_layer
 from intelligence.scoring.financial_overview import get_user_financial_overview
 from intelligence.scoring.family_office_score import compute_family_office_score
+
+from core.cache import redis_client
 
 
 # =========================
@@ -47,9 +50,22 @@ def compute_level(score_value: int, plan: str = "FREE"):
 
 
 # =========================
-# MAIN ENGINE
+# MAIN ENGINE (CACHE OPTIMIZED SAFE)
 # =========================
 def compute_user_intelligence(user_email: str):
+
+    cache_key = f"intel:{user_email}"
+
+    # =========================
+    # CACHE CHECK (SAFE)
+    # =========================
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass  # NEVER break flow
 
     with engine.begin() as conn:
 
@@ -57,7 +73,8 @@ def compute_user_intelligence(user_email: str):
         # USER FETCH
         # =========================
         user = conn.execute(text("""
-            SELECT id, email, plan, profile_completed, revenus_mensuels, charges_mensuelles
+            SELECT id, email, plan, profile_completed,
+                   revenus_mensuels, charges_mensuelles
             FROM users
             WHERE email = :email
         """), {"email": user_email}).fetchone()
@@ -65,8 +82,11 @@ def compute_user_intelligence(user_email: str):
         if not user:
             return {"error": "user not found"}
 
+        # =========================
+        # ONBOARDING REQUIRED
+        # =========================
         if not user.profile_completed:
-            return {
+            result = {
                 "state": "ONBOARDING_REQUIRED",
                 "score": {"score": 0},
                 "level": "ONBOARDING",
@@ -74,6 +94,15 @@ def compute_user_intelligence(user_email: str):
                 "opportunities": [],
                 "upgrade": None
             }
+
+            # cache safe
+            if redis_client:
+                try:
+                    redis_client.setex(cache_key, 30, json.dumps(result))
+                except:
+                    pass
+
+            return result
 
         # =========================
         # PROFILE
@@ -97,7 +126,7 @@ def compute_user_intelligence(user_email: str):
         }
 
         # =========================
-        # NORMALIZED PROFILE
+        # PROFILE CLEAN
         # =========================
         profile_dict = {
             "epargne": onboarding["epargne"],
@@ -119,7 +148,6 @@ def compute_user_intelligence(user_email: str):
         """), {"user_id": user.id}).fetchall()
 
         portfolio_list = []
-
         total_portfolio_value = 0
 
         for p in rows:
@@ -146,19 +174,13 @@ def compute_user_intelligence(user_email: str):
         financial = get_user_financial_overview(user.id) or {}
 
         financial_features = {}
-
         totals = financial.get("totals", {}) if isinstance(financial, dict) else {}
 
         if totals:
-            income = safe_get(totals, "monthly_income", 0)
-            debt = safe_get(totals, "total_debt", 0)
-            savings = safe_get(totals, "total_savings", 0)
-            cashflow = safe_get(totals, "net_cashflow", 0)
-
             financial_features = {
-                "cashflow_score": cashflow,
-                "debt_risk_score": debt,
-                "savings_velocity_score": savings,
+                "cashflow_score": safe_get(totals, "net_cashflow", 0),
+                "debt_risk_score": safe_get(totals, "total_debt", 0),
+                "savings_velocity_score": safe_get(totals, "total_savings", 0),
                 "income_stability_score": len(financial.get("income_sources", [])) * 10,
                 "raw": totals
             }
@@ -173,6 +195,7 @@ def compute_user_intelligence(user_email: str):
         ) or {}
 
         score_value = safe_get(score_result, "score", 0)
+
         if isinstance(score_value, dict):
             score_value = safe_get(score_value, "score", 0)
 
@@ -184,30 +207,11 @@ def compute_user_intelligence(user_email: str):
         level = compute_level(score_value, user.plan)
 
         # =========================
-        # ENGINE CALLS FIXED
+        # ENGINE CALLS
         # =========================
         upgrade = compute_upgrade_decision(user.plan, score_value)
-
-        features = compute_feature_access(
-            profile_dict,
-            {"score": score_value}
-        )
-
+        features = compute_feature_access(profile_dict, {"score": score_value})
         opportunities = compute_opportunities(profile_dict, portfolio_list)
-
-        # =========================
-        # STRATEGIC LAYER FIXED
-        # =========================
-        strategic_context = {
-            "profile": profile_dict,
-            "portfolio": portfolio_list,
-            "financial": financial_features,
-            "monthly_income": profile_dict.get("monthly_income", 0),
-            "savings": profile_dict.get("epargne", 0),
-            "capital": profile_dict.get("investments", 0),
-            "portfolio_value": profile_dict.get("portfolio_value", 0),
-            "risk_profile": profile_dict.get("risk_profile", "medium"),
-        }
 
         strategic_intelligence = compute_strategic_layer(
             profile_dict,
@@ -217,23 +221,31 @@ def compute_user_intelligence(user_email: str):
         )
 
         # =========================
-        # RETURN SAFE
+        # RESULT
         # =========================
-        return {
+        result = {
             "user": user.email,
             "plan": user.plan,
-
             "strategic_intelligence": strategic_intelligence,
-
             "score": {
                 "score": score_value,
                 "details": score_result.get("details", {}),
                 "advice": score_result.get("advice", [])
             },
-
             "level": level,
             "onboarding": onboarding,
             "upgrade": upgrade,
             "features": features,
             "opportunities": opportunities
         }
+
+        # =========================
+        # CACHE STORE SAFE
+        # =========================
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 60, json.dumps(result))
+            except:
+                pass
+
+        return result
