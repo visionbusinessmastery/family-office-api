@@ -1,10 +1,30 @@
-# =========================
-# COMPUTE FAMILY OFFICE SCORE
-# =========================
-
 import logging
+from core.cache import redis_client
+import json
 
 logger = logging.getLogger(__name__)
+
+
+# =========================
+# CACHE HELPERS
+# =========================
+def get_cache(key):
+    try:
+        if redis_client:
+            data = redis_client.get(key)
+            if data:
+                return json.loads(data)
+    except:
+        pass
+    return None
+
+
+def set_cache(key, value, ttl=300):
+    try:
+        if redis_client:
+            redis_client.setex(key, ttl, json.dumps(value))
+    except:
+        pass
 
 
 # =========================
@@ -13,14 +33,23 @@ logger = logging.getLogger(__name__)
 def safe_get(d, key, default=0):
     try:
         return d.get(key, default) if isinstance(d, dict) else default
-    except Exception:
+    except:
         return default
 
 
 # =========================
-# MAIN ENGINE
+# MAIN ENGINE (OPTIMIZED)
 # =========================
 def compute_family_office_score(profile: dict, portfolio: list, financial: dict = None):
+
+    cache_key = f"score:{profile.get('email','unknown')}"
+
+    # =========================
+    # CACHE CHECK
+    # =========================
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
 
     financial = financial or {}
 
@@ -35,21 +64,12 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
         total_assets = savings + investments
 
         # =========================
-        # 1. WEALTH SCORE
+        # WEALTH SCORE (SMOOTHED)
         # =========================
-        if total_assets >= 100000:
-            wealth = 90
-        elif total_assets >= 50000:
-            wealth = 70
-        elif total_assets >= 10000:
-            wealth = 50
-        elif total_assets > 0:
-            wealth = 30
-        else:
-            wealth = 10
+        wealth = min(100, (total_assets / 100000) * 100)
 
         # =========================
-        # 2. DIVERSIFICATION
+        # DIVERSIFICATION
         # =========================
         asset_types = set()
 
@@ -59,10 +79,10 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
                 if t:
                     asset_types.add(t)
 
-        diversification = min(len(asset_types) * 25, 100)
+        diversification = min(len(asset_types) * 20, 100)
 
         # =========================
-        # 3. RISK ALIGNMENT
+        # RISK EXPOSURE
         # =========================
         crypto_exposure = 0
         total_value = 0
@@ -79,57 +99,54 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
 
         crypto_ratio = crypto_exposure / total_value if total_value > 0 else 0
 
-        risk_score = 70  # default safe baseline
-
+        # =========================
+        # RISK SCORE (COHERENT)
+        # =========================
         if risk_profile == "low":
-            risk_score = 100 if crypto_ratio <= 0.1 else 60
+            risk_score = 100 if crypto_ratio <= 0.1 else 50
         elif risk_profile == "medium":
-            risk_score = 80 if crypto_ratio <= 0.4 else 50
-        elif risk_profile == "high":
-            risk_score = 85
+            risk_score = 80 if crypto_ratio <= 0.3 else 40
+        else:
+            risk_score = 70
 
         # =========================
-        # 4. ACTIVITY SCORE
+        # ACTIVITY SCORE (REAL SIGNAL)
         # =========================
-        activity = 100 if profile else 30
+        activity = min(100, len(profile.keys()) * 10)
 
         # =========================
-        # 5. FINANCIAL SCORE
+        # FINANCIAL SCORE (NORMALIZED)
         # =========================
         financial_score = 50
 
-        try:
-            if financial:
-                cashflow = safe_get(financial, "cashflow_score", 0)
-                debt_risk = safe_get(financial, "debt_risk_score", 50)
-                savings_velocity = safe_get(financial, "savings_velocity_score", 0)
-                income_stability = safe_get(financial, "income_stability_score", 0)
+        if financial:
+            cashflow = safe_get(financial, "cashflow_score", 0)
+            debt_risk = safe_get(financial, "debt_risk_score", 50)
+            savings_velocity = safe_get(financial, "savings_velocity_score", 0)
+            income_stability = safe_get(financial, "income_stability_score", 0)
 
-                financial_score = (
-                    cashflow * 0.4 +
-                    (100 - debt_risk) * 0.3 +
-                    savings_velocity * 0.2 +
-                    income_stability * 0.1
-                )
-
-        except Exception as e:
-            logger.warning(f"[FINANCIAL SCORE ERROR] {e}")
+            financial_score = (
+                min(max(cashflow, 0), 100) * 0.4 +
+                (100 - min(max(debt_risk, 0), 100)) * 0.3 +
+                min(max(savings_velocity, 0), 100) * 0.2 +
+                min(max(income_stability, 0), 100) * 0.1
+            )
 
         # =========================
-        # 6. GLOBAL SCORE
+        # GLOBAL SCORE
         # =========================
         score = int(
-            (wealth * 0.25) +
+            (wealth * 0.30) +
             (diversification * 0.20) +
             (risk_score * 0.15) +
             (activity * 0.10) +
-            (financial_score * 0.30)
+            (financial_score * 0.25)
         )
 
-        score = max(5, min(score, 100))  # clamp safe
+        score = max(5, min(score, 100))
 
         # =========================
-        # 7. LEVEL
+        # LEVEL
         # =========================
         if score >= 85:
             level = "ELITE"
@@ -141,40 +158,45 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             level = "BEGINNER"
 
         # =========================
-        # 8. ADVICE ENGINE
+        # ADVICE ENGINE
         # =========================
         advice = []
 
-        if diversification < 50:
+        if diversification < 40:
             advice.append("Diversifie tes actifs")
 
         if risk_score < 60:
             advice.append("Rééquilibre ton risque")
 
-        if wealth < 50:
-            advice.append("Augmente ton capital")
+        if wealth < 40:
+            advice.append("Augmente ton patrimoine")
 
         if financial_score < 40:
             advice.append("Améliore ton cashflow")
 
         # =========================
-        # 9. DEBUG PAYLOAD
+        # DEBUG
         # =========================
-        debug = {
-            "wealth": wealth,
-            "diversification": diversification,
-            "risk_score": risk_score,
-            "activity": activity,
-            "financial_score": round(financial_score, 2),
-            "crypto_ratio": round(crypto_ratio, 3),
-        }
-
-        return {
+        result = {
             "score": score,
             "level": level,
-            "details": debug,
+            "details": {
+                "wealth": round(wealth, 2),
+                "diversification": diversification,
+                "risk_score": risk_score,
+                "activity": activity,
+                "financial_score": round(financial_score, 2),
+                "crypto_ratio": round(crypto_ratio, 3),
+            },
             "advice": advice,
         }
+
+        # =========================
+        # CACHE STORE
+        # =========================
+        set_cache(cache_key, result, ttl=300)
+
+        return result
 
     except Exception as e:
         logger.error(f"[FAMILY OFFICE SCORE CRASH] {e}")
@@ -183,5 +205,5 @@ def compute_family_office_score(profile: dict, portfolio: list, financial: dict 
             "score": 10,
             "level": "BEGINNER",
             "details": {},
-            "advice": ["Erreur de calcul, données incomplètes"],
+            "advice": ["Erreur de calcul"]
         }
