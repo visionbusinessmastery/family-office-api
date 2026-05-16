@@ -27,6 +27,10 @@ from intelligence.gamification.api.dashboard import (
     router as gamification_router
 )
 
+from intelligence.api.global_command_center import (
+    router as global_command_center_router
+)
+
 # =========================
 # LOGGING
 # =========================
@@ -201,6 +205,10 @@ app.include_router(
     stocks_router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+app.include_router(
+    global_command_center_router
 )
 
 # =========================
