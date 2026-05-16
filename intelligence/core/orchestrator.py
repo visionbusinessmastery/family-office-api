@@ -15,7 +15,7 @@ from intelligence.strategic.dashboard_engine import build_dashboard
 from intelligence.strategic.module_engine import get_all_opportunities
 
 # ✅ AJOUT UNIQUE (SAFE)
-from intelligence.gamification.orchestrator import build_gamification
+from intelligence.gamification.core.gamification_engine import build_gamification
 
 
 # =========================
