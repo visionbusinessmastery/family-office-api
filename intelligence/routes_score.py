@@ -4,7 +4,6 @@
 from fastapi import APIRouter, Depends
 from auth.utils import get_current_user
 
-# 🔥 MOTEUR CENTRAL UNIQUE (source de vérité)
 from intelligence.user_intelligence_engine import compute_user_intelligence
 
 router = APIRouter()
@@ -16,11 +15,11 @@ router = APIRouter()
 @router.post("/score/recalculate")
 def recalculate_score(user=Depends(get_current_user)):
 
-    email = user
+    email = user  # get_current_user retourne email
 
     try:
         # =========================
-        # ENGINE CALL
+        # ENGINE CALL (SOURCE OF TRUTH)
         # =========================
         intel = compute_user_intelligence(email)
 
@@ -40,7 +39,7 @@ def recalculate_score(user=Depends(get_current_user)):
             "details": score_data.get("details", {}),
             "advice": score_data.get("advice", []),
             "level": intel.get("level", "UNKNOWN"),
-            "plan": intel.get("plan", {})
+            "plan": intel.get("plan", "FREE")
         }
 
     except Exception as e:
