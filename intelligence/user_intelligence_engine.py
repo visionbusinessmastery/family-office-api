@@ -235,7 +235,8 @@ def compute_user_intelligence(user_email: str):
         return {
             "user": user.email,
             "plan": user.plan,
-            "strategic_intelligence = compute_strategic_layer(context, modules)
+            
+            "strategic_intelligence": compute_strategic_layer(context, modules),
 
             "score": {
                 "score": score_value,
