@@ -2,7 +2,7 @@ from openai import OpenAI
 import os
 import json
 
-from intelligence.orchestrator import run_orchestrator
+from intelligence.core.orchestrator import run_orchestrator
 from portfolio.service import get_user_portfolio
 from market.service import get_market
 
