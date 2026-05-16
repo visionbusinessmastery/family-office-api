@@ -473,3 +473,19 @@ def build_scoring_context(
     )
 
     return context
+
+
+def build_scoring_context(user=None, portfolio=None, financial=None):
+
+    user = build_user_context(user or {})
+    portfolio = build_portfolio_context(portfolio or [])
+    financial = build_financial_context(financial or {})
+
+    return {
+        **user,
+        **portfolio,
+        **financial,
+        "portfolio": portfolio,
+        "user_raw": user,
+        "financial_raw": financial
+    }
