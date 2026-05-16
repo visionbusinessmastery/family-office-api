@@ -2,6 +2,8 @@
 # IMPORTS
 # =========================
 from intelligence.engines.allocation_engine import compute_allocation_strategy
+from intelligence.scoring.family_office_score import compute_family_office_score
+from intelligence.scoring.financial_overview import get_user_financial_overview
 
 from sqlalchemy import text
 from database import engine
