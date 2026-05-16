@@ -47,7 +47,7 @@ from intelligence.engines.recommendation_engine import (
 # STRATEGIC LAYER
 # =========================
 from intelligence.strategic.strategic_layer import (
-    compute_strategic_intelligence
+    compute_strategic_layer
 )
 
 logger = logging.getLogger(__name__)
