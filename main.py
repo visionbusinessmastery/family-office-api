@@ -205,3 +205,14 @@ def info():
         "version": "4.0",
         "status": "production_ready"
     }
+
+print("APP STARTING 1")
+
+from database import Base, engine
+print("DB IMPORT OK")
+
+from core.limiter import limiter
+print("LIMITER OK")
+
+from auth.utils import decode_token
+print("AUTH OK")
