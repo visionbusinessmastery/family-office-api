@@ -8,11 +8,11 @@ from database import engine
 from intelligence.analyzers.family_office_score import compute_family_office_score
 from intelligence.analyzers.financial_overview import get_user_financial_overview
 
-from intelligence.upgrade_engine import compute_upgrade_decision
-from intelligence.feature_engine import compute_feature_access
-from intelligence.dashboard_engine import build_dashboard
+from intelligence.core.upgrade_engine import compute_upgrade_decision
+from intelligence.strategic.feature_engine import compute_feature_access
+from intelligence.strategic.dashboard_engine import build_dashboard
 
-from intelligence.module_engine import get_all_opportunities
+from intelligence.strategic.module_engine import get_all_opportunities
 
 # ✅ AJOUT UNIQUE (SAFE)
 from intelligence.gamification.orchestrator import build_gamification
