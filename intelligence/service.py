@@ -1,9 +1,7 @@
 # =========================
 # IMPORTS
 # =========================
-from .analyzers.allocation import allocate_portfolio
-from .analyzers.ai_global import global_ai_analysis
-from .analyzers.family_office_score import compute_family_office_score
+from intelligence.engines.allocation_engine import compute_allocation_strategy
 
 from sqlalchemy import text
 from database import engine
