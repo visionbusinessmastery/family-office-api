@@ -1,9 +1,9 @@
 # =========================
-# MODULE SCORE WRAPPER (PREMIUM)
+# MODULE SCORE WRAPPER (SAAS READY)
 # =========================
 
-import time
 import json
+import time
 
 from intelligence.scoring.scoring_registry import (
     SCORING_ENGINES
@@ -73,22 +73,44 @@ def compute_module_score(
         return cached
 
     # =========================
-    # ENGINE FETCH
+    # MODULE FETCH
     # =========================
-    engine = SCORING_ENGINES.get(module_name)
+    module = SCORING_ENGINES.get(module_name)
 
-    if not engine:
+    if not module:
 
-        result = {
+        return {
             "score": 0,
             "module": module_name,
             "error": "Unknown module"
         }
 
-        return result
+    # =========================
+    # MODULE STATUS
+    # =========================
+    if not module.get("active", True):
+
+        return {
+            "score": 0,
+            "module": module_name,
+            "error": "Module disabled"
+        }
 
     # =========================
-    # ENGINE EXECUTION
+    # ENGINE FETCH
+    # =========================
+    engine = module.get("engine")
+
+    if not engine:
+
+        return {
+            "score": 0,
+            "module": module_name,
+            "error": "Engine missing"
+        }
+
+    # =========================
+    # EXECUTION TIMER
     # =========================
     started = time.time()
 
@@ -101,7 +123,10 @@ def compute_module_score(
         # =========================
         if isinstance(raw_score, dict):
 
-            score = raw_score.get("score", 0)
+            score = raw_score.get(
+                "score",
+                0
+            )
 
         else:
 
@@ -117,16 +142,35 @@ def compute_module_score(
             4
         )
 
+        # =========================
+        # FINAL RESULT
+        # =========================
         result = {
 
             "score": score,
 
             "module": module_name,
 
+            "category":
+                module.get("category"),
+
+            "premium":
+                module.get("premium", False),
+
+            "version":
+                module.get("version", "v1"),
+
+            "weight":
+                module.get("weight", 1),
+
+            "label":
+                module.get("label", module_name),
+
             "execution_time":
                 execution_time,
 
-            "cached": False,
+            "cached":
+                False,
         }
 
         # =========================
