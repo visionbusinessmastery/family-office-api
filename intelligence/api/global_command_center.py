@@ -15,31 +15,31 @@ from intelligence.scoring.scoring_context_builder import (
 # =========================
 # AI ENGINES
 # =========================
-from intelligence.risk_engine import (
+from intelligence.engines.risk_engine import (
     compute_risk_profile
 )
 
-from intelligence.wealth_engine import (
+from intelligence.engines.wealth_engine import (
     compute_wealth_projection
 )
 
-from intelligence.allocation_engine import (
+from intelligence.engines.allocation_engine import (
     compute_allocation_strategy
 )
 
-from intelligence.diversification_engine import (
+from intelligence.engines.diversification_engine import (
     compute_diversification
 )
 
-from intelligence.prediction_engine import (
+from intelligence.engines.prediction_engine import (
     compute_predictions
 )
 
-from intelligence.macro_engine import (
+from intelligence.engines.macro_engine import (
     compute_macro_exposure
 )
 
-from intelligence.recommendation_engine import (
+from intelligence.engines.recommendation_engine import (
     generate_recommendationss
 )
 
