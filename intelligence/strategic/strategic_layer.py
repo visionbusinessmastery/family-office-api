@@ -4,7 +4,7 @@ from intelligence.engines.risk_engine import compute_risk_profile
 from intelligence.engines.wealth_engine import compute_wealth_projection
 from intelligence.engines.allocation_engine import compute_allocation_strategy
 from intelligence.engines.diversification_engine import compute_diversification
-from intelligence.engines.prediction_engine import compute_prediction
+from intelligence.engines.prediction_engine import compute_predictions
 from intelligence.engines.macro_engine import compute_macro_exposure
 from intelligence.engines.recommendation_engine import compute_recommendations
 
