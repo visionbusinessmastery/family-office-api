@@ -23,13 +23,10 @@ from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
-from intelligence.gamification.api.dashboard import (
-    router as gamification_router
-)
+from intelligence.gamification.api.dashboard import router as gamification_router
 
-from intelligence.api.global_command_center import (
-    router as global_command_center_router
-)
+from intelligence.api.global_command_center import router as global_command_center_router
+
 
 # =========================
 # LOGGING
@@ -72,32 +69,19 @@ app.add_middleware(
 # ERROR HANDLERS
 # =========================
 @app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(
-    request: Request,
-    exc: RateLimitExceeded
-):
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
-        content={
-            "status": "error",
-            "message": "Too many requests"
-        },
+        content={"status": "error", "message": "Too many requests"},
     )
 
 @app.exception_handler(Exception)
-async def global_error_handler(
-    request: Request,
-    exc: Exception
-):
-
+async def global_error_handler(request: Request, exc: Exception):
     logging.error(f"ERROR: {str(exc)}")
 
     return JSONResponse(
         status_code=500,
-        content={
-            "status": "error",
-            "message": str(exc)
-        },
+        content={"status": "error", "message": str(exc)},
     )
 
 # =========================
@@ -105,137 +89,58 @@ async def global_error_handler(
 # =========================
 @app.on_event("startup")
 def startup():
-
     print("DB INIT START")
-
     Base.metadata.create_all(bind=engine)
-
     print("DB INIT OK")
 
 # =========================
 # AUTH MIDDLEWARE
 # =========================
 @app.middleware("http")
-async def auth_middleware(
-    request: Request,
-    call_next
-):
+async def auth_middleware(request: Request, call_next):
 
     try:
-
-        token = request.headers.get(
-            "Authorization"
-        )
+        token = request.headers.get("Authorization")
 
         if token:
-
-            token = token.replace(
-                "Bearer ",
-                ""
-            )
+            token = token.replace("Bearer ", "")
 
             try:
-
-                request.state.user_email = (
-                    decode_token(token)
-                )
-
+                request.state.user_email = decode_token(token)
             except Exception as e:
-
-                logging.error(
-                    f"TOKEN ERROR: {str(e)}"
-                )
-
-                request.state.user_email = (
-                    "anonymous"
-                )
-
+                logging.error(f"TOKEN ERROR: {str(e)}")
+                request.state.user_email = "anonymous"
         else:
-
-            request.state.user_email = (
-                "anonymous"
-            )
+            request.state.user_email = "anonymous"
 
     except Exception as e:
-
-        logging.error(
-            f"MIDDLEWARE ERROR: {str(e)}"
-        )
-
-        request.state.user_email = (
-            "anonymous"
-        )
+        logging.error(f"MIDDLEWARE ERROR: {str(e)}")
+        request.state.user_email = "anonymous"
 
     response = await call_next(request)
-
     return response
+
 
 print("AUTH OK")
 
 # =========================
 # ROUTES
 # =========================
-app.include_router(
-    auth_router,
-    prefix="/auth",
-    tags=["Auth"]
-)
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 
-app.include_router(
-    advisor_router,
-    prefix="/advisor",
-    tags=["Advisor"]
-)
+app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
+app.include_router(finance_router, prefix="/finance", tags=["Finance"])
+app.include_router(intelligence_score_router, prefix="/intelligence", tags=["Score"])
 
-app.include_router(
-    intelligence_router,
-    prefix="/intelligence",
-    tags=["Intelligence"]
-)
+app.include_router(gamification_router, prefix="/gamification", tags=["Gamification"])
 
-app.include_router(
-    finance_router,
-    prefix="/finance",
-    tags=["Finance"]
-)
+app.include_router(market_router, prefix="/market", tags=["Market"])
+app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
+app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
-app.include_router(
-    intelligence_score_router,
-    prefix="/intelligence",
-    tags=["Score"]
-)
-
-app.include_router(
-    gamification_router,
-    tags=["Gamification"]
-)
-
-app.include_router(
-    market_router,
-    prefix="/market",
-    tags=["Market"]
-)
-
-app.include_router(
-    portfolio_router,
-    prefix="/portfolio",
-    tags=["Portfolio"]
-)
-
-app.include_router(
-    stocks_router,
-    prefix="/stocks",
-    tags=["Stocks"]
-)
-
-# =========================
-# GLOBAL COMMAND CENTER
-# =========================
-app.include_router(
-    global_command_center_router,
-    prefix="/global",
-    tags=["Global AI"]
-)
+# FIX IMPORTANT : PAS de double prefix global
+app.include_router(global_command_center_router, prefix="/global-command-center", tags=["Global AI"])
 
 print("ROUTERS OK")
 
@@ -244,7 +149,6 @@ print("ROUTERS OK")
 # =========================
 @app.get("/")
 def root():
-
     return {
         "status": "AI FAMILY OFFICE V4 ONLINE",
         "architecture": "clean_v4"
@@ -252,7 +156,6 @@ def root():
 
 @app.get("/health")
 def health():
-
     return {
         "status": "ok",
         "modules": [
@@ -270,7 +173,6 @@ def health():
 
 @app.get("/info")
 def info():
-
     return {
         "app": "Family Office AI",
         "version": "4.0",
