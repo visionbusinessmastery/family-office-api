@@ -25,7 +25,10 @@ from portfolio.routes import router as portfolio_router
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
-from intelligence.api.global_command_center import router as global_command_center_router
+
+from intelligence.api.global_command_center_routes import (
+    router as global_command_center_router
+)
 
 
 # =========================
@@ -144,7 +147,7 @@ app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
 app.include_router(
     global_command_center_router,
-    prefix="/global-command-center",
+    prefix="/intelligence/global-command-center",
     tags=["Global AI"]
 )
 
