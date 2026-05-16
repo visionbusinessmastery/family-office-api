@@ -8,7 +8,7 @@ from intelligence.gamification.notifications import generate_notification
 
 
 # =========================
-# SYNCHRO GAMIFICATION
+# SYNCHRO GAMIFICATION (CORE ENGINE)
 # =========================
 def sync_gamification(user, score, plan, streak, action="view_dashboard"):
 
@@ -30,3 +30,26 @@ def sync_gamification(user, score, plan, streak, action="view_dashboard"):
         "ai_coach": coach,
         "notification": notification
     }
+
+
+# =========================
+# GAMIFICATION ORCHESTRATOR (WRAPPER LOCAL)
+# =========================
+def build_gamification(
+    user,
+    score,
+    plan="BASIC",
+    streak=0,
+    action="view_dashboard"
+):
+    """
+    Wrapper propre pour usage orchestrator global
+    """
+
+    return sync_gamification(
+        user=user,
+        score=score,
+        plan=plan,
+        streak=streak,
+        action=action
+    )
