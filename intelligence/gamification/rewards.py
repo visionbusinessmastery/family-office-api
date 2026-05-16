@@ -1,17 +1,28 @@
 # =========================
-# REWARD ENGINE (SAFE EXTENSION)
+# REWARD ENGINE (PRODUCTION SAFE)
 # =========================
 
 import random
 
 
-def compute_reward_bonus(streak: int, plan: str):
+def compute_reward_bonus(streak: int, plan: str, daily_actions: int = 0):
 
     bonus = 0
     reason = []
 
+    plan = (plan or "FREE").upper()
+
     # =========================
-    # STREAK BONUSES
+    # DAILY CAP PROTECTION (ANTI FARM)
+    # =========================
+    if daily_actions >= 20:
+        return {
+            "bonus_xp": 0,
+            "reasons": ["daily_cap_reached"]
+        }
+
+    # =========================
+    # STREAK SYSTEM (LINEAR + SAFE)
     # =========================
     if streak >= 3:
         bonus += 5
@@ -26,20 +37,29 @@ def compute_reward_bonus(streak: int, plan: str):
         reason.append("streak_14")
 
     # =========================
-    # RANDOM ENGAGEMENT BOOST
+    # CONTROLLED ENGAGEMENT BOOST (NO PURE RANDOM)
     # =========================
-    lucky = random.randint(1, 100)
+    engagement_score = (streak + daily_actions) % 100
 
-    if lucky > 90:
-        bonus += 15
-        reason.append("lucky_boost")
+    if engagement_score > 85:
+        bonus += 5
+        reason.append("high_engagement_boost")
 
     # =========================
-    # LIBERTY BONUS
+    # PLAN MULTIPLIER (SAFE SCALING)
     # =========================
     if plan == "LIBERTY":
-        bonus += 25
+        bonus += 15
         reason.append("liberty_multiplier")
+
+    elif plan == "ELITE":
+        bonus += 10
+        reason.append("elite_multiplier")
+
+    # =========================
+    # HARD CAP (IMPORTANT)
+    # =========================
+    bonus = min(bonus, 40)
 
     return {
         "bonus_xp": bonus,
