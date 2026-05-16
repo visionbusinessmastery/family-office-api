@@ -2,7 +2,6 @@
 # IMPORTS (SAFE EXTENSION)
 # =========================
 from sqlalchemy import text
-from intelligence.constants.tiers import PLAN_HIERARCHY
 
 
 # =========================
