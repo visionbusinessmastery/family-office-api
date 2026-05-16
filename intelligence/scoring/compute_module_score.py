@@ -2,8 +2,7 @@
 # MODULE SCORE WRAPPER
 # =========================
 
-from intelligence.scoring_registry import SCORING_ENGINES
-
+from intelligence.scoring.scoring_registry import SCORING_ENGINES
 
 def compute_module_score(module_name: str, context: dict):
 
