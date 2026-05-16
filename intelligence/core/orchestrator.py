@@ -1,18 +1,56 @@
 # =========================
-# UNIFIED ORCHESTRATOR V4 FIX
+# UNIFIED ORCHESTRATOR V4 (FIXED + SAAS READY)
 # =========================
+
+import json
+import hashlib
 
 from sqlalchemy import text
 from database import engine
 
+from core.cache import redis_client
+
+from intelligence.scoring.family_office_score import compute_family_office_score
+from intelligence.scoring.financial_overview import get_user_financial_overview
+
 from intelligence.core.upgrade_engine import compute_upgrade_decision
 from intelligence.strategic.feature_engine import compute_feature_access
 from intelligence.strategic.dashboard_engine import build_dashboard
-
 from intelligence.strategic.module_engine import get_all_opportunities
 
-# ✅ AJOUT UNIQUE (SAFE)
 from intelligence.gamification.core.gamification_engine import build_gamification
+
+
+# =========================
+# CACHE HELPERS
+# =========================
+def get_cache(key):
+    try:
+        if redis_client:
+            data = redis_client.get(key)
+            if data:
+                return json.loads(data)
+    except:
+        pass
+    return None
+
+
+def set_cache(key, value, ttl=300):
+    try:
+        if redis_client:
+            redis_client.setex(key, ttl, json.dumps(value))
+    except:
+        pass
+
+
+# =========================
+# HASH BUILDER (ORCHESTRATOR CACHE)
+# =========================
+def build_hash(user_email):
+
+    return hashlib.md5(
+        user_email.encode()
+    ).hexdigest()
 
 
 # =========================
@@ -20,8 +58,20 @@ from intelligence.gamification.core.gamification_engine import build_gamificatio
 # =========================
 def run_orchestrator(user_email: str):
 
+    cache_key = f"orchestrator:{build_hash(user_email)}"
+
+    # =========================
+    # CACHE CHECK
+    # =========================
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+
     with engine.begin() as conn:
 
+        # =========================
+        # USER FETCH
+        # =========================
         user = conn.execute(
             text("""
                 SELECT id, email, plan, profile_completed
@@ -34,6 +84,9 @@ def run_orchestrator(user_email: str):
         if not user:
             return {"error": "USER_NOT_FOUND"}
 
+        # =========================
+        # ONBOARDING CHECK
+        # =========================
         if not user.profile_completed:
             return {
                 "state": "ONBOARDING_REQUIRED",
@@ -41,6 +94,9 @@ def run_orchestrator(user_email: str):
                 "level": "ONBOARDING"
             }
 
+        # =========================
+        # PROFILE
+        # =========================
         profile = conn.execute(
             text("""
                 SELECT *
@@ -52,6 +108,9 @@ def run_orchestrator(user_email: str):
 
         profile_dict = dict(profile._mapping) if profile else {}
 
+        # =========================
+        # PORTFOLIO
+        # =========================
         portfolio_rows = conn.execute(
             text("""
                 SELECT asset_name, category, quantity, purchase_price
@@ -64,6 +123,7 @@ def run_orchestrator(user_email: str):
         portfolio = []
 
         for p in portfolio_rows:
+
             qty = float(p.quantity or 0)
             price = float(p.purchase_price or 0)
 
@@ -73,6 +133,9 @@ def run_orchestrator(user_email: str):
                 "value": qty * price
             })
 
+        # =========================
+        # FINANCIAL OVERVIEW
+        # =========================
         financial = get_user_financial_overview(user.id) or {}
 
         # =========================
@@ -87,7 +150,7 @@ def run_orchestrator(user_email: str):
         score = score_data.get("score", 0)
 
         # =========================
-        # MODULE OPPORTUNITIES
+        # USER PROFILE CONTEXT
         # =========================
         user_profile = {
             **profile_dict,
@@ -96,6 +159,9 @@ def run_orchestrator(user_email: str):
             "score": score
         }
 
+        # =========================
+        # MODULE OPPORTUNITIES
+        # =========================
         opportunities = get_all_opportunities(user_profile)
 
         # =========================
@@ -126,9 +192,9 @@ def run_orchestrator(user_email: str):
         )
 
         # =========================
-        # 🧠 GAMIFICATION (AJOUT SAFE)
+        # GAMIFICATION
         # =========================
-        streak = profile_dict.get("streak", 0) if isinstance(profile_dict, dict) else 0
+        streak = profile_dict.get("streak", 0)
 
         gamification = build_gamification(
             user,
@@ -138,9 +204,9 @@ def run_orchestrator(user_email: str):
         )
 
         # =========================
-        # FINAL RESPONSE
+        # RESULT
         # =========================
-        return {
+        result = {
             "user": user.email,
             "plan": user.plan,
 
@@ -149,12 +215,17 @@ def run_orchestrator(user_email: str):
             "features": features,
             "opportunities": opportunities,
             "dashboard": dashboard,
-
-            # 🔥 AJOUT SAFE
             "gamification": gamification,
 
             "portfolio_size": len(portfolio)
         }
+
+        # =========================
+        # CACHE STORE
+        # =========================
+        set_cache(cache_key, result, ttl=300)
+
+        return result
 
 
 # =========================
