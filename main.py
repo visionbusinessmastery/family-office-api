@@ -9,6 +9,8 @@ from database import Base, engine
 from core.limiter import limiter
 from auth.utils import decode_token
 
+from contextlib import asynccontextmanager 
+
 # =========================
 # ROUTERS IMPORT
 # =========================
@@ -87,12 +89,18 @@ async def global_error_handler(request: Request, exc: Exception):
 # =========================
 # STARTUP
 # =========================
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     print("DB INIT START")
     Base.metadata.create_all(bind=engine)
     print("DB INIT OK")
+    yield
 
+app = FastAPI(
+    title="AI Family Office V4",
+    version="4.0.0",
+    lifespan=lifespan
+)
 # =========================
 # AUTH MIDDLEWARE
 # =========================
