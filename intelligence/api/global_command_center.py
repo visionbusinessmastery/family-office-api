@@ -1,35 +1,43 @@
 # =========================
-# GLOBAL COMMAND CENTER FIXED
+# GLOBAL COMMAND CENTER V3
 # =========================
 
+import json
+import hashlib
 import logging
+
 from fastapi import APIRouter
 
-from intelligence.scoring.compute_module_score import compute_module_score
-from intelligence.scoring.scoring_context_builder import build_scoring_context
+from core.cache import redis_client
 
-from intelligence.engines.risk_engine import compute_risk_profile
-from intelligence.engines.wealth_engine import compute_wealth_projection
-from intelligence.engines.allocation_engine import compute_allocation_strategy
-from intelligence.engines.diversification_engine import compute_diversification
-from intelligence.engines.prediction_engine import compute_predictions
-from intelligence.engines.macro_engine import compute_macro_exposure
-from intelligence.engines.recommendation_engine import generate_recommendations
+from intelligence.scoring.compute_module_score import (
+    compute_module_score
+)
 
-from intelligence.strategic.strategic_layer import compute_strategic_layer
+from intelligence.scoring.scoring_context_builder import (
+    build_scoring_context
+)
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/global-command-center", tags=["Global Command Center"])
+router = APIRouter(
+    prefix="/global-command-center",
+    tags=["Global Command Center"]
+)
 
-
+# =========================
+# MODULE WEIGHTS
+# =========================
 MODULE_WEIGHTS = {
+
     "business": 1.2,
     "crypto": 0.9,
     "real_estate": 1.3,
     "banking": 1.0,
     "market": 1.0,
+
     "stocks": 1.1,
+
     "startup": 0.8,
     "private_equity": 1.4,
     "franchise": 0.9,
@@ -41,78 +49,292 @@ MODULE_WEIGHTS = {
 }
 
 
+# =========================
+# CACHE HELPERS
+# =========================
+def get_cache(key):
+
+    try:
+
+        if redis_client:
+
+            data = redis_client.get(key)
+
+            if data:
+                return json.loads(data)
+
+    except:
+        pass
+
+    return None
+
+
+def set_cache(key, value, ttl=300):
+
+    try:
+
+        if redis_client:
+
+            redis_client.setex(
+                key,
+                ttl,
+                json.dumps(value)
+            )
+
+    except:
+        pass
+
+
+# =========================
+# HASH BUILDER
+# =========================
+def build_hash(
+    user,
+    onboarding,
+    portfolio,
+    financial
+):
+
+    raw = json.dumps({
+        "user": user,
+        "onboarding": onboarding,
+        "portfolio": portfolio,
+        "financial": financial
+    }, sort_keys=True)
+
+    return hashlib.md5(
+        raw.encode()
+    ).hexdigest()
+
+
+# =========================
+# LEVEL ENGINE
+# =========================
 def compute_level(score: int):
+
     if score >= 90:
         return "LEGEND"
+
     if score >= 80:
         return "ELITE"
+
     if score >= 70:
         return "ADVANCED"
+
     if score >= 50:
         return "INTERMEDIATE"
+
     return "BEGINNER"
 
 
-def compute_global_command_center(user=None, onboarding=None, portfolio=None, financial_overview=None):
+# =========================
+# MAIN ENGINE
+# =========================
+def compute_global_command_center(
+    user=None,
+    onboarding=None,
+    portfolio=None,
+    financial_overview=None,
+):
 
+    user = user or {}
     onboarding = onboarding or {}
     portfolio = portfolio or []
     financial_overview = financial_overview or {}
 
     try:
 
+        # =========================
+        # CACHE KEY
+        # =========================
+        cache_hash = build_hash(
+            user,
+            onboarding,
+            portfolio,
+            financial_overview
+        )
+
+        cache_key = (
+            f"gcc:{cache_hash}"
+        )
+
+        # =========================
+        # CACHE CHECK
+        # =========================
+        cached = get_cache(cache_key)
+
+        if cached:
+            return cached
+
+        # =========================
+        # BUILD CONTEXT
+        # =========================
         context = build_scoring_context(
             user=user,
-            onboarding=onboarding,
             portfolio=portfolio,
-            financial_overview=financial_overview,
+            financial=financial_overview,
         )
 
         modules = {}
+
         weighted_total = 0
         total_weight = 0
 
-        for name, weight in MODULE_WEIGHTS.items():
+        # =========================
+        # MODULE SCORING
+        # =========================
+        for module_name, weight in MODULE_WEIGHTS.items():
 
-            result = compute_module_score(name, context)
-            score = result.get("score", 0)
+            result = compute_module_score(
+                module_name,
+                context
+            )
 
-            modules[name] = {"score": score, "weight": weight}
+            module_score = result.get(
+                "score",
+                0
+            )
 
-            weighted_total += score * weight
+            modules[module_name] = {
+
+                "score":
+                    module_score,
+
+                "weight":
+                    weight,
+            }
+
+            weighted_total += (
+                module_score * weight
+            )
+
             total_weight += weight
 
-        global_score = int(weighted_total / total_weight) if total_weight else 0
-        global_score = max(0, min(global_score, 100))
+        # =========================
+        # GLOBAL SCORE
+        # =========================
+        global_score = int(
+            weighted_total / total_weight
+        ) if total_weight > 0 else 0
 
-        level = compute_level(global_score)
+        global_score = max(
+            0,
+            min(global_score, 100)
+        )
 
+        # =========================
+        # LEVEL
+        # =========================
+        level = compute_level(
+            global_score
+        )
+
+        # =========================
+        # AI ADVICE
+        # =========================
         advice = []
 
-        if modules.get("crypto", {}).get("score", 0) < 40:
-            advice.append("Développe tes connaissances crypto")
+        if modules.get(
+            "crypto",
+            {}
+        ).get("score", 0) < 40:
 
-        if modules.get("real_estate", {}).get("score", 0) < 50:
-            advice.append("Augmente ton exposition immobilière")
+            advice.append(
+                "Développe tes connaissances crypto"
+            )
 
-        if modules.get("business", {}).get("score", 0) < 50:
-            advice.append("Développe des revenus business")
+        if modules.get(
+            "real_estate",
+            {}
+        ).get("score", 0) < 50:
 
-        return {
-            "global_score": global_score,
-            "level": level,
-            "modules": modules,
-            "advice": advice,
-            "context": context
+            advice.append(
+                "Augmente ton exposition immobilière"
+            )
+
+        if modules.get(
+            "business",
+            {}
+        ).get("score", 0) < 50:
+
+            advice.append(
+                "Développe des revenus business"
+            )
+
+        if modules.get(
+            "banking",
+            {}
+        ).get("score", 0) < 50:
+
+            advice.append(
+                "Renforce ton épargne de sécurité"
+            )
+
+        if modules.get(
+            "entrepreneurship",
+            {}
+        ).get("score", 0) > 80:
+
+            advice.append(
+                "Excellent potentiel entrepreneurial"
+            )
+
+        # =========================
+        # FINAL PAYLOAD
+        # =========================
+        result = {
+
+            "global_score":
+                global_score,
+
+            "level":
+                level,
+
+            "modules":
+                modules,
+
+            "advice":
+                advice,
+
+            "context": {
+
+                "portfolio_size":
+                    len(portfolio),
+
+                "module_count":
+                    len(modules),
+
+                "financial_loaded":
+                    bool(financial_overview),
+            }
         }
 
+        # =========================
+        # CACHE STORE
+        # =========================
+        set_cache(
+            cache_key,
+            result,
+            ttl=300
+        )
+
+        return result
+
     except Exception as e:
-        logger.error(f"GLOBAL COMMAND ERROR: {e}")
+
+        logger.error(
+            f"[GLOBAL COMMAND ERROR] {e}"
+        )
 
         return {
+
             "global_score": 0,
+
             "level": "BEGINNER",
+
             "modules": {},
+
             "advice": [],
+
             "error": str(e)
         }
