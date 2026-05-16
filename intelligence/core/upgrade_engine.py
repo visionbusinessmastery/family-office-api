@@ -3,6 +3,16 @@
 # =========================
 from sqlalchemy import text
 
+# =========================
+# PLAN HIERARCHY
+# =========================
+PLAN_HIERARCHY = {
+    "FREE": 0,
+    "SILVER": 1,
+    "GOLD": 2,
+    "ELITE": 3,
+    "LIBERTY": 4
+}
 
 # =========================
 # PLAN FROM SCORE (XP SYSTEM)
