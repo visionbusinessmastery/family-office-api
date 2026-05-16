@@ -154,3 +154,43 @@ def save_portfolio_snapshot(user_id: int):
             "user_id": user_id,
             "total": float(total or 0)
         })
+
+
+def enrich_portfolio_with_ai(portfolio):
+
+    enriched = []
+
+    for asset in portfolio:
+
+        ticker = asset.get("asset")
+
+        news = get_market_news(ticker) or []
+
+        sentiment_result = analyze_sentiment(news) or {}
+
+        sentiment_score = (
+            sentiment_result.get("score", 50)
+            if isinstance(sentiment_result, dict)
+            else 50
+        )
+
+        trend_score = get_trends(ticker)
+
+        price_change = asset.get("price_change", 0)
+
+        score = calculate_ai_score(
+            sentiment_score,
+            trend_score,
+            price_change
+        )
+
+        enriched.append({
+            **asset,
+            "ai_score": score,
+            "signal": get_signal(score),
+            "risk": get_risk(score),
+            "sentiment_score": sentiment_score,
+            "trend_score": trend_score
+        })
+
+    return enriched
