@@ -4,6 +4,8 @@
 
 import logging
 
+from fastapi import APIRouter
+
 from intelligence.scoring.compute_module_score import (
     compute_module_score
 )
@@ -53,6 +55,14 @@ from intelligence.strategic.strategic_layer import (
 logger = logging.getLogger(__name__)
 
 # =========================
+# FASTAPI ROUTER
+# =========================
+router = APIRouter(
+    prefix="/global-command-center",
+    tags=["Global Command Center"]
+)
+
+# =========================
 # MODULE WEIGHTS
 # =========================
 MODULE_WEIGHTS = {
@@ -99,7 +109,7 @@ def compute_level(score: int):
 # MAIN ENGINE
 # =========================
 def compute_global_command_center(
-    user,
+    user=None,
     onboarding=None,
     portfolio=None,
     financial_overview=None,
@@ -162,30 +172,30 @@ def compute_global_command_center(
         # =========================
         # AI ENGINES
         # =========================
-        risk_engine = compute_risk_engine(context)
+        risk_engine = compute_risk_profile(context)
 
-        wealth_engine = compute_wealth_engine(context)
+        wealth_engine = compute_wealth_projection(context)
 
-        allocation_engine = compute_allocation_engine(
+        allocation_engine = compute_allocation_strategy(
             context
         )
 
         diversification_engine = (
-            compute_diversification_engine(
+            compute_diversification(
                 context
             )
         )
 
-        prediction_engine = compute_prediction_engine(
+        prediction_engine = compute_predictions(
             context
         )
 
-        macro_engine = compute_macro_engine(
+        macro_engine = compute_macro_exposure(
             context
         )
 
         recommendations = (
-            compute_asset_recommendations(
+            generate_recommendations(
                 context
             )
         )
@@ -194,7 +204,7 @@ def compute_global_command_center(
         # STRATEGIC INTELLIGENCE
         # =========================
         strategic_intelligence = (
-            compute_strategic_intelligence(
+            compute_strategic_layer(
                 context=context,
                 modules=modules,
                 risk_engine=risk_engine,
@@ -234,20 +244,11 @@ def compute_global_command_center(
         # =========================
         return {
 
-            # =========================
-            # CORE
-            # =========================
             "global_score": global_score,
             "level": level,
 
-            # =========================
-            # MODULES
-            # =========================
             "modules": modules,
 
-            # =========================
-            # AI ENGINES
-            # =========================
             "risk_engine": risk_engine,
 
             "wealth_engine": wealth_engine,
@@ -263,26 +264,14 @@ def compute_global_command_center(
             "macro_engine":
                 macro_engine,
 
-            # =========================
-            # RECOMMENDATIONS
-            # =========================
             "recommendations":
                 recommendations,
 
-            # =========================
-            # STRATEGIC AI
-            # =========================
             "strategic_intelligence":
                 strategic_intelligence,
 
-            # =========================
-            # AI ADVICE
-            # =========================
             "advice": advice,
 
-            # =========================
-            # RAW CONTEXT
-            # =========================
             "context": {
 
                 "monthly_income":
@@ -350,3 +339,20 @@ def compute_global_command_center(
 
             "error": str(e),
         }
+
+
+# =========================
+# API ROUTE
+# =========================
+@router.get("/")
+def global_command_center_health():
+
+    return {
+        "status": "Global Command Center Online"
+    }
+
+
+@router.get("/demo")
+def global_command_center_demo():
+
+    return compute_global_command_center()
