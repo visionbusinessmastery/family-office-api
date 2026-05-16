@@ -3,18 +3,24 @@ import redis
 
 REDIS_URL = os.getenv("REDIS_URL")
 
-if not REDIS_URL:
-    raise Exception("REDIS_URL manquante")
+redis_client = None
 
-redis_client = redis.from_url(
-    REDIS_URL,
-    decode_responses=True,
-    ssl_cert_reqs=None  # important pour Redis Cloud
-)
+if REDIS_URL:
+    try:
+        redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            ssl_cert_reqs=None
+        )
+    except Exception as e:
+        print("🔴 Redis init failed:", str(e))
+        redis_client = None
 
-# TEST SAFE (optionnel)
-try:
-    redis_client.ping()
-    print("🟢 REDIS CONNECTÉ OK")
-except Exception as e:
-    print("🔴 REDIS ERROR:", str(e))
+
+def test_redis():
+    if not redis_client:
+        return False
+    try:
+        return redis_client.ping()
+    except:
+        return False
