@@ -76,6 +76,54 @@ def build_affiliations(conn, user_id: int):
     return suggestions[:3]
 
 
+def build_gamification_actions(score: float, level):
+    actions = []
+
+    if score >= 70:
+        actions.append({
+            "title": "Mission Advanced",
+            "description": "Choisir une opportunite prioritaire et definir une action executable en 7 jours.",
+            "xp": 150,
+        })
+        actions.append({
+            "title": "Optimisation portefeuille",
+            "description": "Verifier la plus forte exposition et reduire le risque si elle depasse ton seuil.",
+            "xp": 120,
+        })
+    else:
+        actions.append({
+            "title": "Base financiere",
+            "description": "Completer revenus, charges, dettes et epargne pour debloquer plus de signaux.",
+            "xp": 100,
+        })
+
+    return actions
+
+
+def build_upgrade(score: float, level):
+    level_text = str(level or "").upper()
+
+    if level_text in ["LIBERTY", "LEGACY"]:
+        return {
+            "recommended_plan": "liberty_legacy",
+            "title": "Liberty Legacy",
+            "description": "Conserver, multiplier et transmettre ta liberte financiere a ta famille.",
+        }
+
+    if score >= 70 or level_text in ["ADVANCED", "ELITE"]:
+        return {
+            "recommended_plan": "liberty",
+            "title": "Passer au plan Liberty",
+            "description": "Tu es proche d'un niveau ou l'automatisation, les opportunites avancees et le suivi IA deviennent utiles.",
+        }
+
+    return {
+        "recommended_plan": "gold",
+        "title": "Debloquer Gold",
+        "description": "Acceder a plus d'analyses, de signaux et d'actions personnalisees.",
+    }
+
+
 # =========================
 # GET USER ID
 # =========================
@@ -118,6 +166,8 @@ def get_gamification(user=Depends(get_current_user)):
             "level": 1,
             "streak": 0,
             "badges": [],
+            "actions": build_gamification_actions(0, "FREE"),
+            "upgrade": build_upgrade(0, "FREE"),
             "ai_coach": {
                 "message": "Ajoute tes donnees pour recevoir des affiliations pertinentes.",
                 "affiliations": [],
@@ -163,6 +213,8 @@ def get_gamification(user=Depends(get_current_user)):
             "level": row.level or 1,
             "streak": row.streak or 0,
             "badges": badges,
+            "actions": build_gamification_actions(row.xp or 0, row.level or 1),
+            "upgrade": build_upgrade(row.xp or 0, row.level or 1),
             "ai_coach": {
                 "message": (
                     "Je te propose les prochaines actions et affiliations en "

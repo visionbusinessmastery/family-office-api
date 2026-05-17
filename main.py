@@ -15,6 +15,7 @@ from auth.utils import decode_token
 # =========================
 from auth.routes import router as auth_router
 from advisor.routes import router as advisor_router
+from billing.routes import router as billing_router
 
 from intelligence.routes import router as intelligence_router
 from intelligence.category_opportunities import router as category_opportunities_router
@@ -137,6 +138,7 @@ print("AUTH OK")
 # =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
+app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
 app.include_router(category_opportunities_router, prefix="/intelligence", tags=["Opportunities"])
