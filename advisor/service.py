@@ -13,8 +13,10 @@ from market.service import get_market
 from advisor.autopilot_v4_engine import get_autopilot_v4
 
 from core.cache import redis_client
+from database import engine
+from auth.utils import get_user_id
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 
 
 # =========================
@@ -76,14 +78,33 @@ def advisor_logic(user_email, message, level="free"):
     # CONTEXT ENGINE
     # =========================
     context = run_orchestrator(user_email)
+    user_id = None
+
+    with engine.connect() as conn:
+        user_id = get_user_id(conn, user_email)
 
     # =========================
     # DATA SOURCES (CACHED)
     # =========================
-    portfolio = get_user_portfolio(user_email)
+    portfolio = get_user_portfolio(user_id) if user_id else {}
     market = get_market("global")
 
     opportunities = context.get("opportunities", [])
+
+    if not os.getenv("OPENAI_API_KEY"):
+        result = {
+            "analysis": (
+                "Je peux deja analyser ton profil avec les donnees disponibles. "
+                f"Score actuel: {context.get('global_score') or context.get('score', {}).get('score', 0)}. "
+                f"Opportunites detectees: {len(opportunities) if isinstance(opportunities, list) else opportunities.get('count', 0) if isinstance(opportunities, dict) else 0}. "
+                "Configure OPENAI_API_KEY cote backend pour activer une reponse IA complete."
+            ),
+            "context_score": context.get("global_score") or context.get("score"),
+            "autopilot": None
+        }
+
+        set_cache(cache_key, result, ttl=120)
+        return result
 
     # =========================
     # LLM PROMPT
@@ -190,11 +211,15 @@ def portfolio_manager(user_email, message):
 
 def portfolio_autopilot(user_email, message):
 
-    engine = get_autopilot_v4()
+    autopilot = get_autopilot_v4()
+    user_id = None
 
-    return engine.run(
+    with engine.connect() as conn:
+        user_id = get_user_id(conn, user_email)
+
+    return autopilot.run(
         user_email=user_email,
-        portfolio=get_user_portfolio(user_email),
+        portfolio=get_user_portfolio(user_id) if user_id else {},
         market=get_market("global"),
         context={},
         llm_analysis=message,

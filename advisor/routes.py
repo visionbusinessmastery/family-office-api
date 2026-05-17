@@ -20,6 +20,7 @@ router = APIRouter()
 # =========================
 # 1. CHAT ADVISOR (IA CONSEIL)
 # =========================
+@router.post("/")
 @router.post("/advisor")
 @limiter.limit("10/minute")
 def advisor(request: Request, data: AdvisorRequest):
