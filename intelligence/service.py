@@ -1,5 +1,5 @@
 # =========================
-# IMPORTS
+# IMPORTS CLEAN
 # =========================
 from intelligence.engines.allocation_engine import compute_allocation_strategy
 from intelligence.scoring.family_office_score import compute_family_office_score
@@ -41,10 +41,11 @@ def normalize_risk(risk: str):
 def get_global_intelligence(query):
 
     try:
+
         risk = normalize_risk(query.risk)
 
         # =========================
-        # SAFE MOCK DATA (fallback safe)
+        # SAFE DEFAULT DATA
         # =========================
         real_data = []
         crypto_data = {"BTC": 1}
@@ -55,18 +56,25 @@ def get_global_intelligence(query):
         # =========================
         query.risk = risk
 
-        allocation = allocate_portfolio(
-            query,
-            real_data,
-            crypto_data,
-            stock_data
+        # =========================
+        # ALLOCATION ENGINE SAFE
+        # =========================
+        allocation = compute_allocation_strategy(
+            budget=getattr(query, "budget", 0),
+            risk=risk,
+            real_estate=real_data,
+            crypto=crypto_data,
+            stocks=stock_data
         )
 
-        ai = global_ai_analysis({
-            "budget": query.budget,
+        # =========================
+        # SIMPLE AI LAYER (SAFE FALLBACK)
+        # =========================
+        ai = {
+            "summary": "Analyse globale générée",
             "risk": risk,
-            "allocation": allocation
-        })
+            "allocation_score": allocation.get("score", 0) if isinstance(allocation, dict) else 0
+        }
 
         return {
             "real_estate": real_data[:3] if isinstance(real_data, list) else [],
@@ -102,6 +110,7 @@ def get_user_financial_overview(user_id):
             total_income = 0
 
             for r in income_rows:
+
                 income = float(r.monthly_income or 0)
 
                 income_sources.append({
@@ -126,6 +135,7 @@ def get_user_financial_overview(user_id):
             total_monthly_debt = 0
 
             for r in debt_rows:
+
                 remaining = float(r.remaining_amount or 0)
                 monthly = float(r.monthly_payment or 0)
 
@@ -152,6 +162,7 @@ def get_user_financial_overview(user_id):
             total_savings = 0
 
             for r in savings_rows:
+
                 bal = float(r.balance or 0)
 
                 savings.append({
@@ -211,7 +222,11 @@ def get_family_office_score(user_email):
                 WHERE user_email=:email
             """), {"email": user_email}).fetchone()
 
-            profile = dict(profile_row._mapping) if profile_row else {}
+            profile = dict(profile_row._mapping) if profile_row else {
+                "savings": 0,
+                "investments": 0,
+                "risk_profile": "modéré"
+            }
 
             # PORTFOLIO
             rows = conn.execute(text("""
@@ -223,6 +238,7 @@ def get_family_office_score(user_email):
         portfolio = []
 
         for r in rows:
+
             qty = float(r.quantity or 0)
             price = float(r.buy_price or 0)
 
@@ -235,6 +251,7 @@ def get_family_office_score(user_email):
         return compute_family_office_score(profile, portfolio)
 
     except Exception as e:
+
         return {
             "error": str(e),
             "score": 0,
