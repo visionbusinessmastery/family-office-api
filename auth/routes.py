@@ -234,8 +234,8 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus_mensuels": data.get("revenus"),
-            "charges_mensuelles": data.get("charges"),
+            "revenus": data.get("revenus_mensuels"),
+            "charges": data.get("charges_mensuelles"),
         })
 
         if result.rowcount == 0:
