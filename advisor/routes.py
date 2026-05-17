@@ -10,6 +10,7 @@ from .schemas import AdvisorRequest
 
 from .service import (
     get_advisor_free,
+    portfolio_autopilot,
     portfolio_manager,
 )
 
