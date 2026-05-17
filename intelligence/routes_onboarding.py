@@ -51,3 +51,24 @@ def update_onboarding(data: dict, user=Depends(get_current_user)):
         )
 
     return {"status": "updated"}
+
+
+# sync onboarding → financial system
+
+conn.execute(text("""
+    INSERT INTO income_sources (user_id, name, income_type, monthly_income)
+    VALUES (:uid, 'Onboarding income', 'manual', :income)
+    ON CONFLICT DO NOTHING
+"""), {
+    "uid": user_id,
+    "income": data.get("revenus_mensuels", 0)
+})
+
+conn.execute(text("""
+    INSERT INTO debts (user_id, name, debt_type, remaining_amount, monthly_payment)
+    VALUES (:uid, 'Onboarding charges', 'manual', 0, :charges)
+    ON CONFLICT DO NOTHING
+"""), {
+    "uid": user_id,
+    "charges": data.get("charges_mensuelles", 0)
+})
