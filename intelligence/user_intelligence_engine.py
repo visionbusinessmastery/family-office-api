@@ -1,77 +1,4 @@
 # =========================
-# IMPORTS
-# =========================
-from sqlalchemy import text
-from database import engine
-import json
-
-from intelligence.core.upgrade_engine import compute_upgrade_decision
-from intelligence.strategic.feature_engine import compute_feature_access
-from intelligence.strategic.opportunity_engine import compute_opportunities
-from intelligence.strategic.strategic_layer import compute_strategic_layer
-from intelligence.scoring.financial_overview import get_user_financial_overview
-from intelligence.scoring.family_office_score import compute_family_office_score
-
-from core.cache import redis_client
-
-
-# =========================
-# CACHE HELPERS
-# =========================
-def get_cache(key):
-    try:
-        if redis_client:
-            data = redis_client.get(key)
-            if data:
-                return json.loads(data)
-    except:
-        pass
-    return None
-
-
-def set_cache(key, value, ttl=60):
-    try:
-        if redis_client:
-            redis_client.setex(key, ttl, json.dumps(value))
-    except:
-        pass
-
-
-# =========================
-# SAFE GETTER
-# =========================
-def safe_get(obj, key, default=0):
-    try:
-        return obj.get(key, default) if isinstance(obj, dict) else default
-    except:
-        return default
-
-
-# =========================
-# LEVEL SYSTEM
-# =========================
-def compute_level(score_value: int, plan: str = "FREE"):
-
-    plan = (plan or "FREE").upper()
-
-    if plan == "LIBERTY":
-        return "LIBERTY"
-
-    if score_value >= 15000:
-        return "LIBERTY"
-    elif score_value >= 7000:
-        return "ELITE"
-    elif score_value >= 3000:
-        return "ELITE"
-    elif score_value >= 1000:
-        return "GOLD"
-    elif score_value >= 40:
-        return "SILVER"
-    else:
-        return "FREE"
-
-
-# =========================
 # MAIN ENGINE
 # =========================
 def compute_user_intelligence(user_email: str):
@@ -79,9 +6,6 @@ def compute_user_intelligence(user_email: str):
     cache_key = f"intel:{user_email}"
     context_cache_key = f"context:{user_email}"
 
-    # =========================
-    # GLOBAL CACHE (FAST RETURN)
-    # =========================
     cached = get_cache(cache_key)
     if cached:
         return cached
@@ -102,24 +26,27 @@ def compute_user_intelligence(user_email: str):
             return {"error": "user not found"}
 
         # =========================
-        # ONBOARDING CHECK
+        # ONBOARDING REQUIRED STATE
         # =========================
         if not user.profile_completed:
 
             result = {
                 "state": "ONBOARDING_REQUIRED",
-                "score": {"score": 0},
+                "global_score": 0,
                 "level": "ONBOARDING",
-                "features": [],
-                "opportunities": [],
-                "upgrade": None
+                "modules": {},
+                "advice": [],
+                "onboarding": {
+                    "monthly_income": float(user.revenus_mensuels or 0),
+                    "monthly_expenses": float(user.charges_mensuelles or 0)
+                }
             }
 
             set_cache(cache_key, result, ttl=30)
             return result
 
         # =========================
-        # CONTEXT CACHE (PROFILE + ONBOARDING)
+        # CONTEXT CACHE
         # =========================
         context = get_cache(context_cache_key)
 
@@ -185,9 +112,6 @@ def compute_user_intelligence(user_email: str):
 
         profile_dict["portfolio_value"] = total_portfolio_value
 
-        if profile_dict["investments"] == 0:
-            profile_dict["investments"] = total_portfolio_value
-
         # =========================
         # FINANCIAL OVERVIEW
         # =========================
@@ -196,13 +120,16 @@ def compute_user_intelligence(user_email: str):
 
         financial_features = {
             "cashflow_score": safe_get(totals, "net_cashflow", 0),
+
+            # 🔥 ONBOARDING DRIVER DATA
             "monthly_income": onboarding["monthly_income"],
             "monthly_expenses": onboarding["monthly_expenses"],
+
             "debt_risk_score": safe_get(totals, "total_debt", 0),
             "savings_velocity_score": safe_get(totals, "total_savings", 0),
             "income_stability_score": len(financial.get("income_sources", [])) * 10,
             "raw": totals
-        } if totals else {}
+        }
 
         # =========================
         # SCORE ENGINE
@@ -215,9 +142,6 @@ def compute_user_intelligence(user_email: str):
 
         score_value = int(safe_get(score_result, "score", 0))
 
-        # =========================
-        # LEVEL + FEATURES
-        # =========================
         level = compute_level(score_value, user.plan)
 
         upgrade = compute_upgrade_decision(user.plan, score_value)
@@ -232,23 +156,23 @@ def compute_user_intelligence(user_email: str):
         )
 
         # =========================
-        # RESULT
+        # FINAL RESULT (🔥 FIX IMPORTANT)
         # =========================
         result = {
             "user": user.email,
             "plan": user.plan,
-            "strategic_intelligence": strategic_intelligence,
-            "score": {
-                "score": score_value,
-                "details": score_result.get("details", {}),
-                "advice": score_result.get("advice", [])
-            },
+
+            "global_score": score_value,
             "level": level,
-            "onboarding": {
-                 "monthly_income": onboarding["monthly_income"],
-                 "monthly_expenses": onboarding["monthly_expenses"]
-            },
-            "onboarding": onboarding,
+
+            "onboarding": onboarding,   # 🔥 CRITICAL FIX
+
+            "strategic_intelligence": strategic_intelligence,
+
+            "modules": score_result.get("details", {}),
+
+            "advice": score_result.get("advice", []),
+
             "upgrade": upgrade,
             "features": features,
             "opportunities": opportunities
