@@ -156,6 +156,7 @@ def build_scoring_context(user=None, portfolio=None, financial=None, onboarding=
     user = user or {}
     portfolio = portfolio or []
     financial = financial or {}
+    onboarding = onboarding or {}
 
     # =========================
     # CACHE KEY
@@ -185,6 +186,7 @@ def build_scoring_context(user=None, portfolio=None, financial=None, onboarding=
         "user": user_context,
         "portfolio": portfolio,
         "financial": financial_context,
+        "onboarding": onboarding,
 
         # FLATTENED FAST ACCESS
         "capital": user_context["capital"],
