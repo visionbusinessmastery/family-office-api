@@ -196,6 +196,8 @@ def compute_user_intelligence(user_email: str):
 
         financial_features = {
             "cashflow_score": safe_get(totals, "net_cashflow", 0),
+            "monthly_income": onboarding["monthly_income"],
+            "monthly_expenses": onboarding["monthly_expenses"],
             "debt_risk_score": safe_get(totals, "total_debt", 0),
             "savings_velocity_score": safe_get(totals, "total_savings", 0),
             "income_stability_score": len(financial.get("income_sources", [])) * 10,
