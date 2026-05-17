@@ -16,8 +16,26 @@ from auth.utils import (
     verify_password
 )
 from auth.email_service import send_verification_email
+from core.cache import redis_client
 
 router = APIRouter()
+
+# =========================
+# INVALIDATE USER
+# =========================
+def invalidate_user_intelligence_caches(email: str):
+    try:
+        if not redis_client:
+            return
+
+        redis_client.delete(
+            f"intel:{email}",
+            f"context:{email}",
+            f"score:{email}",
+        )
+    except Exception:
+        pass
+
 
 
 # =========================
@@ -240,7 +258,9 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
 
         if result.rowcount == 0:
             raise HTTPException(status_code=400, detail="Onboarding failed")
-
+        
+        invalidate_user_intelligence_caches(email)
+        
     return {"status": "ok"}
 
 
@@ -286,6 +306,8 @@ def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
         if result.rowcount == 0:
             return {"error": "onboarding failed"}
 
+        invalidate_user_intelligence_caches(email)
+        
     return {"status": "completed"}
 
 
@@ -308,6 +330,8 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
             "charges_mensuelles": data.get("charges_mensuelles")
         })
 
+        invalidate_user_intelligence_caches(email)
+        
     return {"status": "updated"}
 
 
