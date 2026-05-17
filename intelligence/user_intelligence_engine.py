@@ -244,6 +244,10 @@ def compute_user_intelligence(user_email: str):
                 "advice": score_result.get("advice", [])
             },
             "level": level,
+            "onboarding": {
+                 "monthly_income": onboarding["monthly_income"],
+                 "monthly_expenses": onboarding["monthly_expenses"]
+            },
             "onboarding": onboarding,
             "upgrade": upgrade,
             "features": features,
