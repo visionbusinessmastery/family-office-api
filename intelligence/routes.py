@@ -102,19 +102,36 @@ def global_command_center(request: Request):
 
         intelligence = compute_user_intelligence(user_email)
 
+        family_score = intelligence.get("family_office_score") or {}
+
+        # =========================
+        # NORMALISATION SAFE FRONTEND
+        # =========================
+        details = family_score.get("details", {})
+
         return {
-            "global_score": intelligence.get("global_score", 0),
-            "level": intelligence.get("level", "Starter"),
+            "global_score": intelligence.get("global_score", family_score.get("score", 0)),
+            "level": intelligence.get("level", family_score.get("level", "Starter")),
+
+            # 🔥 IMPORTANT: STRUCTURE STABLE FRONTEND
+            "family_office_score": {
+                "score": family_score.get("score", 0),
+                "level": family_score.get("level", "Starter"),
+                "details": {
+                    "wealth": details.get("wealth", 0),
+                    "diversification": details.get("diversification", 0),
+                    "debt": details.get("debt", 0),
+                    "activity": details.get("activity", 0),
+                    "financial_score": details.get("financial_score", 0),
+                    "crypto_ratio": details.get("crypto_ratio", 0),
+                },
+                "advice": family_score.get("advice", []),
+            },
+
+            "gamification": intelligence.get("gamification", {}),
+
             "modules": intelligence.get("modules", {}),
             "advice": intelligence.get("advice", []),
-            "family_office_score": intelligence.get(
-                "family_office_score",
-                {}
-            ),
-            "gamification": intelligence.get(
-                "gamification",
-                {}
-            ),
         }
 
     return safe_execute(
