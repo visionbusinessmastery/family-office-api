@@ -226,16 +226,16 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
             SET
                 age = :age,
                 situation_pro = :situation_pro,
-                revenus_mensuels = :revenus,
-                charges_mensuelles = :charges,
+                revenus_mensuels = :revenus_mensuels,
+                charges_mensuelles = :charges_mensuelles,
                 profile_completed = TRUE
             WHERE email = :email
         """), {
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus": data.get("revenus_mensuels"),
-            "charges": data.get("charges_mensuelles"),
+            "revenus_mensuels": data.get("revenus_mensuels"),
+            "charges_mensuelles": data.get("charges_mensuelles"),
         })
 
         if result.rowcount == 0:
@@ -271,16 +271,16 @@ def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
             SET
                 age = :age,
                 situation_pro = :situation_pro,
-                revenus_mensuels = :revenus,
-                charges_mensuelles = :charges,
+                revenus_mensuels = :revenus_mensuels,
+                charges_mensuelles = :charges_mensuelles,
                 profile_completed = TRUE
             WHERE email = :email
         """), {
             "email": email,
             "age": data.get("age"),
             "situation_pro": data.get("situation_pro"),
-            "revenus_mensuels": data.get("revenus"),
-            "charges_mensuelles": data.get("charges"),
+            "revenus_mensuels": data.get("revenus_mensuels"),
+            "charges_mensuelles": data.get("charges_mensuelles"),
         })
 
         if result.rowcount == 0:
@@ -299,13 +299,13 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
 
         conn.execute(text("""
             UPDATE users
-            SET revenus_mensuels = :revenus,
-                charges_mensuelles = :charges
+            SET revenus_mensuels = :revenus_mensuels,
+                charges_mensuelles = :charges_mensuelles,
             WHERE email = :email
         """), {
             "email": email,
-            "revenus": data.get("revenus_mensuels"),
-            "charges": data.get("charges_mensuelles"),
+            "revenus_mensuels": data.get("revenus_mensuels"),
+            "charges_mensuelles": data.get("charges_mensuelles"),
         })
 
     return {"status": "updated"}
