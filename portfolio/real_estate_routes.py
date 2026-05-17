@@ -139,8 +139,7 @@ def get_real_estate_rows(conn, user_id: int):
     """), {"user_id": user_id}).fetchall()
 
 
-@router.get("/")
-def get_real_estate(user=Depends(get_current_user)):
+def list_real_estate_assets(user):
     with engine.begin() as conn:
         user_id = get_user_id(conn, user)
 
@@ -152,8 +151,17 @@ def get_real_estate(user=Depends(get_current_user)):
     return build_response(rows)
 
 
-@router.post("/")
-def add_real_estate_asset(data: RealEstateRequest, user=Depends(get_current_user)):
+@router.get("/")
+def get_real_estate(user=Depends(get_current_user)):
+    return list_real_estate_assets(user)
+
+
+@router.get("")
+def get_real_estate_no_slash(user=Depends(get_current_user)):
+    return list_real_estate_assets(user)
+
+
+def create_real_estate_asset(data: RealEstateRequest, user):
     with engine.begin() as conn:
         user_id = get_user_id(conn, user)
 
@@ -202,6 +210,19 @@ def add_real_estate_asset(data: RealEstateRequest, user=Depends(get_current_user
         invalidate_real_estate_caches(user, user_id)
 
     return {"status": "created"}
+
+
+@router.post("/")
+def add_real_estate_asset(data: RealEstateRequest, user=Depends(get_current_user)):
+    return create_real_estate_asset(data, user)
+
+
+@router.post("")
+def add_real_estate_asset_no_slash(
+    data: RealEstateRequest,
+    user=Depends(get_current_user),
+):
+    return create_real_estate_asset(data, user)
 
 
 @router.put("/{asset_id}")
@@ -276,4 +297,3 @@ def delete_real_estate_asset(asset_id: int, user=Depends(get_current_user)):
         invalidate_real_estate_caches(user, user_id)
 
     return {"status": "deleted", "id": asset_id}
-
