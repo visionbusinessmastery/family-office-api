@@ -151,7 +151,7 @@ def build_financial_context(financial: dict):
 # =========================
 # MAIN CONTEXT BUILDER (ONLY ONE VERSION)
 # =========================
-def build_scoring_context(user=None, portfolio=None, financial=None):
+def build_scoring_context(user=None, portfolio=None, financial=None, onboarding=None):
 
     user = user or {}
     portfolio = portfolio or []
