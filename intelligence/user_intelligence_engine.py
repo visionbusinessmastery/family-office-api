@@ -74,7 +74,7 @@ def build_finance_payload(conn, user_id: int, onboarding: dict):
     }
 
     rows = conn.execute(text("""
-        SELECT type, label, amount
+        SELECT type, name, amount
         FROM finance_items
         WHERE user_id = :user_id
     """), {"user_id": user_id}).fetchall()
@@ -85,7 +85,8 @@ def build_finance_payload(conn, user_id: int, onboarding: dict):
             continue
 
         finance[item_type].append({
-            "label": row.label,
+            "name": row.name,
+            "label": row.name,
             "amount": float(row.amount or 0),
         })
 

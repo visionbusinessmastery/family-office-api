@@ -52,6 +52,10 @@ def invalidate_finance_caches(email: str, user_id: Optional[int] = None):
         pass
 
 
+def get_item_name(data: dict):
+    return data.get("name") or data.get("label") or ""
+
+
 # =========================
 # CREATE ITEM
 # =========================
@@ -77,7 +81,7 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
             {
                 "user_id": user_id,
                 "type": data.get("type"),
-                "name": data.get("name"),
+                "name": get_item_name(data),
                 "amount": data.get("amount", 0),
             }
         )
@@ -104,7 +108,7 @@ def get_finance(user=Depends(get_current_user)):
 
         rows = conn.execute(
             text("""
-                SELECT id, type, label, amount
+                SELECT id, type, name, amount
                 FROM finance_items
                 WHERE user_id = :user_id
                 ORDER BY id DESC
@@ -123,6 +127,7 @@ def get_finance(user=Depends(get_current_user)):
             "id": r.id,
             "type": r.type,
             "name": r.name,
+            "label": r.name,
             "amount": float(r.amount or 0)
         }
 
@@ -171,7 +176,7 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
             {
                 "id": item_id,
                 "user_id": user_id,
-                "name": data.get("name"),
+                "name": get_item_name(data),
                 "amount": data.get("amount", 0)
             }
         )
@@ -259,5 +264,3 @@ def add_xp(conn, user_id: int, xp_amount: int):
                 "user_id": user_id
             }
         )
-
-

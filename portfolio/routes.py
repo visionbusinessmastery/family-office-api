@@ -8,7 +8,11 @@ from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
 
-from .service import save_portfolio_snapshot
+from .service import (
+    get_user_portfolio,
+    invalidate_portfolio_cache,
+    save_portfolio_snapshot,
+)
 
 router = APIRouter()
 
@@ -31,25 +35,7 @@ def get_portfolio(request: Request):
             if not user:
                 raise Exception("User not found")
 
-            rows = conn.execute(text("""
-                SELECT id, asset_name, category, quantity, purchase_price
-                FROM portfolio
-                WHERE user_id = :user_id
-            """), {"user_id": user.id}).fetchall()
-
-            result = []
-
-            for r in rows:
-                result.append({
-                    "id": r.id,
-                    "asset_name": r.asset_name,
-                    "asset_type": r.category,
-                    "quantity": float(r.quantity or 0),
-                    "purchase_price": float(r.purchase_price or 0),
-                    "value": float((r.quantity or 0) * (r.purchase_price or 0))
-                })
-
-            return {"portfolio": result}
+            return get_user_portfolio(user.id)
 
     return safe_execute(_get, module_name="PORTFOLIO")
 
@@ -96,6 +82,7 @@ def add_asset(request: Request, data: PortfolioRequest):
                 "purchase_price": data.purchase_price
             })
             
+            invalidate_portfolio_cache(user.id, user_email)
             save_portfolio_snapshot(user.id)
         
         return {"status": "asset ajouté"}
@@ -143,6 +130,7 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
             if result.rowcount == 0:
                 raise Exception("Asset not found")
 
+            invalidate_portfolio_cache(user.id, user_email)
             save_portfolio_snapshot(user.id)
 
         return {"status": "updated", "id": asset_id}
@@ -180,6 +168,7 @@ def delete_asset(request: Request, asset_id: int):
             if result.rowcount == 0:
                 raise Exception("Asset not found or not owned by user")
 
+            invalidate_portfolio_cache(user.id, user_email)
             save_portfolio_snapshot(user.id)
 
         return {"status": "deleted", "id": asset_id}
@@ -200,6 +189,12 @@ def portfolio_history(request: Request):
             SELECT id FROM users WHERE email = :email
         """), {"email": user_email}).fetchone()
 
+        total_cost = conn.execute(text("""
+            SELECT COALESCE(SUM(quantity * purchase_price), 0)
+            FROM portfolio
+            WHERE user_id = :user_id
+        """), {"user_id": user.id}).scalar()
+
         rows = conn.execute(text("""
             SELECT total_value, created_at
             FROM portfolio_history
@@ -211,7 +206,8 @@ def portfolio_history(request: Request):
         "history": [
             {
                 "date": r.created_at.isoformat(),
-                "value": float(r.total_value)
+                "value": float(r.total_value),
+                "gain": float(r.total_value) - float(total_cost or 0)
             }
             for r in rows
         ]

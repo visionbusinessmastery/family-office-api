@@ -31,6 +31,26 @@ def set_cache(key, value, ttl=900):
         pass
 
 
+def invalidate_portfolio_cache(user_id: int, email: str = None):
+    try:
+        if redis_client:
+            keys = [
+                f"portfolio:{user_id}",
+                f"cmd_center:{user_id}",
+            ]
+
+            if email:
+                keys.extend([
+                    f"intel:{email}",
+                    f"context:{email}",
+                    f"score:{email}",
+                ])
+
+            redis_client.delete(*keys)
+    except:
+        pass
+
+
 # =========================
 # STOCK CACHE (🔥 NEW - IMPORTANT)
 # =========================
@@ -47,6 +67,60 @@ def get_stock_cached(ticker: str):
     set_cache(cache_key, data, ttl=300)
 
     return data
+
+
+def build_portfolio_payload(rows):
+    portfolio = []
+    total_value = 0
+    total_cost = 0
+
+    for r in rows:
+
+        asset = r.asset_name
+        asset_type = r.category
+        quantity = float(r.quantity or 0)
+        purchase_price = float(r.purchase_price or 0)
+
+        ticker = resolve_ticker(asset)
+        stock_data = get_stock_cached(ticker)
+        current_price = stock_data.get("price") or purchase_price
+
+        value = quantity * current_price
+        cost = quantity * purchase_price
+        gain = value - cost
+        gain_percent = (gain / cost * 100) if cost > 0 else 0
+
+        total_value += value
+        total_cost += cost
+
+        portfolio.append({
+            "id": r.id,
+            "asset_name": asset,
+            "asset_type": asset_type,
+            "quantity": quantity,
+            "purchase_price": purchase_price,
+            "current_price": current_price,
+            "current_value": round(value, 2),
+            "value": round(value, 2),
+            "cost": round(cost, 2),
+            "gain": round(gain, 2),
+            "gain_percent": round(gain_percent, 2),
+            "ticker": ticker,
+            "source": stock_data.get("source", "N/A")
+        })
+
+    total_gain = total_value - total_cost
+
+    return {
+        "portfolio": portfolio,
+        "total_value": round(total_value, 2),
+        "total_cost": round(total_cost, 2),
+        "total_gain": round(total_gain, 2),
+        "total_gain_percent": round(
+            (total_gain / total_cost * 100) if total_cost > 0 else 0,
+            2
+        )
+    }
 
 
 # =========================
@@ -71,60 +145,7 @@ def get_user_portfolio(user_id: int):
             WHERE user_id = :user_id
         """), {"user_id": user_id}).fetchall()
 
-        portfolio = []
-        total_value = 0
-        total_cost = 0
-
-        for r in rows:
-
-            asset = r.asset_name
-            asset_type = r.category
-            quantity = float(r.quantity or 0)
-            purchase_price = float(r.purchase_price or 0)
-
-            ticker = resolve_ticker(asset)
-
-            # =========================
-            # STOCK DATA (CACHE SAFE)
-            # =========================
-            stock_data = get_stock_cached(ticker)
-
-            current_price = stock_data.get("price") or purchase_price
-
-            value = quantity * current_price
-            cost = quantity * purchase_price
-            gain = value - cost
-
-            gain_percent = (gain / cost * 100) if cost > 0 else 0
-
-            total_value += value
-            total_cost += cost
-
-            portfolio.append({
-                "id": r.id,
-                "asset_name": asset,
-                "asset_type": asset_type,
-                "quantity": quantity,
-                "purchase_price": purchase_price,
-                "current_price": current_price,
-                "value": round(value, 2),
-                "gain": round(gain, 2),
-                "gain_percent": round(gain_percent, 2),
-                "ticker": ticker,
-                "source": stock_data.get("source", "N/A")
-            })
-
-        result = {
-            "portfolio": portfolio,
-            "total_value": round(total_value, 2),
-            "total_cost": round(total_cost, 2),
-            "total_gain": round(total_value - total_cost, 2),
-            "total_gain_percent": round(
-                ((total_value - total_cost) / total_cost * 100)
-                if total_cost > 0 else 0,
-                2
-            )
-        }
+        result = build_portfolio_payload(rows)
 
     # =========================
     # CACHE STORE
@@ -141,18 +162,20 @@ def save_portfolio_snapshot(user_id: int):
 
     with engine.begin() as conn:
 
-        total = conn.execute(text("""
-            SELECT COALESCE(SUM(quantity * purchase_price), 0)
+        rows = conn.execute(text("""
+            SELECT id, asset_name, category, quantity, purchase_price
             FROM portfolio
             WHERE user_id = :user_id
-        """), {"user_id": user_id}).scalar()
+        """), {"user_id": user_id}).fetchall()
+
+        snapshot = build_portfolio_payload(rows)
 
         conn.execute(text("""
             INSERT INTO portfolio_history (user_id, total_value, created_at)
             VALUES (:user_id, :total, NOW())
         """), {
             "user_id": user_id,
-            "total": float(total or 0)
+            "total": float(snapshot.get("total_value") or 0)
         })
 
 
