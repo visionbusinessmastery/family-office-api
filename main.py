@@ -19,6 +19,7 @@ from advisor.routes import router as advisor_router
 from intelligence.routes import router as intelligence_router
 from intelligence.routes_finance import router as finance_router
 from intelligence.routes_score import router as intelligence_score_router
+from intelligence.routes_onboarding import router as onboarding_router
 
 from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
@@ -137,6 +138,7 @@ app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
 app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(intelligence_score_router, prefix="/intelligence", tags=["Score"])
+app.include_router(onboarding_router)
 
 app.include_router(gamification_router, prefix="/gamification", tags=["Gamification"])
 
