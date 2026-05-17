@@ -207,6 +207,7 @@ def portfolio_history(request: Request):
             {
                 "date": r.created_at.isoformat(),
                 "value": float(r.total_value),
+                "cost": float(total_cost or 0),
                 "gain": float(r.total_value) - float(total_cost or 0)
             }
             for r in rows
