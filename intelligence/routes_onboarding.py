@@ -1,12 +1,31 @@
 # =========================
+# INTELLIGENCE ROUTES ONBOARDING
+# =========================
+
+# =========================
 # IMPORTS
 # =========================
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
+from core.cache import redis_client
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
+
+# =========================
+# INVALIDATE USER INTELLIGENCE CACHE
+# =========================
+def invalidate_user_intelligence_caches(email: str):
+    try:
+        if redis_client:
+            redis_client.delete(
+                f"intel:{email}",
+                f"context:{email}",
+                f"score:{email}",
+            )
+    except Exception:
+        pass
 
 
 # =========================
@@ -18,8 +37,8 @@ def update_onboarding(data: dict, user=Depends(get_current_user)):
     # =========================
     # SAFE EMAIL EXTRACTION
     # =========================
-    email = user.get("email") if isinstance(user, dict) else user.email
-
+    email = user.get("email") if isinstance(user, dict) else user
+    
     # =========================
     # SAFE CASTING
     # =========================
@@ -90,7 +109,10 @@ def update_onboarding(data: dict, user=Depends(get_current_user)):
                 "uid": uid,
                 "charges": charges
             })
+            
+        invalidate_user_intelligence_caches(email)
 
+    
         # =========================
         # SUCCESS RESPONSE
         # =========================
