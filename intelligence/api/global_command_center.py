@@ -173,6 +173,7 @@ def compute_global_command_center(
             user=user,
             portfolio=portfolio,
             financial=financial_overview,
+            onboarding=onboarding
         )
 
         modules = {}
