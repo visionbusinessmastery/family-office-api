@@ -2,6 +2,9 @@
 # INTELLIGENCE ROUTES V4 CLEAN
 # =========================
 
+# =========================
+# IMPORTS
+# =========================
 from fastapi import APIRouter, Request
 from core.limiter import limiter
 from core.utils import safe_execute
@@ -92,48 +95,48 @@ def run_intelligence(request: Request):
 
 
 # =========================
+# FRONTEND PAYLOAD NORMALIZER
+# =========================
+def build_command_center_payload(user_email: str):
+    intelligence = compute_user_intelligence(user_email)
+    family_score = intelligence.get("family_office_score") or intelligence.get("score") or {}
+    details = family_score.get("details", {})
+
+    return {
+        "user": intelligence.get("user", user_email),
+        "plan": intelligence.get("plan", "FREE"),
+        "global_score": intelligence.get("global_score", family_score.get("score", 0)),
+        "level": intelligence.get("level", family_score.get("level", "BEGINNER")),
+        "onboarding": intelligence.get("onboarding", {}),
+        "family_office_score": {
+            "score": family_score.get("score", 0),
+            "level": family_score.get("level", intelligence.get("level", "BEGINNER")),
+            "details": {
+                "wealth": details.get("wealth", 0),
+                "diversification": details.get("diversification", 0),
+                "debt": details.get("debt", 0),
+                "activity": details.get("activity", 0),
+                "financial_score": details.get("financial_score", 0),
+                "crypto_ratio": details.get("crypto_ratio", 0),
+            },
+            "advice": family_score.get("advice", []),
+        },
+        "gamification": intelligence.get("gamification", {}),
+        "modules": intelligence.get("modules", {}),
+        "advice": intelligence.get("advice", []),
+        "strategic_intelligence": intelligence.get("strategic_intelligence", {}),
+    }
+
+
+# =========================
 # GLOBAL COMMAND CENTER
 # =========================
 @router.get("/global-command-center")
 def global_command_center(request: Request):
 
     def _run():
-        user_email = request.state.user_email
-
-        intelligence = compute_user_intelligence(user_email)
-
-        family_score = intelligence.get("family_office_score") or {}
-
-        # =========================
-        # NORMALISATION SAFE FRONTEND
-        # =========================
-        details = family_score.get("details", {})
-
-        return {
-            "global_score": intelligence.get("global_score", family_score.get("score", 0)),
-            "level": intelligence.get("level", family_score.get("level", "Starter")),
-
-            # 🔥 IMPORTANT: STRUCTURE STABLE FRONTEND
-            "family_office_score": {
-                "score": family_score.get("score", 0),
-                "level": family_score.get("level", "Starter"),
-                "details": {
-                    "wealth": details.get("wealth", 0),
-                    "diversification": details.get("diversification", 0),
-                    "debt": details.get("debt", 0),
-                    "activity": details.get("activity", 0),
-                    "financial_score": details.get("financial_score", 0),
-                    "crypto_ratio": details.get("crypto_ratio", 0),
-                },
-                "advice": family_score.get("advice", []),
-            },
-
-            "gamification": intelligence.get("gamification", {}),
-
-            "modules": intelligence.get("modules", {}),
-            "advice": intelligence.get("advice", []),
-        }
-
+        return build_command_center_payload(request.state.user_email)
+        
     return safe_execute(
         _run,
         module_name="GLOBAL_COMMAND_CENTER"
