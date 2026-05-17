@@ -24,6 +24,7 @@ from intelligence.routes_onboarding import router as onboarding_router
 from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
 from portfolio.real_estate_routes import router as real_estate_router
+from portfolio.specialized_assets_routes import router as specialized_assets_router
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
@@ -146,6 +147,7 @@ app.include_router(gamification_router, prefix="/gamification", tags=["Gamificat
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(real_estate_router, prefix="/real-estate", tags=["Real Estate"])
+app.include_router(specialized_assets_router, tags=["Specialized Assets"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
 app.include_router(

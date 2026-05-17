@@ -38,6 +38,44 @@ def set_cache(key, value, ttl=300):
         pass
 
 
+def build_affiliations(conn, user_id: int):
+    suggestions = []
+
+    finance = conn.execute(
+        text("""
+            SELECT type, COALESCE(SUM(amount), 0) AS total
+            FROM finance_items
+            WHERE user_id = :user_id
+            GROUP BY type
+        """),
+        {"user_id": user_id}
+    ).fetchall()
+
+    totals = {row.type: float(row.total or 0) for row in finance}
+
+    if totals.get("epargne", 0) < max(totals.get("charges", 0), 1):
+        suggestions.append({
+            "title": "Compte epargne ou cash management",
+            "reason": "Renforcer le matelas de securite avant de prendre plus de risque.",
+            "priority": "high",
+        })
+
+    if totals.get("dettes", 0) > totals.get("epargne", 0):
+        suggestions.append({
+            "title": "Courtier credit / restructuration",
+            "reason": "Optimiser le cout de la dette peut liberer du cashflow.",
+            "priority": "medium",
+        })
+
+    suggestions.append({
+        "title": "Plateforme d'investissement adaptee au profil",
+        "reason": "Comparer les frais, la liquidite et les supports avant allocation.",
+        "priority": "medium",
+    })
+
+    return suggestions[:3]
+
+
 # =========================
 # GET USER ID
 # =========================
@@ -79,7 +117,11 @@ def get_gamification(user=Depends(get_current_user)):
             "xp": 0,
             "level": 1,
             "streak": 0,
-            "badges": []
+            "badges": [],
+            "ai_coach": {
+                "message": "Ajoute tes donnees pour recevoir des affiliations pertinentes.",
+                "affiliations": [],
+            },
         }
 
         if not user_id:
@@ -96,6 +138,7 @@ def get_gamification(user=Depends(get_current_user)):
         ).fetchone()
 
         if not row:
+            default_response["ai_coach"]["affiliations"] = build_affiliations(conn, user_id)
             set_cache(cache_key, default_response, ttl=60)
             return default_response
 
@@ -119,7 +162,14 @@ def get_gamification(user=Depends(get_current_user)):
             "xp": row.xp or 0,
             "level": row.level or 1,
             "streak": row.streak or 0,
-            "badges": badges
+            "badges": badges,
+            "ai_coach": {
+                "message": (
+                    "Je te propose les prochaines actions et affiliations en "
+                    "fonction de ta situation, de ton score et de tes objectifs."
+                ),
+                "affiliations": build_affiliations(conn, user_id),
+            }
         }
 
         # =========================
