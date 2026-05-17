@@ -17,6 +17,7 @@ from auth.routes import router as auth_router
 from advisor.routes import router as advisor_router
 
 from intelligence.routes import router as intelligence_router
+from intelligence.category_opportunities import router as category_opportunities_router
 from intelligence.routes_finance import router as finance_router
 from intelligence.routes_score import router as intelligence_score_router
 from intelligence.routes_onboarding import router as onboarding_router
@@ -138,6 +139,7 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
+app.include_router(category_opportunities_router, prefix="/intelligence", tags=["Opportunities"])
 app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(intelligence_score_router, prefix="/intelligence", tags=["Score"])
 app.include_router(onboarding_router)
