@@ -8,9 +8,15 @@ from database import engine
 
 
 router = APIRouter()
+_workspace_schema_ready = False
 
 
 def ensure_workspace_tables(conn):
+    global _workspace_schema_ready
+
+    if _workspace_schema_ready:
+        return
+
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS workspaces (
             id SERIAL PRIMARY KEY,
@@ -52,6 +58,8 @@ def ensure_workspace_tables(conn):
             accepted_at TIMESTAMP
         )
     """))
+
+    _workspace_schema_ready = True
 
 
 def require_user_id(conn, email: str):

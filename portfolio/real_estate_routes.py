@@ -8,9 +8,15 @@ from .real_estate_schemas import RealEstateRequest
 
 
 router = APIRouter()
+_real_estate_schema_ready = False
 
 
 def ensure_real_estate_table(conn):
+    global _real_estate_schema_ready
+
+    if _real_estate_schema_ready:
+        return
+
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS real_estate_assets (
             id SERIAL PRIMARY KEY,
@@ -27,6 +33,8 @@ def ensure_real_estate_table(conn):
             updated_at TIMESTAMP DEFAULT NOW()
         )
     """))
+
+    _real_estate_schema_ready = True
 
 
 def invalidate_real_estate_caches(email: str, user_id: int):

@@ -1,10 +1,12 @@
 import os
 import requests
+import logging
 
 # =========================
 # CONFIG
 # =========================
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+logger = logging.getLogger(__name__)
 
 ENV = os.getenv("ENV", "dev")
 
@@ -76,17 +78,14 @@ def send_verification_email(to_email: str, token: str):
     try:
         response = requests.post(url, json=payload, headers=headers)
 
-        print("📩 RESEND STATUS:", response.status_code)
-        print("📩 RESEND BODY:", response.text)
-        print("📨 SENDING EMAIL TO:", to_email)
+        logger.info("Resend verification email status=%s to=%s", response.status_code, to_email)
 
         # ⚠️ IMPORTANT : on ne bloque PAS le register
         if response.status_code not in [200, 201]:
-            print("⚠️ EMAIL FAILED BUT USER STILL CREATED")
-            print("DETAIL:", response.text)
+            logger.warning("Verification email failed but user was created: %s", response.text)
 
     except Exception as e:
-        print("❌ EMAIL ERROR (NON BLOQUANT):", str(e))
+        logger.warning("Verification email error, non blocking: %s", e)
         # ❗ on ne raise PLUS
         # sinon ton register crash
 

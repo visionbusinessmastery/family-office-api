@@ -16,7 +16,7 @@ from auth.utils import decode_token
 from auth.routes import router as auth_router
 from advisor.routes import router as advisor_router
 from billing.routes import router as billing_router
-from workspaces.routes import router as workspaces_router
+from workspaces.routes import router as workspaces_router, ensure_workspace_tables
 
 from intelligence.routes import router as intelligence_router
 from intelligence.category_opportunities import router as category_opportunities_router
@@ -26,8 +26,15 @@ from intelligence.routes_onboarding import router as onboarding_router
 
 from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
-from portfolio.real_estate_routes import router as real_estate_router
-from portfolio.specialized_assets_routes import router as specialized_assets_router
+from portfolio.real_estate_routes import (
+    router as real_estate_router,
+    ensure_real_estate_table,
+)
+from portfolio.specialized_assets_routes import (
+    router as specialized_assets_router,
+    ensure_venture_table,
+    ensure_yield_table,
+)
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
@@ -45,16 +52,21 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-print("APP STARTING")
+logging.info("APP STARTING")
 
 # =========================
 # LIFESPAN
 # =========================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("DB INIT START")
+    logging.info("DB INIT START")
     Base.metadata.create_all(bind=engine)
-    print("DB INIT OK")
+    with engine.begin() as conn:
+        ensure_workspace_tables(conn)
+        ensure_real_estate_table(conn)
+        ensure_yield_table(conn)
+        ensure_venture_table(conn)
+    logging.info("DB INIT OK")
     yield
 
 
@@ -69,7 +81,7 @@ app = FastAPI(
 
 app.state.limiter = limiter
 
-print("LIMITER OK")
+logging.info("LIMITER OK")
 
 # =========================
 # CORS (FIX IMPORTANT)
@@ -132,7 +144,7 @@ async def auth_middleware(request: Request, call_next):
     return response
 
 
-print("AUTH OK")
+logging.info("AUTH OK")
 
 # =========================
 # ROUTES
@@ -162,7 +174,7 @@ app.include_router(
     tags=["Global AI"]
 )
 
-print("ROUTERS OK")
+logging.info("ROUTERS OK")
 
 # =========================
 # HEALTH
@@ -200,4 +212,4 @@ def info():
         "status": "production_ready"
     }
 
-print("MAIN LOADED SUCCESSFULLY")
+logging.info("MAIN LOADED SUCCESSFULLY")

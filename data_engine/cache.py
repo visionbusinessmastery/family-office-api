@@ -2,12 +2,14 @@ import time
 import json
 import hashlib
 import requests
+import logging
 
 from core.cache import redis_client
 
 
 CACHE = {}
 CACHE_DURATION = 900  # 15 min
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -32,7 +34,7 @@ def get(url):
             if cached:
                 return json.loads(cached)
         except Exception as e:
-            print("Redis read error:", e)
+            logger.warning("Redis read error: %s", e)
 
     # =========================
     # 2. LOCAL CACHE (FAST LAYER)
@@ -73,10 +75,10 @@ def get(url):
                     json.dumps(data)
                 )
             except Exception as e:
-                print("Redis write error:", e)
+                logger.warning("Redis write error: %s", e)
 
         return data
 
     except requests.RequestException as e:
-        print("HTTP error:", e)
+        logger.warning("HTTP cache fetch error: %s", e)
         return None

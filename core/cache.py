@@ -1,7 +1,9 @@
 import redis
 import os
+import logging
 
 REDIS_URL = os.getenv("REDIS_URL")
+logger = logging.getLogger(__name__)
 
 redis_client = None
 
@@ -13,5 +15,5 @@ try:
             ssl_cert_reqs=None  # 🔥 IMPORTANT FIX SSL CLOUD
         )
 except Exception as e:
-    print("[REDIS INIT ERROR]", e)
+    logger.warning("Redis init error: %s", e)
     redis_client = None

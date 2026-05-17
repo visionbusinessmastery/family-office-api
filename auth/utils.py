@@ -9,6 +9,10 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 import os
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 # =========================
 # CONFIG
@@ -81,7 +85,7 @@ def get_current_user(
         return email
 
     except Exception as e:
-        print("TOKEN ERROR:", e)
+        logger.warning("Token error: %s", e)
         raise HTTPException(status_code=401, detail="Token invalide")
 
 # =========================

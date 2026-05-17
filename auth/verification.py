@@ -2,6 +2,10 @@ from datetime import datetime, timedelta
 from sqlalchemy import text
 from database import engine
 import uuid
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def generate_verification_token():
@@ -44,7 +48,7 @@ def save_verification_token(email: str, token: str):
             "expires_at": expires
         })
 
-    print("📧 TOKEN SAVED:", email, token)
+    logger.info("Verification token saved for %s", email)
 
     return {
         "email": email,

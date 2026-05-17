@@ -2,7 +2,11 @@
 # MODULE ENGINE
 # =========================
 
+import logging
+
 from intelligence.scoring.module_registry import MODULES
+
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -22,7 +26,6 @@ def get_all_opportunities(user_profile):
                 all_opportunities.extend(results)
 
         except Exception as e:
-
-            print(f"MODULE ERROR {module_name}: {e}")
+            logger.warning("Module error %s: %s", module_name, e)
 
     return all_opportunities

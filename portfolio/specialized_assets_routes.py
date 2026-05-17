@@ -8,6 +8,8 @@ from .specialized_assets_schemas import YieldAssetRequest, VentureAssetRequest
 
 
 router = APIRouter()
+_yield_schema_ready = False
+_venture_schema_ready = False
 
 
 def invalidate_asset_caches(email: str, user_id: int):
@@ -29,6 +31,11 @@ def invalidate_asset_caches(email: str, user_id: int):
 
 
 def ensure_yield_table(conn):
+    global _yield_schema_ready
+
+    if _yield_schema_ready:
+        return
+
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS yield_assets (
             id SERIAL PRIMARY KEY,
@@ -44,8 +51,15 @@ def ensure_yield_table(conn):
         )
     """))
 
+    _yield_schema_ready = True
+
 
 def ensure_venture_table(conn):
+    global _venture_schema_ready
+
+    if _venture_schema_ready:
+        return
+
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS venture_assets (
             id SERIAL PRIMARY KEY,
@@ -62,6 +76,8 @@ def ensure_venture_table(conn):
             updated_at TIMESTAMP DEFAULT NOW()
         )
     """))
+
+    _venture_schema_ready = True
 
 
 def require_user_id(conn, email: str):
@@ -375,4 +391,3 @@ def delete_venture_asset(asset_id: int, user=Depends(get_current_user)):
         invalidate_asset_caches(user, user_id)
 
     return {"status": "deleted", "id": asset_id}
-
