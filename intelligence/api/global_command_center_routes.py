@@ -1,8 +1,14 @@
-from fastapi import APIRouter
+# =========================
+# GLOBAL COMMAND CENTER ROUTE
+# =========================
 
-from intelligence.api.global_command_center import (
-    compute_global_command_center
-)
+# =========================
+# IMPORTS
+# =========================
+from fastapi import APIRouter, Request
+
+from core.utils import safe_execute
+from intelligence.routes import build_command_center_payload
 
 # =========================
 # ROUTER
@@ -12,16 +18,12 @@ router = APIRouter(
 )
 
 # =========================
-# GLOBAL COMMAND CENTER
+# GLOBAL COMMAND CENTER (FRONTEND ENTRYPOINT)
 # =========================
 @router.get("/")
-def global_command_center():
+def global_command_center(request: Request):
 
-    result = compute_global_command_center(
-        user={},
-        onboarding={},
-        portfolio=[],
-        financial_overview={}
-    )
+    def _run():
+        return build_command_center_payload(request.state.user_email)
 
-    return result
+    return safe_execute(_run, module_name="GLOBAL_COMMAND_CENTER")
