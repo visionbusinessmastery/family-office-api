@@ -1,4 +1,3 @@
-```python
 import logging
 import json
 
@@ -454,4 +453,3 @@ def compute_family_office_score(
                 "Erreur de calcul du score"
             ]
         }
-```
