@@ -305,7 +305,7 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
         """), {
             "email": email,
             "revenus_mensuels": data.get("revenus_mensuels"),
-            "charges_mensuelles": data.get("charges_mensuelles"),
+            "charges_mensuelles": data.get("charges_mensuelles")
         })
 
     return {"status": "updated"}
