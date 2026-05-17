@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
+from workspaces.routes import resolve_workspace_context
 
 from .service import (
     get_user_portfolio,
@@ -44,9 +45,9 @@ def get_portfolio(request: Request):
 
         with engine.begin() as conn:
 
-            user = get_user_or_404(conn, user_email)
+            workspace = resolve_workspace_context(conn, request, user_email)
 
-            return get_user_portfolio(user.id)
+            return get_user_portfolio(workspace["user_id"])
 
     return safe_execute(_get, module_name="PORTFOLIO")
 
@@ -63,7 +64,7 @@ def add_asset(request: Request, data: PortfolioRequest):
 
         with engine.begin() as conn:
 
-            user = get_user_or_404(conn, user_email)
+            workspace = resolve_workspace_context(conn, request, user_email, write=True)
 
             conn.execute(text("""
                 INSERT INTO portfolio (
@@ -81,16 +82,17 @@ def add_asset(request: Request, data: PortfolioRequest):
                     :purchase_price
                 )
             """), {
-                "user_id": user.id,
+                "user_id": workspace["user_id"],
                 "asset_name": data.asset_name.upper().strip(),
                 "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
                 "purchase_price": data.purchase_price
             })
             
-            user_id = user.id
+            user_id = workspace["user_id"]
+            cache_email = workspace["email"]
 
-        refresh_portfolio_side_effects(user_id, user_email)
+        refresh_portfolio_side_effects(user_id, cache_email)
         
         return {"status": "asset ajouté"}
 
@@ -109,7 +111,7 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
 
         with engine.begin() as conn:
 
-            user = get_user_or_404(conn, user_email)
+            workspace = resolve_workspace_context(conn, request, user_email, write=True)
 
             result = conn.execute(text("""
                 UPDATE portfolio
@@ -122,7 +124,7 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
                 AND user_id = :user_id
             """), {
                 "asset_id": asset_id,
-                "user_id": user.id,
+                "user_id": workspace["user_id"],
                 "asset_name": data.asset_name.upper().strip(),
                 "category": data.asset_type.upper().strip(),
                 "quantity": data.quantity,
@@ -132,9 +134,10 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
             if result.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Asset not found")
 
-            user_id = user.id
+            user_id = workspace["user_id"]
+            cache_email = workspace["email"]
 
-        refresh_portfolio_side_effects(user_id, user_email)
+        refresh_portfolio_side_effects(user_id, cache_email)
 
         return {"status": "updated", "id": asset_id}
 
@@ -153,14 +156,14 @@ def delete_asset(request: Request, asset_id: int):
 
         with engine.begin() as conn:
 
-            user = get_user_or_404(conn, user_email)
+            workspace = resolve_workspace_context(conn, request, user_email, write=True)
 
             result = conn.execute(text("""
                 DELETE FROM portfolio
                 WHERE id = :asset_id AND user_id = :user_id
             """), {
                 "asset_id": asset_id,
-                "user_id": user.id
+                "user_id": workspace["user_id"]
             })
 
             if result.rowcount == 0:
@@ -169,9 +172,10 @@ def delete_asset(request: Request, asset_id: int):
                     detail="Asset not found or not owned by user",
                 )
 
-            user_id = user.id
+            user_id = workspace["user_id"]
+            cache_email = workspace["email"]
 
-        refresh_portfolio_side_effects(user_id, user_email)
+        refresh_portfolio_side_effects(user_id, cache_email)
 
         return {"status": "deleted", "id": asset_id}
 
@@ -187,20 +191,20 @@ def portfolio_history(request: Request):
     user_email = request.state.user_email
 
     with engine.begin() as conn:
-        user = get_user_or_404(conn, user_email)
+        workspace = resolve_workspace_context(conn, request, user_email)
 
         total_cost = conn.execute(text("""
             SELECT COALESCE(SUM(quantity * purchase_price), 0)
             FROM portfolio
             WHERE user_id = :user_id
-        """), {"user_id": user.id}).scalar()
+        """), {"user_id": workspace["user_id"]}).scalar()
 
         rows = conn.execute(text("""
             SELECT total_value, created_at
             FROM portfolio_history
             WHERE user_id = :user_id
             ORDER BY created_at ASC
-        """), {"user_id": user.id}).fetchall()
+        """), {"user_id": workspace["user_id"]}).fetchall()
 
     return {
         "history": [
