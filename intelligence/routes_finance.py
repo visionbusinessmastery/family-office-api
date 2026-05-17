@@ -1,10 +1,17 @@
 # =========================
+# INTELLIGENCE ROUTES FINANCE
+# =========================
+
+# =========================
 # IMPORTS
 # =========================
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
+from core.cache import redis_client
 
 router = APIRouter(tags=["Finance"])
 
@@ -22,6 +29,27 @@ def get_user_id(conn, email: str):
     ).fetchone()
 
     return row.id if row else None
+
+# =========================
+# INVALIDATE FINANCE CACHE
+# =========================
+def invalidate_finance_caches(email: str, user_id: Optional[int] = None):
+    try:
+        if not redis_client:
+            return
+
+        keys = [
+            f"intel:{email}",
+            f"context:{email}",
+            f"score:{email}",
+        ]
+
+        if user_id is not None:
+            keys.append(f"financial:{user_id}")
+
+        redis_client.delete(*keys)
+    except Exception:
+        pass
 
 
 # =========================
@@ -43,17 +71,19 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
             )
         conn.execute(
             text("""
-                INSERT INTO finance_items (user_id, type, label, amount)
-                VALUES (:user_id, :type, :label, :amount)
+                INSERT INTO finance_items (user_id, type, name, amount)
+                VALUES (:user_id, :type, :name, :amount)
             """),
             {
                 "user_id": user_id,
                 "type": data.get("type"),
-                "label": data.get("label"),
+                "name": data.get("name"),
                 "amount": data.get("amount", 0),
             }
         )
 
+        invalidate_finance_caches(email, user_id)
+  
     return {"status": "created"}
 
 
@@ -91,7 +121,8 @@ def get_finance(user=Depends(get_current_user)):
 
         item = {
             "id": r.id,
-            "label": r.label,
+            "type": r.type,
+            "name": r.name,
             "amount": float(r.amount or 0)
         }
 
@@ -133,17 +164,19 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
         conn.execute(
             text("""
                 UPDATE finance_items
-                SET label = :label,
+                SET name = :name,
                     amount = :amount
                 WHERE id = :id AND user_id = :user_id
             """),
             {
                 "id": item_id,
                 "user_id": user_id,
-                "label": data.get("label"),
+                "name": data.get("name"),
                 "amount": data.get("amount", 0)
             }
         )
+
+        invalidate_finance_caches(email, user_id)
 
     return {"status": "updated"}
 
@@ -174,6 +207,8 @@ def delete_finance(item_id: int, user=Depends(get_current_user)):
             }
         )
 
+        invalidate_finance_caches(email, user_id)
+        
     return {"status": "deleted"}
 
 
@@ -224,42 +259,5 @@ def add_xp(conn, user_id: int, xp_amount: int):
                 "user_id": user_id
             }
         )
-
-
-# =========================
-# GAMIFICATION ENDPOINT
-# =========================
-@router.get("/")
-def get_gamification(user=Depends(get_current_user)):
-
-    email = user
-
-    with engine.connect() as conn:
-
-        user_id = get_user_id(conn, email)
-
-        row = conn.execute(
-            text("""
-                SELECT xp, level, streak, badges
-                FROM user_gamification
-                WHERE user_id = :user_id
-            """),
-            {"user_id": user_id}
-        ).fetchone()
-
-        if not row:
-            return {
-                "xp": 0,
-                "level": 1,
-                "streak": 0,
-                "badges": []
-            }
-
-        return {
-            "xp": row.xp or 0,
-            "level": row.level or 1,
-            "streak": row.streak or 0,
-            "badges": row.badges.split(",") if row.badges else []
-        }
 
 
