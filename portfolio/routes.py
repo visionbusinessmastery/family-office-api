@@ -3,7 +3,7 @@
 # =========================
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
@@ -15,6 +15,22 @@ from .service import (
 )
 
 router = APIRouter()
+
+
+def get_user_or_404(conn, email: str):
+    user = conn.execute(text("""
+        SELECT id FROM users WHERE email = :email
+    """), {"email": email}).fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+
+def refresh_portfolio_side_effects(user_id: int, email: str):
+    invalidate_portfolio_cache(user_id, email)
+    save_portfolio_snapshot(user_id)
 
 # =========================
 # GET PORTFOLIO
@@ -28,12 +44,7 @@ def get_portfolio(request: Request):
 
         with engine.begin() as conn:
 
-            user = conn.execute(text("""
-                SELECT id FROM users WHERE email = :email
-            """), {"email": user_email}).fetchone()
-
-            if not user:
-                raise Exception("User not found")
+            user = get_user_or_404(conn, user_email)
 
             return get_user_portfolio(user.id)
 
@@ -52,12 +63,7 @@ def add_asset(request: Request, data: PortfolioRequest):
 
         with engine.begin() as conn:
 
-            user = conn.execute(text("""
-                SELECT id FROM users WHERE email = :email
-            """), {"email": user_email}).fetchone()
-
-            if not user:
-                raise Exception("User not found")
+            user = get_user_or_404(conn, user_email)
 
             conn.execute(text("""
                 INSERT INTO portfolio (
@@ -82,8 +88,9 @@ def add_asset(request: Request, data: PortfolioRequest):
                 "purchase_price": data.purchase_price
             })
             
-            invalidate_portfolio_cache(user.id, user_email)
-            save_portfolio_snapshot(user.id)
+            user_id = user.id
+
+        refresh_portfolio_side_effects(user_id, user_email)
         
         return {"status": "asset ajouté"}
 
@@ -102,12 +109,7 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
 
         with engine.begin() as conn:
 
-            user = conn.execute(text("""
-                SELECT id FROM users WHERE email = :email
-            """), {"email": user_email}).fetchone()
-
-            if not user:
-                raise Exception("User not found")
+            user = get_user_or_404(conn, user_email)
 
             result = conn.execute(text("""
                 UPDATE portfolio
@@ -128,10 +130,11 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
             })
 
             if result.rowcount == 0:
-                raise Exception("Asset not found")
+                raise HTTPException(status_code=404, detail="Asset not found")
 
-            invalidate_portfolio_cache(user.id, user_email)
-            save_portfolio_snapshot(user.id)
+            user_id = user.id
+
+        refresh_portfolio_side_effects(user_id, user_email)
 
         return {"status": "updated", "id": asset_id}
 
@@ -150,12 +153,7 @@ def delete_asset(request: Request, asset_id: int):
 
         with engine.begin() as conn:
 
-            user = conn.execute(text("""
-                SELECT id FROM users WHERE email = :email
-            """), {"email": user_email}).fetchone()
-
-            if not user:
-                raise Exception("User not found")
+            user = get_user_or_404(conn, user_email)
 
             result = conn.execute(text("""
                 DELETE FROM portfolio
@@ -166,10 +164,14 @@ def delete_asset(request: Request, asset_id: int):
             })
 
             if result.rowcount == 0:
-                raise Exception("Asset not found or not owned by user")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Asset not found or not owned by user",
+                )
 
-            invalidate_portfolio_cache(user.id, user_email)
-            save_portfolio_snapshot(user.id)
+            user_id = user.id
+
+        refresh_portfolio_side_effects(user_id, user_email)
 
         return {"status": "deleted", "id": asset_id}
 
@@ -185,9 +187,7 @@ def portfolio_history(request: Request):
     user_email = request.state.user_email
 
     with engine.begin() as conn:
-        user = conn.execute(text("""
-            SELECT id FROM users WHERE email = :email
-        """), {"email": user_email}).fetchone()
+        user = get_user_or_404(conn, user_email)
 
         total_cost = conn.execute(text("""
             SELECT COALESCE(SUM(quantity * purchase_price), 0)
