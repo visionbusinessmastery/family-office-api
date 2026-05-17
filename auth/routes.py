@@ -300,7 +300,7 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
         conn.execute(text("""
             UPDATE users
             SET revenus_mensuels = :revenus_mensuels,
-                charges_mensuelles = :charges_mensuelles,
+                charges_mensuelles = :charges_mensuelles
             WHERE email = :email
         """), {
             "email": email,
