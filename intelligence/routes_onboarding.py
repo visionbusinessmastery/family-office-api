@@ -34,14 +34,14 @@ def update_onboarding(data: dict, user=Depends(get_current_user)):
             # =========================
             result = conn.execute(text("""
                 UPDATE users
-                SET revenus_mensuels = :revenus,
-                    charges_mensuelles = :charges,
+                SET revenus_mensuels = :revenus_mensuels,
+                    charges_mensuelles = :charges_mensuelles,
                     profile_completed = TRUE
                 WHERE email = :email
             """), {
                 "email": email,
-                "revenus": revenus,
-                "charges": charges,
+                "revenus_mensuels": revenus_mensuels,
+                "charges_mensuelles": charges_mensuelles,
             })
 
             if result.rowcount == 0:
