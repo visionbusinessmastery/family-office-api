@@ -25,6 +25,9 @@ class PortfolioAsset(BaseModel):
     purchase_price: float
 
     value: float
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
+    cost: Optional[float] = None
 
     ticker: Optional[str] = None
     gain: Optional[float] = None
