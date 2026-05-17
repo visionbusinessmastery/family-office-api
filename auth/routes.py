@@ -157,7 +157,7 @@ def get_me(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT email, plan, profile_completed
+            SELECT email, plan, profile_completed, revenus_mensuels, charges_mensuelles
             FROM users
             WHERE email = :email
         """), {"email": email}).fetchone()
@@ -170,20 +170,20 @@ def get_me(email: str = Depends(get_current_user)):
         # =========================
         profile_completed = bool(user.profile_completed)
 
-        if not profile_completed:
-            return {
-                "email": user.email,
-                "plan": user.plan,
-                "profile_completed": False,
-                "state": "ONBOARDING_REQUIRED"
-            }
-
-        return {
+        data = {
             "email": user.email,
             "plan": user.plan,
-            "profile_completed": True,
-            "state": "READY"
+            "profile_completed": profile_completed,
+            "revenus_mensuels": user.revenus_mensuels or 0,
+            "charges_mensuelles": user.charges_mensuelles or 0,
         }
+
+        if not profile_completed:
+            data["state"] = "ONBOARDING_REQUIRED"
+        else:
+            data["state"] = "READY"
+
+        return data
 
 # =========================
 # LOGIN
