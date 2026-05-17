@@ -24,7 +24,7 @@ class AutopilotV4:
     def run(self, user_email=None, portfolio=None, market=None, context=None, llm_analysis=None, level="free"):
 
         # fallback compatibility (ancien appel simplifié)
-        market_signal = context.get("score", 0.5) if context else 0.5
+        market_signal = extract_score_signal(context)
 
         risk_level = detect_risk(str(market_signal))
         target_alloc = optimal_allocation(risk_level)
@@ -164,6 +164,23 @@ def detect_risk(signal: str):
         return "medium"
     else:
         return "high"
+
+
+def extract_score_signal(context):
+    if not isinstance(context, dict):
+        return 0.5
+
+    raw_score = context.get("global_score") or context.get("score", 0.5)
+
+    if isinstance(raw_score, dict):
+        raw_score = raw_score.get("score", 50)
+
+    try:
+        score = float(raw_score)
+    except:
+        return 0.5
+
+    return score / 100 if score > 1 else score
 
 # =========================
 # FACTORY FUNCTION

@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET  # 🔥 ajout
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 
 
 # =========================

@@ -1,9 +1,15 @@
 import os
 from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 
 def analyze_sentiment(news_list):
+    if not client:
+        return {
+            "label": "neutral",
+            "score": 50,
+            "summary": "OPENAI_API_KEY non configuree"
+        }
 
     text = ""
 

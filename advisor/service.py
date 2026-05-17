@@ -2,33 +2,30 @@
 # AI ADVISOR ENGINE V2
 # =========================
 
-import os
-import json
 import hashlib
+import json
+import os
+
 from openai import OpenAI
 
-from intelligence.core.orchestrator import run_orchestrator
-from portfolio.service import get_user_portfolio
-from market.service import get_market
 from advisor.autopilot_v4_engine import get_autopilot_v4
-
+from auth.utils import get_user_id
 from core.cache import redis_client
 from database import engine
-from auth.utils import get_user_id
+from intelligence.core.orchestrator import run_orchestrator
+from market.service import get_market
+from portfolio.service import get_user_portfolio
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 
 
-# =========================
-# CACHE HELPERS
-# =========================
 def get_cache(key):
     try:
         if redis_client:
             data = redis_client.get(key)
             if data:
                 return json.loads(data)
-    except:
+    except Exception:
         pass
     return None
 
@@ -37,80 +34,63 @@ def set_cache(key, value, ttl=300):
     try:
         if redis_client:
             redis_client.setex(key, ttl, json.dumps(value))
-    except:
+    except Exception:
         pass
 
 
-# =========================
-# HASH BUILDER (LLM CACHE)
-# =========================
 def build_hash(user_email, message, level):
-
     raw = json.dumps(
-        {
-            "email": user_email,
-            "message": message,
-            "level": level
-        },
-        sort_keys=True
+        {"email": user_email, "message": message, "level": level},
+        sort_keys=True,
     )
-
     return hashlib.md5(raw.encode()).hexdigest()
 
 
-# =========================
-# MAIN ADVISOR
-# =========================
 def advisor_logic(user_email, message, level="free"):
-
-    # =========================
-    # CACHE KEY (FULL REQUEST)
-    # =========================
-    cache_key = (
-        f"advisor:{build_hash(user_email, message, level)}"
-    )
+    cache_key = f"advisor:{build_hash(user_email, message, level)}"
 
     cached = get_cache(cache_key)
     if cached:
         return cached
 
-    # =========================
-    # CONTEXT ENGINE
-    # =========================
     context = run_orchestrator(user_email)
     user_id = None
 
     with engine.connect() as conn:
         user_id = get_user_id(conn, user_email)
 
-    # =========================
-    # DATA SOURCES (CACHED)
-    # =========================
     portfolio = get_user_portfolio(user_id) if user_id else {}
     market = get_market("global")
-
     opportunities = context.get("opportunities", [])
 
-    if not os.getenv("OPENAI_API_KEY"):
-        result = {
-            "analysis": (
-                "Je peux deja analyser ton profil avec les donnees disponibles. "
-                f"Score actuel: {context.get('global_score') or context.get('score', {}).get('score', 0)}. "
-                f"Opportunites detectees: {len(opportunities) if isinstance(opportunities, list) else opportunities.get('count', 0) if isinstance(opportunities, dict) else 0}. "
-                "Configure OPENAI_API_KEY cote backend pour activer une reponse IA complete."
-            ),
-            "context_score": context.get("global_score") or context.get("score"),
-            "autopilot": None
-        }
+    prompt = build_advisor_prompt(context, portfolio, opportunities, message)
+    llm_text = get_llm_response(prompt)
 
+    if not llm_text:
+        result = build_fallback_response(context, opportunities)
         set_cache(cache_key, result, ttl=120)
         return result
 
-    # =========================
-    # LLM PROMPT
-    # =========================
-    prompt = f"""
-Tu es un AI Family Office ultra avancé.
+    result = {
+        "analysis": llm_text,
+        "context_score": get_context_score(context),
+        "autopilot": run_autopilot_safely(
+            user_email=user_email,
+            portfolio=portfolio,
+            market=market,
+            context=context,
+            llm_text=llm_text,
+            level=level,
+        ),
+    }
+
+    set_cache(cache_key, result, ttl=300)
+    return result
+
+
+def build_advisor_prompt(context, portfolio, opportunities, message):
+    return f"""
+Tu es un AI Family Office ultra avance.
 
 CONTEXTE GLOBAL:
 {json.dumps(context, indent=2)}
@@ -118,7 +98,7 @@ CONTEXTE GLOBAL:
 PORTEFEUILLE:
 {json.dumps(portfolio, indent=2)}
 
-OPPORTUNITÉS:
+OPPORTUNITES:
 {json.dumps(opportunities, indent=2)}
 
 MESSAGE UTILISATEUR:
@@ -126,66 +106,83 @@ MESSAGE UTILISATEUR:
 
 Donne :
 - analyse patrimoniale
-- stratégie
+- strategie
 - risques
-- opportunités
+- opportunites
 - plan d'action concret
 """
 
-    # =========================
-    # CACHE LLM RESPONSE (IMPORTANT SAAS OPTIMIZATION)
-    # =========================
+
+def get_llm_response(prompt):
     llm_cache_key = f"llm:{hashlib.md5(prompt.encode()).hexdigest()}"
 
-    llm_text = get_cache(llm_cache_key)
+    cached = get_cache(llm_cache_key)
+    if cached:
+        return cached
 
-    if not llm_text:
+    if not client:
+        return None
 
+    try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[{"role": "user", "content": prompt}],
         )
-
         llm_text = response.choices[0].message.content
-
         set_cache(llm_cache_key, llm_text, ttl=600)
+        return llm_text
+    except Exception:
+        return None
 
-    # =========================
-    # AUTOPILOT ENGINE
-    # =========================
-    autopilot = get_autopilot_v4()
 
-    autopilot_result = autopilot.run(
-        user_email=user_email,
-        portfolio=portfolio,
-        market=market,
-        context=context,
-        llm_analysis=llm_text,
-        level=level
+def run_autopilot_safely(user_email, portfolio, market, context, llm_text, level):
+    try:
+        autopilot = get_autopilot_v4()
+        return autopilot.run(
+            user_email=user_email,
+            portfolio=portfolio,
+            market=market,
+            context=context,
+            llm_analysis=llm_text,
+            level=level,
+        )
+    except Exception as e:
+        return {"status": "unavailable", "message": str(e)}
+
+
+def get_context_score(context):
+    score = context.get("global_score") or context.get("score", 0)
+
+    if isinstance(score, dict):
+        return score.get("score", 0)
+
+    return score
+
+
+def build_fallback_response(context, opportunities):
+    score = get_context_score(context)
+    opportunity_count = (
+        len(opportunities)
+        if isinstance(opportunities, list)
+        else opportunities.get("count", 0)
+        if isinstance(opportunities, dict)
+        else 0
     )
 
-    # =========================
-    # FINAL RESULT
-    # =========================
-    result = {
-        "analysis": llm_text,
-        "context_score": context.get("global_score") or context.get("score"),
-        "autopilot": autopilot_result
+    return {
+        "analysis": (
+            "Je peux deja t'aider avec les donnees disponibles. "
+            f"Ton score actuel est {score}/100. "
+            f"J'ai detecte {opportunity_count} opportunite(s) liee(s) a ton profil. "
+            "Pour augmenter ton capital, priorise: augmenter ton cashflow mensuel, "
+            "reduire les charges recurrentes, diversifier les actifs trop concentres, "
+            "et reinvestir regulierement les plus-values dans les zones les mieux scorees."
+        ),
+        "context_score": score,
+        "autopilot": None,
     }
 
-    set_cache(cache_key, result, ttl=300)
 
-    return result
-
-
-# =========================
-# API WRAPPERS
-# =========================
 def get_advisor_free(user_email, message):
     return advisor_logic(user_email, message, "free")
 
@@ -198,30 +195,25 @@ def get_advisor_elite(user_email, message):
     return advisor_logic(user_email, message, "elite")
 
 
-# =========================
-# SIMPLE MODULES
-# =========================
 def portfolio_manager(user_email, message):
     return {
         "status": "ok",
         "message": "Portfolio manager not implemented yet",
-        "user": user_email
+        "user": user_email,
     }
 
 
 def portfolio_autopilot(user_email, message):
-
-    autopilot = get_autopilot_v4()
     user_id = None
 
     with engine.connect() as conn:
         user_id = get_user_id(conn, user_email)
 
-    return autopilot.run(
+    return run_autopilot_safely(
         user_email=user_email,
         portfolio=get_user_portfolio(user_id) if user_id else {},
         market=get_market("global"),
         context={},
-        llm_analysis=message,
-        level="free"
+        llm_text=message,
+        level="free",
     )
