@@ -7,6 +7,10 @@ from stocks.service import get_stock_data, resolve_ticker
 
 from core.cache import redis_client
 import json
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -61,12 +65,23 @@ def get_stock_cached(ticker: str):
     if cached:
         return cached
 
-    data = get_stock_data(ticker) or {}
+    try:
+        data = get_stock_data(ticker) or {}
+    except Exception:
+        logger.exception("[PORTFOLIO] stock lookup failed for %s", ticker)
+        data = {}
 
     # cache prix 5 min (market data change souvent)
     set_cache(cache_key, data, ttl=300)
 
     return data
+
+
+def safe_float(value, default=0):
+    try:
+        return float(value or default)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def build_portfolio_payload(rows):
@@ -81,9 +96,14 @@ def build_portfolio_payload(rows):
         quantity = float(r.quantity or 0)
         purchase_price = float(r.purchase_price or 0)
 
-        ticker = resolve_ticker(asset)
+        try:
+            ticker = resolve_ticker(asset)
+        except Exception:
+            logger.exception("[PORTFOLIO] ticker resolution failed for %s", asset)
+            ticker = asset
+
         stock_data = get_stock_cached(ticker)
-        current_price = stock_data.get("price") or purchase_price
+        current_price = safe_float(stock_data.get("price"), purchase_price)
 
         value = quantity * current_price
         cost = quantity * purchase_price
@@ -160,23 +180,29 @@ def get_user_portfolio(user_id: int):
 # =========================
 def save_portfolio_snapshot(user_id: int):
 
-    with engine.begin() as conn:
+    try:
+        with engine.begin() as conn:
 
-        rows = conn.execute(text("""
-            SELECT id, asset_name, category, quantity, purchase_price
-            FROM portfolio
-            WHERE user_id = :user_id
-        """), {"user_id": user_id}).fetchall()
+            rows = conn.execute(text("""
+                SELECT id, asset_name, category, quantity, purchase_price
+                FROM portfolio
+                WHERE user_id = :user_id
+            """), {"user_id": user_id}).fetchall()
 
-        snapshot = build_portfolio_payload(rows)
+            snapshot = build_portfolio_payload(rows)
 
-        conn.execute(text("""
-            INSERT INTO portfolio_history (user_id, total_value, created_at)
-            VALUES (:user_id, :total, NOW())
-        """), {
-            "user_id": user_id,
-            "total": float(snapshot.get("total_value") or 0)
-        })
+            conn.execute(text("""
+                INSERT INTO portfolio_history (user_id, total_value, created_at)
+                VALUES (:user_id, :total, NOW())
+            """), {
+                "user_id": user_id,
+                "total": float(snapshot.get("total_value") or 0)
+            })
+
+        return True
+    except Exception:
+        logger.exception("[PORTFOLIO] snapshot save failed for user_id=%s", user_id)
+        return False
 
 
 def enrich_portfolio_with_ai(portfolio):
