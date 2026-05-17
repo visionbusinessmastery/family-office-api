@@ -1,4 +1,8 @@
 # =========================
+# INTELLIGENCE ROUTES SCORES
+# =========================
+
+# =========================
 # IMPORTS
 # =========================
 from fastapi import APIRouter, Depends
@@ -32,7 +36,7 @@ def recalculate_score(user=Depends(get_current_user)):
                 "level": "UNKNOWN"
             }
 
-        score_data = intel.get("score", {}) or {}
+        score_data = intel.get("family_office_score") or intel.get("score", {}) or {}
 
         return {
             "score": score_data.get("score", 0),
