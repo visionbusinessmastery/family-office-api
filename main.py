@@ -27,6 +27,7 @@ from intelligence.routes_onboarding import router as onboarding_router
 
 from market.routes import router as market_router
 from portfolio.routes import router as portfolio_router
+from portfolio.service import ensure_portfolio_schema
 from portfolio.real_estate_routes import (
     router as real_estate_router,
     ensure_real_estate_table,
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         ensure_workspace_tables(conn)
+        ensure_portfolio_schema(conn)
         ensure_real_estate_table(conn)
         ensure_yield_table(conn)
         ensure_venture_table(conn)

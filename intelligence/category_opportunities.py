@@ -110,8 +110,13 @@ def get_category_opportunities(user=Depends(get_current_user)):
 
         for row in portfolio_rows:
             category = (row.category or "AUTRE").upper()
-            if category in ["STOCK", "STOCKS", "ETF", "CRYPTO", "COMMODITIES"]:
+            if category in ["STOCK", "STOCKS", "ETF", "CRYPTO", "COMMODITIES", "FOREX"]:
                 engine_items = get_stock_opportunities(profile)
+                quick_action = (
+                    "Verifier que l'exposition devise reste coherente avec tes revenus et depenses."
+                    if category == "FOREX"
+                    else "Verifier si une seule ligne depasse 30% de cette poche."
+                )
                 results.append(category_payload(
                     title=category.replace("_", " "),
                     key=category.lower(),
@@ -120,7 +125,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                         f"Cette poche represente {round(float(row.total or 0), 2)} EUR. "
                         "L'IA doit surtout surveiller concentration, volatilite et liquidite."
                     ),
-                    quick_action="Verifier si une seule ligne depasse 30% de cette poche.",
+                    quick_action=quick_action,
                     opportunity=first_opportunity(engine_items),
                     market=safe_market(category),
                 ))
@@ -210,4 +215,3 @@ def get_category_opportunities(user=Depends(get_current_user)):
             ))
 
     return {"categories": results}
-

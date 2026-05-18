@@ -99,6 +99,7 @@ def compute_family_office_score(
         asset_types = set()
 
         crypto_exposure = 0
+        forex_exposure = 0
 
         for asset in (portfolio or []):
 
@@ -120,6 +121,9 @@ def compute_family_office_score(
 
             if asset_type == "crypto":
                 crypto_exposure += asset_value
+
+            if asset_type in ["forex", "currency", "currencies", "fx"]:
+                forex_exposure += asset_value
 
         # =====================================================
         # FINANCIAL DATA
@@ -392,6 +396,11 @@ def compute_family_office_score(
                 "crypto_ratio": round(
                     crypto_ratio,
                     3
+                ),
+
+                "forex_exposure": round(
+                    forex_exposure,
+                    2
                 ),
 
                 "net_worth": round(

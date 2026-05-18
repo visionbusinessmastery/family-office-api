@@ -48,6 +48,7 @@ PLAN_ENTITLEMENTS = {
             "income_expense_tracking",
             "basic_progression",
             "basic_missions",
+            "forex_limited",
         ],
     },
     "GOLD": {
@@ -75,6 +76,7 @@ PLAN_ENTITLEMENTS = {
             "smart_notifications",
             "category_opportunities",
             "projections",
+            "forex_full",
         ],
     },
     "ELITE": {
@@ -108,6 +110,7 @@ PLAN_ENTITLEMENTS = {
             "advanced_allocations",
             "governance",
             "automatic_imports",
+            "forex_advanced_analytics",
         ],
     },
 }
@@ -144,6 +147,14 @@ MODULE_REGISTRY = [
         "min_plan": "GOLD",
         "min_score": 35,
         "description": "Voir les concentrations et arbitrages prioritaires.",
+    },
+    {
+        "key": "forex",
+        "label": "Forex / Currencies",
+        "stage": 2,
+        "min_plan": "FREE",
+        "min_score": 0,
+        "description": "Suivre une exposition simple aux devises sans interface de trading.",
     },
     {
         "key": "real_estate",

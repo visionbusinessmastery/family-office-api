@@ -56,7 +56,49 @@ COMPANY_TO_TICKER = {
     "pétrole": "CL=F",
 }
 
-YAHOO_SYMBOL_SUFFIXES = ("-USD", "=F")
+YAHOO_SYMBOL_SUFFIXES = ("-USD", "=F", "=X")
+COMMON_CURRENCIES = {
+    "USD",
+    "EUR",
+    "GBP",
+    "JPY",
+    "CHF",
+    "AUD",
+    "CAD",
+    "NZD",
+    "TRY",
+    "MXN",
+    "SEK",
+    "NOK",
+    "DKK",
+    "SGD",
+    "HKD",
+    "CNH",
+    "ZAR",
+}
+
+
+def normalize_forex_symbol(query: str):
+    symbol = query.strip().upper()
+    compact = (
+        symbol
+        .replace("/", "")
+        .replace("-", "")
+        .replace("_", "")
+        .replace(" ", "")
+    )
+
+    if symbol.endswith("=X") and len(symbol) == 8:
+        return symbol
+
+    if len(compact) == 6:
+        base = compact[:3]
+        quote = compact[3:]
+
+        if base in COMMON_CURRENCIES and quote in COMMON_CURRENCIES:
+            return f"{base}{quote}=X"
+
+    return None
 
 
 # =========================
@@ -88,6 +130,10 @@ def resolve_ticker(query: str):
 
     query_clean = query.lower().strip()
     query_symbol = query.strip().upper()
+    forex_symbol = normalize_forex_symbol(query)
+
+    if forex_symbol:
+        return forex_symbol
 
     # 1️⃣ direct mapping
     if query_clean in COMPANY_TO_TICKER:

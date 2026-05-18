@@ -98,6 +98,7 @@ def build_portfolio_context(portfolio):
     crypto_exposure = 0
     stocks_exposure = 0
     real_estate_exposure = 0
+    forex_exposure = 0
 
     for asset in portfolio:
         if not isinstance(asset, dict):
@@ -119,6 +120,9 @@ def build_portfolio_context(portfolio):
         elif asset_type in ["real_estate", "immobilier"]:
             real_estate_exposure += value
 
+        elif asset_type in ["forex", "currency", "currencies", "fx"]:
+            forex_exposure += value
+
     crypto_ratio = crypto_exposure / total_value if total_value > 0 else 0
 
     return {
@@ -129,6 +133,7 @@ def build_portfolio_context(portfolio):
         "crypto_exposure": round(crypto_exposure, 2),
         "stocks_exposure": round(stocks_exposure, 2),
         "real_estate_exposure": round(real_estate_exposure, 2),
+        "forex_exposure": round(forex_exposure, 2),
 
         "crypto_ratio": round(crypto_ratio, 4),
     }

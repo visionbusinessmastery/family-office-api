@@ -10,8 +10,11 @@ from database import engine
 from workspaces.routes import resolve_workspace_context
 
 from .service import (
+    ensure_portfolio_schema,
     get_user_portfolio,
     invalidate_portfolio_cache,
+    normalize_asset_type,
+    parse_forex_pair,
     save_portfolio_snapshot,
 )
 
@@ -32,6 +35,28 @@ def get_user_or_404(conn, email: str):
 def refresh_portfolio_side_effects(user_id: int, email: str):
     invalidate_portfolio_cache(user_id, email)
     save_portfolio_snapshot(user_id)
+
+
+def build_portfolio_db_payload(data: PortfolioRequest):
+    category = normalize_asset_type(data.asset_type)
+    asset_name = data.asset_name.upper().strip()
+    pair = parse_forex_pair(asset_name) if category == "FOREX" else None
+
+    if category == "FOREX" and not pair:
+        raise HTTPException(
+            status_code=400,
+            detail="Paire FOREX invalide. Exemple attendu: EUR/USD",
+        )
+
+    return {
+        "asset_name": pair["pair_name"] if pair else asset_name,
+        "category": category,
+        "quantity": data.quantity,
+        "purchase_price": data.purchase_price,
+        "pair_name": pair["pair_name"] if pair else None,
+        "currency_base": pair["currency_base"] if pair else None,
+        "currency_quote": pair["currency_quote"] if pair else None,
+    }
 
 # =========================
 # GET PORTFOLIO
@@ -65,6 +90,8 @@ def add_asset(request: Request, data: PortfolioRequest):
         with engine.begin() as conn:
 
             workspace = resolve_workspace_context(conn, request, user_email, write=True)
+            ensure_portfolio_schema(conn)
+            payload = build_portfolio_db_payload(data)
 
             conn.execute(text("""
                 INSERT INTO portfolio (
@@ -72,21 +99,24 @@ def add_asset(request: Request, data: PortfolioRequest):
                     asset_name,
                     category,
                     quantity,
-                    purchase_price
+                    purchase_price,
+                    pair_name,
+                    currency_base,
+                    currency_quote
                 )
                 VALUES (
                     :user_id,
                     :asset_name,
                     :category,
                     :quantity,
-                    :purchase_price
+                    :purchase_price,
+                    :pair_name,
+                    :currency_base,
+                    :currency_quote
                 )
             """), {
                 "user_id": workspace["user_id"],
-                "asset_name": data.asset_name.upper().strip(),
-                "category": data.asset_type.upper().strip(),
-                "quantity": data.quantity,
-                "purchase_price": data.purchase_price
+                **payload,
             })
             
             user_id = workspace["user_id"]
@@ -112,6 +142,8 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
         with engine.begin() as conn:
 
             workspace = resolve_workspace_context(conn, request, user_email, write=True)
+            ensure_portfolio_schema(conn)
+            payload = build_portfolio_db_payload(data)
 
             result = conn.execute(text("""
                 UPDATE portfolio
@@ -119,16 +151,16 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
                     asset_name = :asset_name,
                     category = :category,
                     quantity = :quantity,
-                    purchase_price = :purchase_price
+                    purchase_price = :purchase_price,
+                    pair_name = :pair_name,
+                    currency_base = :currency_base,
+                    currency_quote = :currency_quote
                 WHERE id = :asset_id
                 AND user_id = :user_id
             """), {
                 "asset_id": asset_id,
                 "user_id": workspace["user_id"],
-                "asset_name": data.asset_name.upper().strip(),
-                "category": data.asset_type.upper().strip(),
-                "quantity": data.quantity,
-                "purchase_price": data.purchase_price
+                **payload,
             })
 
             if result.rowcount == 0:
