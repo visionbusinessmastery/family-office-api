@@ -103,24 +103,17 @@ def build_gamification_actions(score: float, level):
 def build_upgrade(score: float, level):
     level_text = str(level or "").upper()
 
-    if level_text in ["LIBERTY", "LEGACY"]:
+    if score >= 70 or level_text in ["ADVANCED", "ELITE", "LIBERTY", "LEGACY"]:
         return {
-            "recommended_plan": "liberty_legacy",
-            "title": "Liberty Legacy",
-            "description": "Conserver, multiplier et transmettre ta liberte financiere a ta famille.",
-        }
-
-    if score >= 70 or level_text in ["ADVANCED", "ELITE"]:
-        return {
-            "recommended_plan": "liberty",
-            "title": "Passer au plan Liberty",
-            "description": "Tu es proche d'un niveau ou l'automatisation, les opportunites avancees et le suivi IA deviennent utiles.",
+            "recommended_plan": "elite",
+            "title": "Passer au plan Elite - Wealth OS",
+            "description": "Ton niveau justifie multi-user, gouvernance, IA premium et consolidation patrimoniale.",
         }
 
     return {
         "recommended_plan": "gold",
-        "title": "Debloquer Gold",
-        "description": "Acceder a plus d'analyses, de signaux et d'actions personnalisees.",
+        "title": "Debloquer Gold - Growth",
+        "description": "Acceder au portefeuille avance, immobilier, analytics, opportunites et recommandations IA.",
     }
 
 

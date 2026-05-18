@@ -34,7 +34,29 @@ COMPANY_TO_TICKER = {
     "netflix": "NFLX",
     "phunware": "PHUN",
     "nike": "NKE",
+    "bitcoin": "BTC-USD",
+    "btc": "BTC-USD",
+    "ethereum": "ETH-USD",
+    "eth": "ETH-USD",
+    "solana": "SOL-USD",
+    "sol": "SOL-USD",
+    "bnb": "BNB-USD",
+    "xrp": "XRP-USD",
+    "cardano": "ADA-USD",
+    "ada": "ADA-USD",
+    "dogecoin": "DOGE-USD",
+    "doge": "DOGE-USD",
+    "gold": "GC=F",
+    "or": "GC=F",
+    "xau": "GC=F",
+    "silver": "SI=F",
+    "argent": "SI=F",
+    "oil": "CL=F",
+    "petrole": "CL=F",
+    "pétrole": "CL=F",
 }
+
+YAHOO_SYMBOL_SUFFIXES = ("-USD", "=F")
 
 
 # =========================
@@ -65,15 +87,25 @@ def set_cache(key, value, ttl=300):
 def resolve_ticker(query: str):
 
     query_clean = query.lower().strip()
+    query_symbol = query.strip().upper()
 
     # 1️⃣ direct mapping
     if query_clean in COMPANY_TO_TICKER:
         return COMPANY_TO_TICKER[query_clean]
 
+    if query_symbol.endswith(YAHOO_SYMBOL_SUFFIXES):
+        return query_symbol
+
+    if query_symbol in COMPANY_TO_TICKER.values():
+        return query_symbol
+
     # 2️⃣ fuzzy match
     match = get_close_matches(query_clean, COMPANY_TO_TICKER.keys(), n=1, cutoff=0.6)
     if match:
         return COMPANY_TO_TICKER[match[0]]
+
+    if query_symbol.replace(".", "").isalnum() and 1 <= len(query_symbol) <= 6:
+        return query_symbol
 
     # 3️⃣ fallback search API
     results = search_stock(query_clean)
@@ -93,7 +125,7 @@ def get_stock_data(query: str):
     cache_key = f"stock:{ticker}"
 
     cached = get_cache(cache_key)
-    if cached:
+    if cached and cached.get("price") is not None:
         return cached
 
     data = None
@@ -143,17 +175,31 @@ def get_stock_data(query: str):
     if not data:
         try:
             stock = yf.Ticker(ticker)
-            info = stock.info
+            fast_info = getattr(stock, "fast_info", {}) or {}
+            price = (
+                fast_info.get("last_price")
+                or fast_info.get("lastPrice")
+                or fast_info.get("regular_market_price")
+            )
 
-            price = info.get("currentPrice") or info.get("regularMarketPrice")
+            info = {}
+
+            if not price:
+                info = stock.info or {}
+                price = info.get("currentPrice") or info.get("regularMarketPrice")
+
+            if not price:
+                history = stock.history(period="1d", interval="1m")
+                if not history.empty:
+                    price = history["Close"].dropna().iloc[-1]
 
             if price:
                 data = {
-                    "name": info.get("shortName"),
+                    "name": info.get("shortName") if info else ticker,
                     "ticker": ticker,
-                    "price": price,
-                    "market_cap": info.get("marketCap"),
-                    "sector": info.get("sector"),
+                    "price": float(price),
+                    "market_cap": info.get("marketCap") if info else None,
+                    "sector": info.get("sector") if info else None,
                     "source": "Yahoo Finance"
                 }
         except:
@@ -162,8 +208,10 @@ def get_stock_data(query: str):
     if not data:
         data = {"error": "Aucune donnée disponible", "ticker": ticker}
 
-    # cache 5 min (market data)
-    set_cache(cache_key, data, ttl=300)
+    # Cache only usable prices so a temporary market failure does not freeze
+    # portfolio gains at the purchase price.
+    if data.get("price") is not None:
+        set_cache(cache_key, data, ttl=60)
 
     return data
 

@@ -9,45 +9,61 @@ from database import engine
 
 
 router = APIRouter()
+_billing_schema_ready = False
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://vision-business.com")
 
 PLANS = {
+    "free": {
+        "name": "Free - Foundation",
+        "price_env": None,
+        "description": "Fondations financieres, progression et IA simple.",
+    },
     "gold": {
-        "name": "Gold",
+        "name": "Gold - Growth",
         "price_env": "STRIPE_PRICE_GOLD",
-        "description": "Optimisation avancee et opportunites personnalisees.",
+        "description": "Croissance patrimoniale, analytics, immobilier, opportunites et IA avancee.",
     },
     "elite": {
-        "name": "Elite",
+        "name": "Elite - Wealth OS",
         "price_env": "STRIPE_PRICE_ELITE",
-        "description": "Pilotage patrimonial avance et intelligence premium.",
-    },
-    "liberty": {
-        "name": "Liberty",
-        "price_env": "STRIPE_PRICE_LIBERTY",
-        "description": "Atteindre et piloter la liberte financiere.",
-    },
-    "liberty_legacy": {
-        "name": "Liberty Legacy",
-        "price_env": "STRIPE_PRICE_LIBERTY_LEGACY",
-        "description": (
-            "Conserver, multiplier et transmettre la liberte financiere "
-            "a sa famille."
-        ),
+        "description": "Family Office OS, multi-user, gouvernance, IA premium et consolidation.",
     },
 }
+
+
+def ensure_billing_tables(conn):
+    global _billing_schema_ready
+
+    if _billing_schema_ready:
+        return
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE,
+            plan TEXT NOT NULL DEFAULT 'FREE',
+            status TEXT NOT NULL DEFAULT 'inactive',
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            current_period_end TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
+    _billing_schema_ready = True
 
 
 def get_plan_or_400(plan_id: str):
     plan = PLANS.get(plan_id)
 
-    if not plan:
+    if not plan or plan_id == "free":
         raise HTTPException(status_code=400, detail="Plan inconnu")
 
-    price_id = os.getenv(plan["price_env"])
+    price_id = os.getenv(plan["price_env"] or "")
 
     if not price_id:
         raise HTTPException(
@@ -66,10 +82,48 @@ def get_plans():
                 "id": plan_id,
                 "name": plan["name"],
                 "description": plan["description"],
-                "configured": bool(os.getenv(plan["price_env"])),
+                "configured": plan_id == "free" or bool(os.getenv(plan["price_env"] or "")),
             }
             for plan_id, plan in PLANS.items()
         ]
+    }
+
+
+@router.get("/current-subscription")
+def current_subscription(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+
+        user = conn.execute(text("""
+            SELECT id, plan
+            FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        subscription = conn.execute(text("""
+            SELECT plan, status, current_period_end
+            FROM subscriptions
+            WHERE user_id = :user_id
+        """), {"user_id": user.id}).fetchone()
+
+    if not subscription:
+        return {
+            "plan": (user.plan or "FREE").upper(),
+            "status": "free",
+            "current_period_end": None,
+        }
+
+    return {
+        "plan": subscription.plan,
+        "status": subscription.status,
+        "current_period_end": (
+            subscription.current_period_end.isoformat()
+            if subscription.current_period_end
+            else None
+        ),
     }
 
 
@@ -133,11 +187,49 @@ async def stripe_webhook(request: Request):
 
         if email and plan:
             with engine.begin() as conn:
+                ensure_billing_tables(conn)
+                user = conn.execute(text("""
+                    SELECT id
+                    FROM users
+                    WHERE email = :email
+                """), {"email": email}).fetchone()
+
                 conn.execute(text("""
                     UPDATE users
                     SET plan = :plan
                     WHERE email = :email
                 """), {"plan": plan.upper(), "email": email})
 
-    return {"received": True}
+                if user:
+                    conn.execute(text("""
+                        INSERT INTO subscriptions (
+                            user_id,
+                            plan,
+                            status,
+                            stripe_customer_id,
+                            stripe_subscription_id,
+                            updated_at
+                        )
+                        VALUES (
+                            :user_id,
+                            :plan,
+                            'active',
+                            :stripe_customer_id,
+                            :stripe_subscription_id,
+                            NOW()
+                        )
+                        ON CONFLICT (user_id)
+                        DO UPDATE SET
+                            plan = EXCLUDED.plan,
+                            status = EXCLUDED.status,
+                            stripe_customer_id = EXCLUDED.stripe_customer_id,
+                            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                            updated_at = NOW()
+                    """), {
+                        "user_id": user.id,
+                        "plan": plan.upper(),
+                        "stripe_customer_id": session.get("customer"),
+                        "stripe_subscription_id": session.get("subscription"),
+                    })
 
+    return {"received": True}

@@ -62,7 +62,7 @@ def get_stock_cached(ticker: str):
     cache_key = f"stock:{ticker}"
 
     cached = get_cache(cache_key)
-    if cached:
+    if cached and cached.get("price") is not None:
         return cached
 
     try:
@@ -71,8 +71,8 @@ def get_stock_cached(ticker: str):
         logger.exception("[PORTFOLIO] stock lookup failed for %s", ticker)
         data = {}
 
-    # cache prix 5 min (market data change souvent)
-    set_cache(cache_key, data, ttl=300)
+    if data.get("price") is not None:
+        set_cache(cache_key, data, ttl=60)
 
     return data
 
@@ -146,14 +146,14 @@ def build_portfolio_payload(rows):
 # =========================
 # PORTFOLIO ENGINE (OPTIMIZED + CACHE)
 # =========================
-def get_user_portfolio(user_id: int):
+def get_user_portfolio(user_id: int, use_cache: bool = True):
 
     cache_key = f"portfolio:{user_id}"
 
     # =========================
     # CACHE CHECK
     # =========================
-    cached = get_cache(cache_key)
+    cached = get_cache(cache_key) if use_cache else None
     if cached:
         return cached
 
@@ -170,7 +170,8 @@ def get_user_portfolio(user_id: int):
     # =========================
     # CACHE STORE
     # =========================
-    set_cache(cache_key, result, ttl=900)
+    if use_cache:
+        set_cache(cache_key, result, ttl=60)
 
     return result
 

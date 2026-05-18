@@ -15,7 +15,8 @@ from auth.utils import decode_token
 # =========================
 from auth.routes import router as auth_router
 from advisor.routes import router as advisor_router
-from billing.routes import router as billing_router
+from billing.routes import router as billing_router, ensure_billing_tables
+from product.routes import router as product_router, ensure_product_tables
 from workspaces.routes import router as workspaces_router, ensure_workspace_tables
 
 from intelligence.routes import router as intelligence_router
@@ -66,6 +67,8 @@ async def lifespan(app: FastAPI):
         ensure_real_estate_table(conn)
         ensure_yield_table(conn)
         ensure_venture_table(conn)
+        ensure_product_tables(conn)
+        ensure_billing_tables(conn)
     logging.info("DB INIT OK")
     yield
 
@@ -152,6 +155,7 @@ logging.info("AUTH OK")
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
+app.include_router(product_router, prefix="/product", tags=["Product"])
 app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])

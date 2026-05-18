@@ -17,6 +17,7 @@ from auth.utils import (
 )
 from auth.email_service import send_verification_email
 from core.cache import redis_client
+from product.entitlements import normalize_plan
 
 router = APIRouter()
 
@@ -190,7 +191,7 @@ def get_me(email: str = Depends(get_current_user)):
 
         data = {
             "email": user.email,
-            "plan": user.plan,
+            "plan": normalize_plan(user.plan),
             "profile_completed": profile_completed,
             "revenus_mensuels": user.revenus_mensuels or 0,
             "charges_mensuelles": user.charges_mensuelles or 0,

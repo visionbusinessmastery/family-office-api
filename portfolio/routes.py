@@ -47,7 +47,7 @@ def get_portfolio(request: Request):
 
             workspace = resolve_workspace_context(conn, request, user_email)
 
-            return get_user_portfolio(workspace["user_id"])
+            return get_user_portfolio(workspace["user_id"], use_cache=False)
 
     return safe_execute(_get, module_name="PORTFOLIO")
 
