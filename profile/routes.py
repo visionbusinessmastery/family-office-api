@@ -20,6 +20,7 @@ def ensure_profile_tables(conn):
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL UNIQUE,
             first_name TEXT,
+            bio TEXT,
             avatar_url TEXT,
             goals TEXT,
             horizon TEXT,
@@ -32,6 +33,8 @@ def ensure_profile_tables(conn):
         )
     """))
 
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS bio TEXT"))
+
     _profile_schema_ready = True
 
 
@@ -39,6 +42,7 @@ def row_to_profile(row):
     if not row:
         return {
             "first_name": None,
+            "bio": None,
             "avatar_url": None,
             "goals": [],
             "horizon": None,
@@ -52,6 +56,7 @@ def row_to_profile(row):
 
     return {
         "first_name": row.first_name,
+        "bio": row.bio,
         "avatar_url": row.avatar_url,
         "goals": goals,
         "horizon": row.horizon,
@@ -72,7 +77,7 @@ def get_profile(email: str = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="User not found")
 
         row = conn.execute(text("""
-            SELECT first_name, avatar_url, goals, horizon, investor_profile,
+            SELECT first_name, bio, avatar_url, goals, horizon, investor_profile,
                    risk_level, main_currency, motivation
             FROM user_wealth_profiles
             WHERE user_id = :user_id
@@ -99,16 +104,17 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
 
         conn.execute(text("""
             INSERT INTO user_wealth_profiles (
-                user_id, first_name, avatar_url, goals, horizon,
+                user_id, first_name, bio, avatar_url, goals, horizon,
                 investor_profile, risk_level, main_currency, motivation, updated_at
             )
             VALUES (
-                :user_id, :first_name, :avatar_url, :goals, :horizon,
+                :user_id, :first_name, :bio, :avatar_url, :goals, :horizon,
                 :investor_profile, :risk_level, :main_currency, :motivation, NOW()
             )
             ON CONFLICT (user_id)
             DO UPDATE SET
                 first_name = EXCLUDED.first_name,
+                bio = EXCLUDED.bio,
                 avatar_url = EXCLUDED.avatar_url,
                 goals = EXCLUDED.goals,
                 horizon = EXCLUDED.horizon,
@@ -120,6 +126,7 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
         """), {
             "user_id": user_id,
             "first_name": data.get("first_name"),
+            "bio": data.get("bio"),
             "avatar_url": data.get("avatar_url"),
             "goals": goals_text,
             "horizon": data.get("horizon"),
