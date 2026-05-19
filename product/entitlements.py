@@ -4,13 +4,13 @@ PLAN_ORDER = {
     "GOLD": 2,
     "PLATINUM": 3,
     "ELITE": 4,
+    "LIBERTY": 5,
 }
 
 PLAN_ALIASES = {
     "FOUNDATION": "FREE",
     "GROWTH": "GOLD",
     "WEALTH_OS": "ELITE",
-    "LIBERTY": "ELITE",
     "LIBERTY_LEGACY": "ELITE",
 }
 
@@ -39,6 +39,11 @@ PLAN_COPY = {
         "name": "Wealth OS",
         "price": "79 EUR/mois",
         "promise": "Tu pilotes ton patrimoine comme un Family Office.",
+    },
+    "LIBERTY": {
+        "name": "Sovereign Wealth",
+        "price": "sur mesure",
+        "promise": "Tu preserves, multiplies et transmets ta liberte patrimoniale.",
     },
 }
 
@@ -171,6 +176,44 @@ PLAN_ENTITLEMENTS = {
             "forex_advanced_analytics",
         ],
     },
+    "LIBERTY": {
+        "max_assets": None,
+        "ai_level": "sovereign",
+        "modules": [
+            "foundation",
+            "finance",
+            "portfolio",
+            "diversification",
+            "real_estate",
+            "yield_assets",
+            "venture_assets",
+            "analytics",
+            "command_center",
+            "opportunities",
+            "advanced_guidance",
+            "multi_user",
+            "bank_sync",
+            "governance",
+            "imports",
+            "automation",
+            "legacy_planning",
+            "gamification",
+        ],
+        "features": [
+            "multi_user",
+            "companies",
+            "wealth_consolidation",
+            "banking_apis",
+            "live_sync",
+            "sovereign_guidance",
+            "advanced_allocations",
+            "governance",
+            "automatic_imports",
+            "wealth_architecture",
+            "legacy_planning",
+            "forex_advanced_analytics",
+        ],
+    },
 }
 
 MODULE_REGISTRY = [
@@ -277,6 +320,14 @@ MODULE_REGISTRY = [
         "min_plan": "ELITE",
         "min_score": 80,
         "description": "Architecture preparee pour connexions bancaires et imports.",
+    },
+    {
+        "key": "legacy_planning",
+        "label": "Sovereign Wealth",
+        "stage": 8,
+        "min_plan": "LIBERTY",
+        "min_score": 85,
+        "description": "Gouvernance avancee, transmission et architecture patrimoniale.",
     },
 ]
 

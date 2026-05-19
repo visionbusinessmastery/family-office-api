@@ -19,17 +19,22 @@ PLANS = {
     "free": {
         "name": "Free - Foundation",
         "price_env": None,
-        "description": "Fondations financieres, progression et IA simple.",
+        "description": "Fondations financieres, progression et guidance simple.",
     },
     "gold": {
         "name": "Gold - Growth",
         "price_env": "STRIPE_PRICE_GOLD",
-        "description": "Croissance patrimoniale, analytics, immobilier, opportunites et IA avancee.",
+        "description": "Croissance patrimoniale, analytics, immobilier, opportunites et guidance avancee.",
     },
     "elite": {
         "name": "Elite - Wealth OS",
         "price_env": "STRIPE_PRICE_ELITE",
-        "description": "Family Office OS, multi-user, gouvernance, IA premium et consolidation.",
+        "description": "Family Office OS, multi-user, gouvernance, guidance premium et consolidation.",
+    },
+    "liberty": {
+        "name": "Liberty - Sovereign Wealth",
+        "price_env": "STRIPE_PRICE_LIBERTY",
+        "description": "Niveau ultime WHITE ROCK : autonomie patrimoniale, gouvernance avancee, optimisation globale et acces souverain.",
     },
 }
 
@@ -92,6 +97,7 @@ def ensure_billing_tables(conn):
 
 
 def get_plan_or_400(plan_id: str):
+    plan_id = (plan_id or "").lower()
     plan = PLANS.get(plan_id)
 
     if not plan or plan_id == "free":
@@ -106,6 +112,26 @@ def get_plan_or_400(plan_id: str):
         )
 
     return plan, price_id
+
+
+def get_user_subscription(conn, email: str):
+    user = conn.execute(text("""
+        SELECT id, plan
+        FROM users
+        WHERE email = :email
+    """), {"email": email}).fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    subscription = conn.execute(text("""
+        SELECT plan, status, current_period_end, stripe_price_id, environment,
+               stripe_customer_id, stripe_subscription_id, cancel_at_period_end
+        FROM subscriptions
+        WHERE user_id = :user_id
+    """), {"user_id": user.id}).fetchone()
+
+    return user, subscription
 
 
 @router.get("/plans")
@@ -144,20 +170,7 @@ def current_subscription(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
         ensure_billing_tables(conn)
 
-        user = conn.execute(text("""
-            SELECT id, plan
-            FROM users
-            WHERE email = :email
-        """), {"email": email}).fetchone()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        subscription = conn.execute(text("""
-            SELECT plan, status, current_period_end, stripe_price_id, environment
-            FROM subscriptions
-            WHERE user_id = :user_id
-        """), {"user_id": user.id}).fetchone()
+        user, subscription = get_user_subscription(conn, email)
 
     if not subscription:
         return {
@@ -171,6 +184,7 @@ def current_subscription(email: str = Depends(get_current_user)):
         "status": subscription.status,
         "stripe_price_id": subscription.stripe_price_id,
         "environment": subscription.environment or os.getenv("STRIPE_MODE", "sandbox"),
+        "cancel_at_period_end": bool(subscription.cancel_at_period_end),
         "current_period_end": (
             subscription.current_period_end.isoformat()
             if subscription.current_period_end
@@ -184,7 +198,7 @@ def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
     if not stripe.api_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
 
-    plan_id = data.get("plan", "elite")
+    plan_id = str(data.get("plan", "elite")).lower()
     plan, price_id = get_plan_or_400(plan_id)
 
     try:
@@ -194,6 +208,7 @@ def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=f"{FRONTEND_URL}/dashboard?checkout=success",
             cancel_url=f"{FRONTEND_URL}/dashboard?checkout=cancel",
+            allow_promotion_codes=True,
             metadata={
                 "email": email,
                 "plan": plan_id,
@@ -209,6 +224,110 @@ def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(exc))
 
     return {"url": session.url, "plan": plan["name"]}
+
+
+@router.post("/customer-portal")
+def create_customer_portal(email: str = Depends(get_current_user)):
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        _, subscription = get_user_subscription(conn, email)
+
+    if not subscription or not subscription.stripe_customer_id:
+        raise HTTPException(status_code=400, detail="Customer Stripe introuvable")
+
+    session = stripe.billing_portal.Session.create(
+        customer=subscription.stripe_customer_id,
+        return_url=f"{FRONTEND_URL}/dashboard?billing=portal",
+    )
+
+    return {"url": session.url}
+
+
+@router.get("/billing-history")
+def billing_history(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        user, _ = get_user_subscription(conn, email)
+        invoices = conn.execute(text("""
+            SELECT stripe_invoice_id, amount_due, amount_paid, currency, status,
+                   hosted_invoice_url, created_at
+            FROM billing_invoices
+            WHERE user_id = :user_id
+            ORDER BY created_at DESC
+            LIMIT 24
+        """), {"user_id": user.id}).fetchall()
+
+    return {
+        "invoices": [
+            {
+                "id": row.stripe_invoice_id,
+                "amount_due": row.amount_due,
+                "amount_paid": row.amount_paid,
+                "currency": row.currency,
+                "status": row.status,
+                "url": row.hosted_invoice_url,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in invoices
+        ]
+    }
+
+
+@router.post("/cancel-subscription")
+def cancel_subscription(email: str = Depends(get_current_user)):
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        _, subscription = get_user_subscription(conn, email)
+
+    if not subscription or not subscription.stripe_subscription_id:
+        raise HTTPException(status_code=400, detail="Subscription Stripe introuvable")
+
+    stripe.Subscription.modify(
+        subscription.stripe_subscription_id,
+        cancel_at_period_end=True,
+    )
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET cancel_at_period_end = TRUE, updated_at = NOW()
+            WHERE stripe_subscription_id = :stripe_subscription_id
+        """), {"stripe_subscription_id": subscription.stripe_subscription_id})
+
+    return {"status": "cancel_at_period_end"}
+
+
+@router.post("/reactivate-subscription")
+def reactivate_subscription(email: str = Depends(get_current_user)):
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        _, subscription = get_user_subscription(conn, email)
+
+    if not subscription or not subscription.stripe_subscription_id:
+        raise HTTPException(status_code=400, detail="Subscription Stripe introuvable")
+
+    stripe.Subscription.modify(
+        subscription.stripe_subscription_id,
+        cancel_at_period_end=False,
+    )
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET cancel_at_period_end = FALSE, updated_at = NOW()
+            WHERE stripe_subscription_id = :stripe_subscription_id
+        """), {"stripe_subscription_id": subscription.stripe_subscription_id})
+
+    return {"status": "active"}
 
 
 @router.post("/webhook")
@@ -232,10 +351,23 @@ async def stripe_webhook(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        conn.execute(text("""
+            INSERT INTO subscription_events (stripe_event_id, event_type, status, payload)
+            VALUES (:stripe_event_id, :event_type, :status, :payload)
+            ON CONFLICT (stripe_event_id) DO NOTHING
+        """), {
+            "stripe_event_id": event.get("id"),
+            "event_type": event.get("type"),
+            "status": "received",
+            "payload": str(event)[:8000],
+        })
+
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         email = session.get("metadata", {}).get("email") or session.get("customer_email")
-        plan = session.get("metadata", {}).get("plan")
+        plan = str(session.get("metadata", {}).get("plan") or "").lower()
 
         if email and plan:
             with engine.begin() as conn:

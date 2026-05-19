@@ -110,6 +110,8 @@ def compute_level(score: int, xp: int):
 
 
 def compute_status(score: int, plan: str):
+    if normalize_plan(plan) == "LIBERTY":
+        return "Sovereign Wealth"
     if normalize_plan(plan) == "ELITE":
         return "Wealth OS"
     if score >= 70:
@@ -271,14 +273,24 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "gold",
         })
 
-    if score >= 70 and normalize_plan(plan) != "ELITE":
+    if score >= 70 and not normalize_plan(plan) in ["ELITE", "LIBERTY"]:
         missions.append({
             "key": "unlock_wealth_os",
             "title": "Passer en pilotage Wealth OS",
-            "description": "Ton niveau devient compatible avec multi-user, gouvernance et IA premium.",
+            "description": "Ton niveau devient compatible avec multi-user, gouvernance et guidance premium.",
             "xp": 0,
             "module": "billing",
             "recommended_plan": "elite",
+        })
+
+    if score >= 85 and normalize_plan(plan) != "LIBERTY":
+        missions.append({
+            "key": "unlock_liberty",
+            "title": "Debloquer Liberty",
+            "description": "Ton profil devient compatible avec une architecture patrimoniale souveraine.",
+            "xp": 0,
+            "module": "billing",
+            "recommended_plan": "liberty",
         })
 
     return missions[:3]
