@@ -1,7 +1,9 @@
 PLAN_ORDER = {
     "FREE": 0,
-    "GOLD": 1,
-    "ELITE": 2,
+    "SILVER": 1,
+    "GOLD": 2,
+    "PLATINUM": 3,
+    "ELITE": 4,
 }
 
 PLAN_ALIASES = {
@@ -10,7 +12,6 @@ PLAN_ALIASES = {
     "WEALTH_OS": "ELITE",
     "LIBERTY": "ELITE",
     "LIBERTY_LEGACY": "ELITE",
-    "PLATINUM": "ELITE",
 }
 
 PLAN_COPY = {
@@ -23,6 +24,16 @@ PLAN_COPY = {
         "name": "Growth",
         "price": "29 EUR/mois",
         "promise": "Tu entres en phase de croissance patrimoniale.",
+    },
+    "SILVER": {
+        "name": "Foundation Plus",
+        "price": "legacy",
+        "promise": "Tu consolides tes fondations financieres.",
+    },
+    "PLATINUM": {
+        "name": "Advanced Growth",
+        "price": "legacy",
+        "promise": "Tu acceleres avec des analytics avancees.",
     },
     "ELITE": {
         "name": "Wealth OS",
@@ -40,7 +51,7 @@ PLAN_ENTITLEMENTS = {
             "finance",
             "portfolio",
             "basic_score",
-            "basic_ai",
+            "basic_guidance",
             "gamification",
         ],
         "features": [
@@ -65,7 +76,54 @@ PLAN_ENTITLEMENTS = {
             "analytics",
             "command_center",
             "opportunities",
-            "advanced_ai",
+            "advanced_guidance",
+            "gamification",
+        ],
+        "features": [
+            "advanced_portfolio",
+            "real_estate",
+            "business_assets",
+            "portfolio_chart",
+            "smart_notifications",
+            "category_opportunities",
+            "projections",
+            "forex_full",
+        ],
+    },
+    "SILVER": {
+        "max_assets": 15,
+        "ai_level": "standard",
+        "modules": [
+            "foundation",
+            "finance",
+            "portfolio",
+            "basic_score",
+            "basic_guidance",
+            "gamification",
+        ],
+        "features": [
+            "simple_wealth_view",
+            "income_expense_tracking",
+            "basic_progression",
+            "basic_missions",
+            "forex_limited",
+        ],
+    },
+    "PLATINUM": {
+        "max_assets": 100,
+        "ai_level": "advanced",
+        "modules": [
+            "foundation",
+            "finance",
+            "portfolio",
+            "diversification",
+            "real_estate",
+            "yield_assets",
+            "venture_assets",
+            "analytics",
+            "command_center",
+            "opportunities",
+            "advanced_guidance",
             "gamification",
         ],
         "features": [
@@ -93,7 +151,7 @@ PLAN_ENTITLEMENTS = {
             "analytics",
             "command_center",
             "opportunities",
-            "advanced_ai",
+            "advanced_guidance",
             "multi_user",
             "bank_sync",
             "governance",
@@ -106,7 +164,7 @@ PLAN_ENTITLEMENTS = {
             "wealth_consolidation",
             "banking_apis",
             "live_sync",
-            "premium_ai",
+            "premium_guidance",
             "advanced_allocations",
             "governance",
             "automatic_imports",
@@ -178,7 +236,7 @@ MODULE_REGISTRY = [
         "stage": 4,
         "min_plan": "GOLD",
         "min_score": 55,
-        "description": "Analyser business, startup, franchise et AI business.",
+        "description": "Analyser business, startup, franchise et activites digitales.",
     },
     {
         "key": "command_center",
@@ -197,8 +255,8 @@ MODULE_REGISTRY = [
         "description": "Recevoir des signaux personnalises par rubrique patrimoniale.",
     },
     {
-        "key": "advanced_ai",
-        "label": "IA avancee",
+        "key": "advanced_guidance",
+        "label": "Guidance avancee",
         "stage": 5,
         "min_plan": "GOLD",
         "min_score": 50,

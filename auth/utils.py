@@ -11,6 +11,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import logging
 
+from product.entitlements import normalize_plan, plan_allows
+
 
 logger = logging.getLogger(__name__)
 
@@ -94,17 +96,19 @@ def get_current_user(
 def build_unlocks(plan: str, level: str):
 
     base = ["dashboard"]
+    normalized_plan = normalize_plan(plan)
+    normalized_level = (level or "").upper()
 
-    if plan != "FREE":
+    if plan_allows(normalized_plan, "SILVER"):
         base.append("portfolio")
 
-    if plan in ["GOLD", "ELITE"]:
+    if plan_allows(normalized_plan, "GOLD"):
         base.append("analytics")
 
-    if level == "Advanced":
-        base.append("ai_insights")
+    if normalized_level in ["ADVANCED", "ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR"]:
+        base.append("guided_insights")
 
-    if level == "Elite":
+    if normalized_level in ["ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR"]:
         base.append("family_office_ai")
 
     return base
