@@ -5,6 +5,7 @@ from intelligence.gamification.xp_engine import compute_xp
 from intelligence.gamification.rewards import compute_reward_bonus
 from intelligence.gamification.ai_coach import ai_coach_insight
 from intelligence.gamification.notifications import generate_notification
+from product.entitlements import normalize_plan, plan_allows
 
 from core.cache import redis_client
 import json
@@ -38,6 +39,7 @@ def set_cache(key, value, ttl=120):
 def sync_gamification(user, score, plan, streak, action="view_dashboard"):
 
     user_email = user.get("email") if isinstance(user, dict) else str(user)
+    plan = normalize_plan(plan)
 
     # =========================
     # CACHE KEY
@@ -57,7 +59,7 @@ def sync_gamification(user, score, plan, streak, action="view_dashboard"):
     xp = compute_xp(
         action,
         streak=streak,
-        liberty_mode=(plan == "LIBERTY")
+        liberty_mode=plan_allows(plan, "LIBERTY")
     )
 
     # =========================

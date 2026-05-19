@@ -1,22 +1,24 @@
 PLAN_ORDER = {
     "FREE": 0,
-    "SILVER": 1,
-    "GOLD": 2,
-    "PLATINUM": 3,
-    "ELITE": 4,
-    "LIBERTY": 5,
-    "LEGACY": 6,
+    "GOLD": 1,
+    "ELITE": 2,
+    "LIBERTY": 3,
+    "LEGACY": 4,
 }
 
 PLAN_ALIASES = {
     "FOUNDATION": "FREE",
+    "SILVER": "FREE",
     "GROWTH": "GOLD",
+    "PLATINUM": "ELITE",
     "WEALTH_OS": "ELITE",
     "LIBERTY_LEGACY": "LIBERTY",
     "HERITAGE": "LEGACY",
     "DYNASTY": "LEGACY",
     "DYNASTY_OFFICE": "LEGACY",
 }
+
+ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
 
 PLAN_COPY = {
     "FREE": {
@@ -432,16 +434,58 @@ def normalize_plan(plan: str | None) -> str:
     return PLAN_ALIASES.get(value, value if value in PLAN_ORDER else "FREE")
 
 
+def plan_rank(plan: str | None) -> int:
+    return PLAN_ORDER[normalize_plan(plan)]
+
+
 def plan_allows(current_plan: str, required_plan: str) -> bool:
-    return PLAN_ORDER[normalize_plan(current_plan)] >= PLAN_ORDER[normalize_plan(required_plan)]
+    return plan_rank(current_plan) >= plan_rank(required_plan)
+
+
+def highest_plan(*plans: str | None) -> str:
+    normalized = [normalize_plan(plan) for plan in plans if plan]
+    if not normalized:
+        return "FREE"
+    return max(normalized, key=plan_rank)
+
+
+def resolve_effective_plan(
+    user_plan: str | None,
+    subscription_plan: str | None = None,
+    subscription_status: str | None = None,
+) -> str:
+    if (
+        subscription_plan
+        and str(subscription_status or "").lower() in ACTIVE_SUBSCRIPTION_STATUSES
+    ):
+        return highest_plan(user_plan, subscription_plan)
+
+    return normalize_plan(user_plan)
+
+
+def inherited_values(plan: str, field: str):
+    normalized = normalize_plan(plan)
+    values = []
+
+    for candidate, entitlements in PLAN_ENTITLEMENTS.items():
+        if plan_allows(normalized, candidate):
+            for value in entitlements.get(field, []):
+                if value not in values:
+                    values.append(value)
+
+    return values
 
 
 def build_entitlements(plan: str):
     normalized = normalize_plan(plan)
+    base = dict(PLAN_ENTITLEMENTS[normalized])
+    base["modules"] = inherited_values(normalized, "modules")
+    base["features"] = inherited_values(normalized, "features")
+
     return {
         "plan": normalized,
         "copy": PLAN_COPY[normalized],
-        **PLAN_ENTITLEMENTS[normalized],
+        **base,
     }
 
 
@@ -449,10 +493,7 @@ def can_access_module(plan: str, score: int, module: dict) -> bool:
     normalized = normalize_plan(plan)
     required = normalize_plan(module["min_plan"])
 
-    if normalized == "LEGACY":
+    if plan_allows(normalized, "LIBERTY"):
         return True
-
-    if normalized == "LIBERTY" and required != "LEGACY":
-        return plan_allows(normalized, required)
 
     return plan_allows(normalized, required) and score >= int(module.get("min_score", 0))

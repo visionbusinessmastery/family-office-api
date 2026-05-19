@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from product.entitlements import normalize_plan, plan_rank
 router = APIRouter()
 
 # =========================
@@ -12,9 +13,8 @@ def build_dashboard(user, intelligence):
     if not isinstance(intelligence, dict):
         intelligence = {}
 
-    plan = (user.get("plan") or "FREE").upper()
-    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3, "LEGACY": 4}
-    level_rank = plan_rank.get(plan, 0)
+    plan = normalize_plan(user.get("plan"))
+    level_rank = plan_rank(plan)
 
     score_data = intelligence.get("score")
 
@@ -47,13 +47,6 @@ def build_dashboard(user, intelligence):
             "advanced_portfolio",
             "wealth_optimizer",
             "ethan_advisor"
-        ]
-
-    if plan == "SILVER":
-        dashboard["features"] += [
-            "portfolio_view",
-            "basic_insights",
-            "market_overview"
         ]
 
     if level_rank >= 1:

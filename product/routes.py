@@ -9,6 +9,8 @@ from product.entitlements import (
     build_entitlements,
     can_access_module,
     normalize_plan,
+    plan_allows,
+    resolve_effective_plan,
 )
 
 
@@ -114,11 +116,11 @@ def compute_level(score: int, xp: int):
 
 
 def compute_status(score: int, plan: str):
-    if normalize_plan(plan) == "LEGACY":
+    if plan_allows(plan, "LEGACY"):
         return "Dynasty Office"
-    if normalize_plan(plan) == "LIBERTY":
+    if plan_allows(plan, "LIBERTY"):
         return "Sovereign Wealth"
-    if normalize_plan(plan) == "ELITE":
+    if plan_allows(plan, "ELITE"):
         return "Wealth OS"
     if score >= 70:
         return "Acceleration"
@@ -279,7 +281,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "gold",
         })
 
-    if score >= 70 and not normalize_plan(plan) in ["ELITE", "LIBERTY", "LEGACY"]:
+    if score >= 70 and not plan_allows(plan, "ELITE"):
         missions.append({
             "key": "unlock_wealth_os",
             "title": "Passer en pilotage Wealth OS",
@@ -289,7 +291,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "elite",
         })
 
-    if score >= 85 and not normalize_plan(plan) in ["LIBERTY", "LEGACY"]:
+    if score >= 85 and not plan_allows(plan, "LIBERTY"):
         missions.append({
             "key": "unlock_liberty",
             "title": "Debloquer Liberty",
@@ -299,7 +301,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "liberty",
         })
 
-    if score >= 92 and normalize_plan(plan) != "LEGACY":
+    if score >= 92 and not plan_allows(plan, "LEGACY"):
         missions.append({
             "key": "unlock_legacy",
             "title": "Preparer Legacy",
@@ -330,17 +332,11 @@ def product_context(email: str = Depends(get_current_user)):
             WHERE users.id = :user_id
         """), {"user_id": user_id}).fetchone()
 
-        subscription_active = plan_row and plan_row.subscription_status in [
-            "active",
-            "trialing",
-            "past_due",
-        ]
-        raw_plan = (
-            plan_row.subscription_plan
-            if subscription_active and plan_row.subscription_plan
-            else plan_row.user_plan if plan_row else "FREE"
+        plan = resolve_effective_plan(
+            plan_row.user_plan if plan_row else "FREE",
+            plan_row.subscription_plan if plan_row else None,
+            plan_row.subscription_status if plan_row else None,
         )
-        plan = normalize_plan(raw_plan)
         score = get_score(email)
         entitlements = build_entitlements(plan)
         data_profile = build_data_profile(conn, user_id)

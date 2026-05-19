@@ -16,6 +16,7 @@ from intelligence.scoring.family_office_score import (
 )
 from intelligence.service import get_user_financial_overview
 from intelligence.strategic.feature_engine import compute_feature_access
+from product.entitlements import resolve_effective_plan
 from intelligence.strategic.opportunity_engine import compute_opportunities
 from intelligence.strategic.strategic_layer import compute_strategic_layer
 
@@ -130,27 +131,40 @@ def sum_amount(items):
 # =========================
 def compute_user_intelligence(user_email: str):
 
-    cache_key = f"intel:{user_email}"
-    context_cache_key = f"context:{user_email}"
-
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
-
     with engine.begin() as conn:
 
         # =========================
         # USER FETCH
         # =========================
         user = conn.execute(text("""
-            SELECT id, email, plan, profile_completed,
-                   revenus_mensuels, charges_mensuelles
+            SELECT
+                users.id,
+                users.email,
+                users.plan AS user_plan,
+                users.profile_completed,
+                users.revenus_mensuels,
+                users.charges_mensuelles,
+                subscriptions.plan AS subscription_plan,
+                subscriptions.status AS subscription_status
             FROM users
-            WHERE email = :email
+            LEFT JOIN subscriptions ON subscriptions.user_id = users.id
+            WHERE users.email = :email
         """), {"email": user_email}).fetchone()
 
         if not user:
             return {"error": "user not found"}
+
+        effective_plan = resolve_effective_plan(
+            user.user_plan,
+            user.subscription_plan,
+            user.subscription_status,
+        )
+        cache_key = f"intel:{user_email}:{effective_plan}"
+        context_cache_key = f"context:{user_email}:{effective_plan}"
+
+        cached = get_cache(cache_key)
+        if cached:
+            return cached
 
         # =========================
         # ONBOARDING REQUIRED STATE
@@ -167,7 +181,7 @@ def compute_user_intelligence(user_email: str):
             result = {
                 "state": "ONBOARDING_REQUIRED",
                 "user": user.email,
-                "plan": user.plan,
+                "plan": effective_plan,
                 "global_score": 0,
                 "level": "ONBOARDING",
                 "onboarding": onboarding,
@@ -216,7 +230,7 @@ def compute_user_intelligence(user_email: str):
                 "monthly_income": onboarding["monthly_income"],
                 "debt": onboarding["debts"],
                 "email": user.email,
-                "plan": user.plan,
+                "plan": effective_plan,
             }
 
             set_cache(context_cache_key, {
@@ -290,9 +304,9 @@ def compute_user_intelligence(user_email: str):
 
         score_value = int(safe_get(score_result, "score", 0))
 
-        level = compute_level(score_value, user.plan)
+        level = compute_level(score_value, effective_plan)
 
-        upgrade = compute_upgrade_decision(user.plan, score_value)
+        upgrade = compute_upgrade_decision(effective_plan, score_value)
         features = compute_feature_access(profile_dict, {"score": score_value})
         opportunities = compute_opportunities(profile_dict, portfolio_list)
 
@@ -308,7 +322,7 @@ def compute_user_intelligence(user_email: str):
         # =========================
         result = {
             "user": user.email,
-            "plan": user.plan,
+            "plan": effective_plan,
 
             "global_score": score_value,
             "level": level,

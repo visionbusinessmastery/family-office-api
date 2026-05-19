@@ -1,7 +1,5 @@
 
-# =========================
-# COMPUTE FEATURE ACCESS (PRODUCTION READY)
-# =========================
+from product.entitlements import normalize_plan, plan_rank
 
 def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     """
@@ -24,9 +22,8 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     if not isinstance(usage, dict):
         usage = {}
 
-    plan = (profile.get("plan") or "FREE").upper()
-    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3, "LEGACY": 4}
-    level = plan_rank.get(plan, 0)
+    plan = normalize_plan(profile.get("plan"))
+    level = plan_rank(plan)
 
     score = float(score_data.get("score") or 0)
 

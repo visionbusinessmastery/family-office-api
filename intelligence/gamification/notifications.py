@@ -1,5 +1,8 @@
+from product.entitlements import normalize_plan, plan_allows
+
+
 def generate_notification(user_state: dict, gamification: dict):
-    plan = (user_state.get("plan") or "FREE").upper()
+    plan = normalize_plan(user_state.get("plan"))
     streak = user_state.get("streak", 0)
     xp = 0
 
@@ -8,14 +11,14 @@ def generate_notification(user_state: dict, gamification: dict):
         if isinstance(xp_data, dict):
             xp = xp_data.get("final_xp", 0) or 0
 
-    if plan == "LEGACY":
+    if plan_allows(plan, "LEGACY"):
         return {
             "type": "legacy",
             "priority": "max",
             "message": "Legacy actif: proteger, transmettre et stabiliser devient la priorite.",
         }
 
-    if plan == "LIBERTY":
+    if plan_allows(plan, "LIBERTY"):
         return {
             "type": "liberty",
             "priority": "max",

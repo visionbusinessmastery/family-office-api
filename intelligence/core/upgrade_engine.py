@@ -2,18 +2,7 @@
 # IMPORTS (SAFE EXTENSION)
 # =========================
 from sqlalchemy import text
-
-# =========================
-# PLAN HIERARCHY
-# =========================
-PLAN_HIERARCHY = {
-    "FREE": 0,
-    "SILVER": 1,
-    "GOLD": 2,
-    "ELITE": 3,
-    "LIBERTY": 4,
-    "LEGACY": 5
-}
+from product.entitlements import normalize_plan, plan_rank
 
 # =========================
 # PLAN FROM SCORE (XP SYSTEM)
@@ -36,10 +25,6 @@ def get_plan_from_score(score: int):
         return "GOLD"
 
     # SILVER
-    elif score >= 1000:
-        return "SILVER"
-
-    # FREE
     return "FREE"
 
 
@@ -50,19 +35,15 @@ def compute_upgrade_decision(current_plan: str, score: int):
 
     recommended_plan = get_plan_from_score(score)
 
-    current_level = PLAN_HIERARCHY.get(
-        (current_plan or "FREE").upper(), 0
-    )
-
-    recommended_level = PLAN_HIERARCHY.get(
-        recommended_plan, 0
-    )
+    normalized_current_plan = normalize_plan(current_plan)
+    current_level = plan_rank(normalized_current_plan)
+    recommended_level = plan_rank(recommended_plan)
 
     upgrade = recommended_level > current_level
 
     return {
         "upgrade": upgrade,
-        "from": (current_plan or "FREE").upper(),
+        "from": normalized_current_plan,
         "to": recommended_plan,
         "recommended_plan": recommended_plan,
         "reason": "xp_threshold_reached" if upgrade else None

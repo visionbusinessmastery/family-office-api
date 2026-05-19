@@ -6,6 +6,7 @@ import json
 import hashlib
 
 from core.cache import redis_client
+from product.entitlements import normalize_plan, plan_allows
 
 
 # =========================
@@ -126,10 +127,7 @@ def compute_opportunities(
         profile.get("investments")
     )
 
-    plan = (
-        profile.get("plan")
-        or "FREE"
-    ).upper()
+    plan = normalize_plan(profile.get("plan"))
 
     total_assets = (
         savings + investments
@@ -304,11 +302,7 @@ def compute_opportunities(
     # =========================
     # PREMIUM AI SIGNALS
     # =========================
-    if plan in [
-        "PRO",
-        "ELITE",
-        "LIBERTY"
-    ]:
+    if plan_allows(plan, "ELITE"):
 
         if crypto_ratio > 0.60:
 
@@ -318,7 +312,7 @@ def compute_opportunities(
                     "ai_rebalance",
 
                 "title":
-                    "AI Portfolio Rebalancing",
+                    "Reequilibrage Ethan",
 
                 "description":
                     "Concentration crypto excessive détectée",

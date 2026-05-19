@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 
 from auth.utils import get_current_user
+from core.cache import delete_cache_keys, delete_cache_patterns
 from database import engine
+from product.entitlements import normalize_plan, resolve_effective_plan
 
 
 router = APIRouter()
@@ -42,6 +44,36 @@ PLANS = {
         "description": "Transmission, gouvernance familiale, protection patrimoniale et strategie multi-generationnelle.",
     },
 }
+
+
+def invalidate_subscription_caches(email: str | None, user_id: int | None = None):
+    if email:
+        delete_cache_keys(f"score:{email}")
+        delete_cache_patterns(
+            f"intel:{email}*",
+            f"context:{email}*",
+            f"gamification:{email}*",
+            f"quests:{email}*",
+        )
+
+    if user_id:
+        delete_cache_keys(
+            f"cmd_center:{user_id}",
+            f"financial:{user_id}",
+            f"badges:{user_id}",
+        )
+
+
+def plan_from_price_id(price_id: str | None):
+    if not price_id:
+        return None
+
+    for plan_id, plan in PLANS.items():
+        configured = os.getenv(plan["price_env"] or "")
+        if configured and configured == price_id:
+            return plan_id.upper()
+
+    return None
 
 
 def ensure_billing_tables(conn):
@@ -179,14 +211,22 @@ def current_subscription(email: str = Depends(get_current_user)):
 
     if not subscription:
         return {
-            "plan": (user.plan or "FREE").upper(),
+            "plan": normalize_plan(user.plan),
             "status": "free",
             "current_period_end": None,
         }
 
+    effective_plan = resolve_effective_plan(
+        user.plan,
+        subscription.plan,
+        subscription.status,
+    )
+
     return {
-        "plan": subscription.plan,
+        "plan": effective_plan,
         "status": subscription.status,
+        "subscription_plan": normalize_plan(subscription.plan),
+        "user_plan": normalize_plan(user.plan),
         "stripe_price_id": subscription.stripe_price_id,
         "environment": subscription.environment or os.getenv("STRIPE_MODE", "sandbox"),
         "cancel_at_period_end": bool(subscription.cancel_at_period_end),
@@ -429,25 +469,63 @@ async def stripe_webhook(request: Request):
                         "environment": os.getenv("STRIPE_MODE", "sandbox"),
                     })
 
+                invalidate_subscription_caches(email, user.id if user else None)
+
     if event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
         subscription = event["data"]["object"]
         stripe_subscription_id = subscription.get("id")
         status = subscription.get("status")
         cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
+        price_id = None
+        try:
+            price_id = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+        except Exception:
+            price_id = None
+        next_plan = plan_from_price_id(price_id)
 
         with engine.begin() as conn:
             ensure_billing_tables(conn)
+            current = conn.execute(text("""
+                SELECT users.email, users.id
+                FROM subscriptions
+                JOIN users ON users.id = subscriptions.user_id
+                WHERE subscriptions.stripe_subscription_id = :stripe_subscription_id
+            """), {
+                "stripe_subscription_id": stripe_subscription_id,
+            }).fetchone()
+
             conn.execute(text("""
                 UPDATE subscriptions
-                SET status = :status,
+                SET plan = COALESCE(:plan, plan),
+                    status = :status,
                     cancel_at_period_end = :cancel_at_period_end,
                     updated_at = NOW()
                 WHERE stripe_subscription_id = :stripe_subscription_id
             """), {
+                "plan": next_plan,
                 "status": status,
                 "cancel_at_period_end": cancel_at_period_end,
                 "stripe_subscription_id": stripe_subscription_id,
             })
+
+            if current and next_plan and status in ["active", "trialing", "past_due"]:
+                conn.execute(text("""
+                    UPDATE users
+                    SET plan = :plan
+                    WHERE id = :user_id
+                """), {"plan": next_plan, "user_id": current.id})
+
+            if current and event["type"] == "customer.subscription.deleted":
+                conn.execute(text("""
+                    UPDATE users
+                    SET plan = 'FREE'
+                    WHERE id = :user_id
+                """), {"user_id": current.id})
+
+            invalidate_subscription_caches(
+                current.email if current else None,
+                current.id if current else None,
+            )
 
     if event["type"] in ["invoice.paid", "invoice.payment_failed"]:
         invoice = event["data"]["object"]

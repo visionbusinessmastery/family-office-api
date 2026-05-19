@@ -12,6 +12,7 @@ from auth.utils import get_current_user
 import json
 
 from core.cache import redis_client
+from product.entitlements import plan_allows, resolve_effective_plan
 
 router = APIRouter()
 
@@ -100,14 +101,21 @@ def build_gamification_actions(score: float, level):
     return actions
 
 
-def build_upgrade(score: float, level):
+def build_upgrade(score: float, level, plan: str = "FREE"):
     level_text = str(level or "").upper()
 
-    if level_text in ["LEGACY", "DYNASTY ARCHITECT"]:
+    if plan_allows(plan, "LEGACY") or level_text in ["LEGACY", "DYNASTY ARCHITECT"]:
         return {
             "recommended_plan": "legacy",
             "title": "Legacy - Dynasty Office",
             "description": "Construire est difficile. Preserver l'est encore plus.",
+        }
+
+    if plan_allows(plan, "LIBERTY"):
+        return {
+            "recommended_plan": "legacy",
+            "title": "Legacy - Dynasty Office",
+            "description": "Le prochain seuil concerne la transmission, la gouvernance et la protection familiale.",
         }
 
     if level_text in ["LIBERTY"] or score >= 85:
@@ -134,13 +142,32 @@ def build_upgrade(score: float, level):
 # =========================
 # GET USER ID
 # =========================
-def get_user_id(conn, email: str):
+def get_user_identity(conn, email: str):
     row = conn.execute(
-        text("SELECT id FROM users WHERE email = :email"),
+        text("""
+            SELECT
+                users.id,
+                users.plan AS user_plan,
+                subscriptions.plan AS subscription_plan,
+                subscriptions.status AS subscription_status
+            FROM users
+            LEFT JOIN subscriptions ON subscriptions.user_id = users.id
+            WHERE users.email = :email
+        """),
         {"email": email}
     ).fetchone()
 
-    return row.id if row else None
+    if not row:
+        return None
+
+    return {
+        "id": row.id,
+        "plan": resolve_effective_plan(
+            row.user_plan,
+            row.subscription_plan,
+            row.subscription_status,
+        ),
+    }
 
 
 # =========================
@@ -152,18 +179,16 @@ def get_gamification(user=Depends(get_current_user)):
 
     email = user.get("email") if isinstance(user, dict) else user
 
-    cache_key = f"gamification:{email}"
-
-    # =========================
-    # CACHE CHECK
-    # =========================
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
-
     with engine.connect() as conn:
 
-        user_id = get_user_id(conn, email)
+        identity = get_user_identity(conn, email)
+        user_id = identity["id"] if identity else None
+        plan = identity["plan"] if identity else "FREE"
+        cache_key = f"gamification:{email}:{plan}"
+
+        cached = get_cache(cache_key)
+        if cached:
+            return cached
 
         # =========================
         # FALLBACK SAFE RESPONSE
@@ -174,7 +199,7 @@ def get_gamification(user=Depends(get_current_user)):
             "streak": 0,
             "badges": [],
             "actions": build_gamification_actions(0, "FREE"),
-            "upgrade": build_upgrade(0, "FREE"),
+            "upgrade": build_upgrade(0, "FREE", plan),
             "ai_coach": {
                 "message": "Ajoute tes donnees pour recevoir des affiliations pertinentes.",
                 "affiliations": [],
@@ -221,7 +246,7 @@ def get_gamification(user=Depends(get_current_user)):
             "streak": row.streak or 0,
             "badges": badges,
             "actions": build_gamification_actions(row.xp or 0, row.level or 1),
-            "upgrade": build_upgrade(row.xp or 0, row.level or 1),
+            "upgrade": build_upgrade(row.xp or 0, row.level or 1, plan),
             "ai_coach": {
                 "message": (
                     "Je te propose les prochaines actions et affiliations en "

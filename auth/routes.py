@@ -16,8 +16,8 @@ from auth.utils import (
     verify_password
 )
 from auth.email_service import send_verification_email
-from core.cache import redis_client
-from product.entitlements import normalize_plan
+from core.cache import delete_cache_keys, delete_cache_patterns
+from product.entitlements import normalize_plan, resolve_effective_plan
 
 router = APIRouter()
 
@@ -25,17 +25,13 @@ router = APIRouter()
 # INVALIDATE USER
 # =========================
 def invalidate_user_intelligence_caches(email: str):
-    try:
-        if not redis_client:
-            return
-
-        redis_client.delete(
-            f"intel:{email}",
-            f"context:{email}",
-            f"score:{email}",
-        )
-    except Exception:
-        pass
+    delete_cache_keys(f"score:{email}")
+    delete_cache_patterns(
+        f"intel:{email}*",
+        f"context:{email}*",
+        f"gamification:{email}*",
+        f"quests:{email}*",
+    )
 
 
 
@@ -176,8 +172,16 @@ def get_me(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
 
         user = conn.execute(text("""
-            SELECT email, plan, profile_completed, revenus_mensuels, charges_mensuelles
+            SELECT
+                users.email,
+                users.plan AS user_plan,
+                users.profile_completed,
+                users.revenus_mensuels,
+                users.charges_mensuelles,
+                subscriptions.plan AS subscription_plan,
+                subscriptions.status AS subscription_status
             FROM users
+            LEFT JOIN subscriptions ON subscriptions.user_id = users.id
             WHERE email = :email
         """), {"email": email}).fetchone()
 
@@ -191,7 +195,11 @@ def get_me(email: str = Depends(get_current_user)):
 
         data = {
             "email": user.email,
-            "plan": normalize_plan(user.plan),
+            "plan": resolve_effective_plan(
+                user.user_plan,
+                user.subscription_plan,
+                user.subscription_status,
+            ),
             "profile_completed": profile_completed,
             "revenus_mensuels": user.revenus_mensuels or 0,
             "charges_mensuelles": user.charges_mensuelles or 0,
@@ -270,11 +278,14 @@ def save_onboarding(data: dict, email: str = Depends(get_current_user)):
 # =========================
 @router.post("/plan/update")
 def update_plan(plan: str, email: str = Depends(get_current_user)):
+    normalized_plan = normalize_plan(plan)
 
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE users SET plan = :plan WHERE email = :email
-        """), {"plan": plan, "email": email})
+        """), {"plan": normalized_plan, "email": email})
+
+        invalidate_user_intelligence_caches(email)
 
     return {"status": "updated"}
 

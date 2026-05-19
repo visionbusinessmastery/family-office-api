@@ -99,8 +99,7 @@ def build_unlocks(plan: str, level: str):
     normalized_plan = normalize_plan(plan)
     normalized_level = (level or "").upper()
 
-    if plan_allows(normalized_plan, "SILVER"):
-        base.append("portfolio")
+    base.append("portfolio")
 
     if plan_allows(normalized_plan, "GOLD"):
         base.append("analytics")

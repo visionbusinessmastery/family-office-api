@@ -4,6 +4,7 @@ import json
 import random
 
 from core.cache import redis_client
+from product.entitlements import normalize_plan, plan_allows
 
 
 DAILY_QUESTS = [
@@ -41,10 +42,10 @@ def generate_seed(user_profile: dict, today: str):
 
 def generate_daily_quests(user_profile: dict):
     email = user_profile.get("email", "anon")
-    plan = (user_profile.get("plan") or "FREE").upper()
+    plan = normalize_plan(user_profile.get("plan"))
 
     today = date.today().isoformat()
-    cache_key = f"quests:{email}:{today}"
+    cache_key = f"quests:{email}:{plan}:{today}"
 
     cached = get_cache(cache_key)
     if cached:
@@ -54,7 +55,7 @@ def generate_daily_quests(user_profile: dict):
     rng = random.Random(seed)
     quests = rng.sample(DAILY_QUESTS, 3)
 
-    if plan in ["SILVER", "GOLD", "ELITE", "LIBERTY", "LEGACY"]:
+    if plan_allows(plan, "GOLD"):
         quests.append({
             "id": 100,
             "type": "analysis",
@@ -62,7 +63,7 @@ def generate_daily_quests(user_profile: dict):
             "xp": 15,
         })
 
-    if plan in ["GOLD", "ELITE", "LIBERTY", "LEGACY"]:
+    if plan_allows(plan, "GOLD"):
         quests.append({
             "id": 101,
             "type": "optimization",
@@ -70,7 +71,7 @@ def generate_daily_quests(user_profile: dict):
             "xp": 25,
         })
 
-    if plan in ["ELITE", "LIBERTY", "LEGACY"]:
+    if plan_allows(plan, "ELITE"):
         quests.append({
             "id": 102,
             "type": "strategy",
@@ -78,7 +79,7 @@ def generate_daily_quests(user_profile: dict):
             "xp": 40,
         })
 
-    if plan == "LIBERTY":
+    if plan_allows(plan, "LIBERTY") and not plan_allows(plan, "LEGACY"):
         quests.append({
             "id": 999,
             "type": "freedom",
@@ -86,7 +87,7 @@ def generate_daily_quests(user_profile: dict):
             "xp": 60,
         })
 
-    if plan == "LEGACY":
+    if plan_allows(plan, "LEGACY"):
         quests.append({
             "id": 1000,
             "type": "legacy",

@@ -3,14 +3,13 @@
 # =========================
 
 import random
+from product.entitlements import plan_allows
 
 
 def compute_reward_bonus(streak: int, plan: str, daily_actions: int = 0):
 
     bonus = 0
     reason = []
-
-    plan = (plan or "FREE").upper()
 
     # =========================
     # DAILY CAP PROTECTION (ANTI FARM)
@@ -48,11 +47,15 @@ def compute_reward_bonus(streak: int, plan: str, daily_actions: int = 0):
     # =========================
     # PLAN MULTIPLIER (SAFE SCALING)
     # =========================
-    if plan == "LIBERTY":
+    if plan_allows(plan, "LEGACY"):
+        bonus += 12
+        reason.append("legacy_prestige")
+
+    elif plan_allows(plan, "LIBERTY"):
         bonus += 15
         reason.append("liberty_multiplier")
 
-    elif plan == "ELITE":
+    elif plan_allows(plan, "ELITE"):
         bonus += 10
         reason.append("elite_multiplier")
 
