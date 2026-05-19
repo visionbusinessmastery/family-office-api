@@ -107,13 +107,13 @@ def build_upgrade(score: float, level):
         return {
             "recommended_plan": "elite",
             "title": "Passer au plan Elite - Wealth OS",
-            "description": "Ton niveau justifie multi-user, gouvernance, IA premium et consolidation patrimoniale.",
+            "description": "Ton niveau justifie multi-user, gouvernance, guidance premium et consolidation patrimoniale.",
         }
 
     return {
         "recommended_plan": "gold",
         "title": "Debloquer Gold - Growth",
-        "description": "Acceder au portefeuille avance, immobilier, analytics, opportunites et recommandations IA.",
+        "description": "Acceder au portefeuille avance, immobilier, analytics, opportunites et recommandations Ethan.",
     }
 
 

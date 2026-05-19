@@ -123,7 +123,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                     count=int(row.count or 0),
                     analysis=(
                         f"Cette poche represente {round(float(row.total or 0), 2)} EUR. "
-                        "L'IA doit surtout surveiller concentration, volatilite et liquidite."
+                        "Ethan surveille surtout concentration, volatilite et liquidite."
                     ),
                     quick_action=quick_action,
                     opportunity=first_opportunity(engine_items),
@@ -148,7 +148,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                 count=int(real_estate_rows.count or 0),
                 analysis=(
                     f"Plus-value latente estimee: {round(gain, 2)} EUR. "
-                    "L'IA doit comparer rendement, liquidite et potentiel de revente."
+                    "Ethan compare rendement, liquidite et potentiel de revente."
                 ),
                 quick_action="Mettre a jour la valeur estimee avec un prix de marche recent.",
                 opportunity=first_opportunity(get_real_estate_opportunities(profile)),
@@ -172,7 +172,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                 count=int(row.count or 0),
                 analysis=(
                     f"Taux moyen renseigne: {round(float(row.rate or 0), 2)}%. "
-                    "L'IA doit arbitrer rendement attendu, duree de blocage et risque de defaut."
+                    "Ethan arbitre rendement attendu, duree de blocage et risque de defaut."
                 ),
                 quick_action="Verifier les garanties, la duree et la part maximale par dossier.",
                 opportunity=first_opportunity(
@@ -207,7 +207,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                 count=int(row.count or 0),
                 analysis=(
                     f"Resultat cumule: {round(float(row.result or 0), 2)} EUR. "
-                    "L'IA doit prioriser marge, dette, levee et valorisation."
+                    "Ethan priorise marge, dette, levee et valorisation."
                 ),
                 quick_action="Identifier une action qui augmente le resultat dans les 30 prochains jours.",
                 opportunity=first_opportunity(engines.get(asset_type, get_business_opportunities)(profile)),

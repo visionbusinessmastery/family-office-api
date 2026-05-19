@@ -25,6 +25,8 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
         usage = {}
 
     plan = (profile.get("plan") or "FREE").upper()
+    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3}
+    level = plan_rank.get(plan, 0)
 
     score = float(score_data.get("score") or 0)
 
@@ -41,16 +43,20 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     # =========================
     # 1. PLAN-BASED FEATURES
     # =========================
-    if plan in ["SILVER", "GOLD", "ELITE"]:
+    if level >= 0:
         features.add("portfolio_basic")
 
-    if plan in ["GOLD", "ELITE"]:
+    if level >= 1:
         features.add("portfolio_advanced")
         features.add("investment_tracking")
 
-    if plan == "ELITE":
-        features.add("ai_full_access")
+    if level >= 2:
+        features.add("ethan_full_access")
         features.add("priority_support")
+
+    if level >= 3:
+        features.add("unlock_all")
+        features.add("sovereign_wealth")
 
     # =========================
     # 2. SCORE-BASED FEATURES
@@ -59,7 +65,7 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
         features.add("smart_recommendations")
 
     if score >= 70:
-        features.add("ai_opportunities")
+        features.add("ethan_opportunities")
 
     if score >= 85:
         features.add("elite_insights")

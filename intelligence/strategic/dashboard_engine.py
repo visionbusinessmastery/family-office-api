@@ -13,6 +13,8 @@ def build_dashboard(user, intelligence):
         intelligence = {}
 
     plan = (user.get("plan") or "FREE").upper()
+    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3}
+    level_rank = plan_rank.get(plan, 0)
 
     score_data = intelligence.get("score")
 
@@ -31,88 +33,91 @@ def build_dashboard(user, intelligence):
         "level": level,
         "score": score,
         "features": [],
-        "ai_blocks": [],
+        "ethan_blocks": [],
         "locked_blocks": [],
         "mode": "STANDARD"
     }
 
-    if plan == "FREE":
+    if level_rank >= 0:
         dashboard["features"] = ["basic_portfolio", "education_content"]
+
+    if level_rank == 0:
         dashboard["locked_blocks"] = [
-            "ai_analysis",
+            "ethan_analysis",
             "advanced_portfolio",
             "wealth_optimizer",
-            "ai_advisor"
+            "ethan_advisor"
         ]
 
-    elif plan == "SILVER":
-        dashboard["features"] = [
+    if plan == "SILVER":
+        dashboard["features"] += [
             "portfolio_view",
             "basic_insights",
             "market_overview"
         ]
 
-    elif plan == "GOLD":
-        dashboard["features"] = [
+    if level_rank >= 1:
+        dashboard["features"] += [
             "full_portfolio",
             "market_insights",
-            "ai_recommendations"
+            "ethan_recommendations"
         ]
-        dashboard["ai_blocks"] = [
-            "market_ai",
+        dashboard["ethan_blocks"] += [
+            "market_signals",
             "recommendation_engine"
         ]
 
-    elif plan == "ELITE":
-        dashboard["features"] = [
-            "full_ai_suite",
+    if level_rank >= 2:
+        dashboard["features"] += [
+            "full_ethan_suite",
             "private_deals_access",
             "family_office_mode"
         ]
-        dashboard["ai_blocks"] = [
+        dashboard["ethan_blocks"] += [
             "predictive_engine",
-            "elite_ai_coach",
-            "family_office_ai"
+            "elite_guidance",
+            "family_office_guidance"
         ]
 
-    elif plan == "LIBERTY":
-        dashboard["features"] = [
+    if level_rank >= 3:
+        dashboard["features"] += [
             "wealth_os",
             "autopilot_engine",
             "private_deals",
-            "full_ai_coach",
+            "full_ethan_guidance",
             "family_office_mode"
         ]
-        dashboard["ai_blocks"] = [
-            "liberty_ai_coach",
+        dashboard["ethan_blocks"] += [
+            "liberty_guidance",
             "autonomous_portfolio_engine",
             "wealth_prediction_engine",
-            "family_office_ai"
+            "family_office_guidance"
         ]
 
         dashboard["mode"] = "LIBERTY_OPERATING_SYSTEM"
         dashboard["unlock_all"] = True
+        dashboard["locked_blocks"] = []
 
     if score >= 50:
-        dashboard["ai_blocks"].append("smart_insights")
+        dashboard["ethan_blocks"].append("smart_insights")
 
     if score >= 70:
-        dashboard["ai_blocks"].append("opportunity_engine")
+        dashboard["ethan_blocks"].append("opportunity_engine")
 
     if score >= 1000:
-        dashboard["ai_blocks"].append("xp_engine_boost")
+        dashboard["ethan_blocks"].append("xp_engine_boost")
 
     if score >= 3000:
-        dashboard["ai_blocks"].append("advanced_ai_coach")
+        dashboard["ethan_blocks"].append("advanced_guidance")
 
     if score >= 7000:
-        dashboard["ai_blocks"].append("elite_mode")
+        dashboard["ethan_blocks"].append("elite_mode")
 
     if score >= 15000:
-        dashboard["ai_blocks"].append("liberty_overdrive")
+        dashboard["ethan_blocks"].append("liberty_overdrive")
 
     dashboard["features"] = list(set(dashboard["features"]))
-    dashboard["ai_blocks"] = list(set(dashboard["ai_blocks"]))
+    dashboard["ethan_blocks"] = list(set(dashboard["ethan_blocks"]))
     dashboard["locked_blocks"] = list(set(dashboard["locked_blocks"]))
 
     return dashboard

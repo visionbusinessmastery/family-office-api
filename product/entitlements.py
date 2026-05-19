@@ -351,4 +351,6 @@ def build_entitlements(plan: str):
 
 
 def can_access_module(plan: str, score: int, module: dict) -> bool:
+    if normalize_plan(plan) == "LIBERTY":
+        return True
     return plan_allows(plan, module["min_plan"]) and score >= int(module.get("min_score", 0))
