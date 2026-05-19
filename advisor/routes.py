@@ -2,13 +2,18 @@
 # ADVISOR ROUTES V4 CLEAN
 # =========================
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import text
+
+from auth.utils import get_current_user
 from core.utils import safe_execute
 from core.limiter import limiter
+from database import engine
 
 from .schemas import AdvisorRequest
 
 from .service import (
+    ensure_ethan_ai_tables,
     get_advisor_free,
     portfolio_autopilot,
     portfolio_manager,
@@ -17,9 +22,6 @@ from .service import (
 router = APIRouter()
 
 
-# =========================
-# 1. CHAT ADVISOR (IA CONSEIL)
-# =========================
 @router.post("/")
 @router.post("/advisor")
 @limiter.limit("10/minute")
@@ -33,7 +35,6 @@ def advisor(request: Request, data: AdvisorRequest):
         return {
             "user": user_email,
             "system": "ADVISOR_CHAT_V4",
-            "tier": "free",
             "input": data.message,
             "result": result
         }
@@ -84,3 +85,100 @@ def advisor_autopilot(request: Request, data: AdvisorRequest):
         }
 
     return safe_execute(_run, module_name="AUTOPILOT_ENGINE")
+
+
+@router.get("/usage")
+def advisor_usage(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_ethan_ai_tables(conn)
+        user = conn.execute(text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        rows = conn.execute(text("""
+            SELECT
+                plan,
+                tier,
+                model,
+                COUNT(*) AS requests,
+                COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd,
+                COALESCE(SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END), 0) AS cache_hits
+            FROM ethan_usage_events
+            WHERE user_id = :user_id
+              AND created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY plan, tier, model
+            ORDER BY estimated_cost_usd DESC
+        """), {"user_id": user.id}).fetchall()
+
+    return {
+        "window_days": 30,
+        "usage": [
+            {
+                "plan": row.plan,
+                "tier": row.tier,
+                "model": row.model,
+                "requests": int(row.requests or 0),
+                "input_tokens": int(row.input_tokens or 0),
+                "output_tokens": int(row.output_tokens or 0),
+                "estimated_cost_usd": float(row.estimated_cost_usd or 0),
+                "cache_hit_ratio": (
+                    round(float(row.cache_hits or 0) / float(row.requests or 1), 3)
+                ),
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.get("/admin/usage")
+def advisor_admin_usage(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_ethan_ai_tables(conn)
+        requester = conn.execute(text("""
+            SELECT plan
+            FROM users
+            WHERE email = :email
+        """), {"email": email}).fetchone()
+
+        if not requester or str(requester.plan or "").upper() not in ["LEGACY", "LIBERTY"]:
+            raise HTTPException(status_code=403, detail="Admin usage unavailable")
+
+        rows = conn.execute(text("""
+            SELECT
+                plan,
+                model,
+                COUNT(*) AS requests,
+                COUNT(DISTINCT user_id) AS users,
+                COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd,
+                COALESCE(SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END), 0) AS cache_hits
+            FROM ethan_usage_events
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY plan, model
+            ORDER BY estimated_cost_usd DESC
+        """)).fetchall()
+
+    return {
+        "window_days": 30,
+        "plans": [
+            {
+                "plan": row.plan,
+                "model": row.model,
+                "requests": int(row.requests or 0),
+                "users": int(row.users or 0),
+                "input_tokens": int(row.input_tokens or 0),
+                "output_tokens": int(row.output_tokens or 0),
+                "estimated_cost_usd": float(row.estimated_cost_usd or 0),
+                "cache_hit_ratio": round(float(row.cache_hits or 0) / float(row.requests or 1), 3),
+            }
+            for row in rows
+        ],
+    }

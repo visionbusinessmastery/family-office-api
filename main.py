@@ -15,6 +15,7 @@ from auth.utils import decode_token
 # =========================
 from auth.routes import router as auth_router
 from advisor.routes import router as advisor_router
+from advisor.service import ensure_ethan_ai_tables
 from billing.routes import router as billing_router, ensure_billing_tables
 from product.routes import router as product_router, ensure_product_tables
 from profile.routes import router as profile_router, ensure_profile_tables
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI):
         ensure_profile_tables(conn)
         ensure_referral_tables(conn)
         ensure_legacy_tables(conn)
+        ensure_ethan_ai_tables(conn)
     logging.info("DB INIT OK")
     yield
 
