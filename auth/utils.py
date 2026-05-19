@@ -105,11 +105,14 @@ def build_unlocks(plan: str, level: str):
     if plan_allows(normalized_plan, "GOLD"):
         base.append("analytics")
 
-    if normalized_level in ["ADVANCED", "ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR"]:
+    if normalized_level in ["ADVANCED", "ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR", "LIBERTY", "LEGACY", "DYNASTY ARCHITECT"]:
         base.append("guided_insights")
 
-    if normalized_level in ["ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR"]:
-        base.append("family_office_ai")
+    if normalized_level in ["ELITE", "ELITE INVESTOR", "FAMILY OFFICE OPERATOR", "LIBERTY", "LEGACY", "DYNASTY ARCHITECT"]:
+        base.append("family_office_guidance")
+
+    if plan_allows(normalized_plan, "LEGACY"):
+        base.extend(["family_vault", "heirs_mode", "dynasty_office"])
 
     return base
 

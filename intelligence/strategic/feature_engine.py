@@ -25,7 +25,7 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
         usage = {}
 
     plan = (profile.get("plan") or "FREE").upper()
-    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3}
+    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3, "LEGACY": 4}
     level = plan_rank.get(plan, 0)
 
     score = float(score_data.get("score") or 0)
@@ -57,6 +57,13 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     if level >= 3:
         features.add("unlock_all")
         features.add("sovereign_wealth")
+
+    if level >= 4:
+        features.add("family_vault")
+        features.add("heirs_mode")
+        features.add("dynasty_features")
+        features.add("legacy_dashboard")
+        features.add("asset_protection")
 
     # =========================
     # 2. SCORE-BASED FEATURES

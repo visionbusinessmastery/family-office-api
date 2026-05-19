@@ -103,7 +103,21 @@ def build_gamification_actions(score: float, level):
 def build_upgrade(score: float, level):
     level_text = str(level or "").upper()
 
-    if score >= 70 or level_text in ["ADVANCED", "ELITE", "LIBERTY", "LEGACY"]:
+    if level_text in ["LEGACY", "DYNASTY ARCHITECT"]:
+        return {
+            "recommended_plan": "legacy",
+            "title": "Legacy - Dynasty Office",
+            "description": "Construire est difficile. Preserver l'est encore plus.",
+        }
+
+    if level_text in ["LIBERTY"] or score >= 85:
+        return {
+            "recommended_plan": "liberty",
+            "title": "Liberty - Financial Freedom",
+            "description": "Le vrai luxe est la stabilite. Ethan peut t'aider a structurer une liberte plus durable.",
+        }
+
+    if score >= 70 or level_text in ["ADVANCED", "ELITE"]:
         return {
             "recommended_plan": "elite",
             "title": "Passer au plan Elite - Wealth OS",

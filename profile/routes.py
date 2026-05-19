@@ -28,12 +28,24 @@ def ensure_profile_tables(conn):
             risk_level TEXT,
             main_currency TEXT DEFAULT 'EUR',
             motivation TEXT,
+            has_children BOOLEAN DEFAULT FALSE,
+            transmission_goal TEXT,
+            expatriation_interest TEXT,
+            governance_need TEXT,
+            confidentiality_need TEXT,
+            family_strategy TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         )
     """))
 
     conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS bio TEXT"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS has_children BOOLEAN DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS transmission_goal TEXT"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS expatriation_interest TEXT"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS governance_need TEXT"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS confidentiality_need TEXT"))
+    conn.execute(text("ALTER TABLE user_wealth_profiles ADD COLUMN IF NOT EXISTS family_strategy TEXT"))
 
     _profile_schema_ready = True
 
@@ -50,6 +62,12 @@ def row_to_profile(row):
             "risk_level": None,
             "main_currency": "EUR",
             "motivation": None,
+            "has_children": False,
+            "transmission_goal": None,
+            "expatriation_interest": None,
+            "governance_need": None,
+            "confidentiality_need": None,
+            "family_strategy": None,
         }
 
     goals = [item for item in (row.goals or "").split("|") if item]
@@ -64,6 +82,12 @@ def row_to_profile(row):
         "risk_level": row.risk_level,
         "main_currency": row.main_currency or "EUR",
         "motivation": row.motivation,
+        "has_children": bool(row.has_children),
+        "transmission_goal": row.transmission_goal,
+        "expatriation_interest": row.expatriation_interest,
+        "governance_need": row.governance_need,
+        "confidentiality_need": row.confidentiality_need,
+        "family_strategy": row.family_strategy,
     }
 
 
@@ -78,7 +102,9 @@ def get_profile(email: str = Depends(get_current_user)):
 
         row = conn.execute(text("""
             SELECT first_name, bio, avatar_url, goals, horizon, investor_profile,
-                   risk_level, main_currency, motivation
+                   risk_level, main_currency, motivation, has_children,
+                   transmission_goal, expatriation_interest, governance_need,
+                   confidentiality_need, family_strategy
             FROM user_wealth_profiles
             WHERE user_id = :user_id
         """), {"user_id": user_id}).fetchone()
@@ -105,11 +131,15 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
         conn.execute(text("""
             INSERT INTO user_wealth_profiles (
                 user_id, first_name, bio, avatar_url, goals, horizon,
-                investor_profile, risk_level, main_currency, motivation, updated_at
+                investor_profile, risk_level, main_currency, motivation,
+                has_children, transmission_goal, expatriation_interest,
+                governance_need, confidentiality_need, family_strategy, updated_at
             )
             VALUES (
                 :user_id, :first_name, :bio, :avatar_url, :goals, :horizon,
-                :investor_profile, :risk_level, :main_currency, :motivation, NOW()
+                :investor_profile, :risk_level, :main_currency, :motivation,
+                :has_children, :transmission_goal, :expatriation_interest,
+                :governance_need, :confidentiality_need, :family_strategy, NOW()
             )
             ON CONFLICT (user_id)
             DO UPDATE SET
@@ -122,6 +152,12 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
                 risk_level = EXCLUDED.risk_level,
                 main_currency = EXCLUDED.main_currency,
                 motivation = EXCLUDED.motivation,
+                has_children = EXCLUDED.has_children,
+                transmission_goal = EXCLUDED.transmission_goal,
+                expatriation_interest = EXCLUDED.expatriation_interest,
+                governance_need = EXCLUDED.governance_need,
+                confidentiality_need = EXCLUDED.confidentiality_need,
+                family_strategy = EXCLUDED.family_strategy,
                 updated_at = NOW()
         """), {
             "user_id": user_id,
@@ -134,6 +170,12 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
             "risk_level": data.get("risk_level"),
             "main_currency": data.get("main_currency") or "EUR",
             "motivation": data.get("motivation"),
+            "has_children": bool(data.get("has_children")),
+            "transmission_goal": data.get("transmission_goal"),
+            "expatriation_interest": data.get("expatriation_interest"),
+            "governance_need": data.get("governance_need"),
+            "confidentiality_need": data.get("confidentiality_need"),
+            "family_strategy": data.get("family_strategy"),
         })
 
     return {"status": "ok"}

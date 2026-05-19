@@ -13,7 +13,7 @@ def build_dashboard(user, intelligence):
         intelligence = {}
 
     plan = (user.get("plan") or "FREE").upper()
-    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3}
+    plan_rank = {"FREE": 0, "SILVER": 0, "GOLD": 1, "ELITE": 2, "LIBERTY": 3, "LEGACY": 4}
     level_rank = plan_rank.get(plan, 0)
 
     score_data = intelligence.get("score")
@@ -95,6 +95,26 @@ def build_dashboard(user, intelligence):
         ]
 
         dashboard["mode"] = "LIBERTY_OPERATING_SYSTEM"
+        dashboard["unlock_all"] = True
+        dashboard["locked_blocks"] = []
+
+    if level_rank >= 4:
+        dashboard["features"] += [
+            "family_vault",
+            "heirs_mode",
+            "protection_layer",
+            "global_strategy",
+            "legacy_timeline",
+            "dynasty_office"
+        ]
+        dashboard["ethan_blocks"] += [
+            "legacy_guardian",
+            "dynasty_stability",
+            "succession_readiness",
+            "family_governance_index",
+            "asset_protection_index"
+        ]
+        dashboard["mode"] = "DYNASTY_OFFICE"
         dashboard["unlock_all"] = True
         dashboard["locked_blocks"] = []
 

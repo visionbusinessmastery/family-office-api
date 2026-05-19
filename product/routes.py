@@ -96,6 +96,10 @@ def get_score(email: str) -> int:
 
 
 def compute_level(score: int, xp: int):
+    if score >= 95 or xp >= 9000:
+        return "Dynasty Architect"
+    if score >= 88 or xp >= 6500:
+        return "Legacy Builder"
     if score >= 85 or xp >= 5000:
         return "Family Office Operator"
     if score >= 75 or xp >= 3000:
@@ -110,6 +114,8 @@ def compute_level(score: int, xp: int):
 
 
 def compute_status(score: int, plan: str):
+    if normalize_plan(plan) == "LEGACY":
+        return "Dynasty Office"
     if normalize_plan(plan) == "LIBERTY":
         return "Sovereign Wealth"
     if normalize_plan(plan) == "ELITE":
@@ -273,7 +279,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "gold",
         })
 
-    if score >= 70 and not normalize_plan(plan) in ["ELITE", "LIBERTY"]:
+    if score >= 70 and not normalize_plan(plan) in ["ELITE", "LIBERTY", "LEGACY"]:
         missions.append({
             "key": "unlock_wealth_os",
             "title": "Passer en pilotage Wealth OS",
@@ -283,7 +289,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "elite",
         })
 
-    if score >= 85 and normalize_plan(plan) != "LIBERTY":
+    if score >= 85 and not normalize_plan(plan) in ["LIBERTY", "LEGACY"]:
         missions.append({
             "key": "unlock_liberty",
             "title": "Debloquer Liberty",
@@ -291,6 +297,16 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "xp": 0,
             "module": "billing",
             "recommended_plan": "liberty",
+        })
+
+    if score >= 92 and normalize_plan(plan) != "LEGACY":
+        missions.append({
+            "key": "unlock_legacy",
+            "title": "Preparer Legacy",
+            "description": "Le vrai luxe est la stabilite: transmission, gouvernance et protection familiale.",
+            "xp": 0,
+            "module": "billing",
+            "recommended_plan": "legacy",
         })
 
     return missions[:3]
@@ -304,13 +320,27 @@ def product_context(email: str = Depends(get_current_user)):
         if not user_id:
             raise HTTPException(status_code=404, detail="User not found")
 
-        user = conn.execute(text("""
-            SELECT plan
+        plan_row = conn.execute(text("""
+            SELECT
+                users.plan AS user_plan,
+                subscriptions.plan AS subscription_plan,
+                subscriptions.status AS subscription_status
             FROM users
-            WHERE id = :user_id
+            LEFT JOIN subscriptions ON subscriptions.user_id = users.id
+            WHERE users.id = :user_id
         """), {"user_id": user_id}).fetchone()
 
-        plan = normalize_plan(user.plan if user else "FREE")
+        subscription_active = plan_row and plan_row.subscription_status in [
+            "active",
+            "trialing",
+            "past_due",
+        ]
+        raw_plan = (
+            plan_row.subscription_plan
+            if subscription_active and plan_row.subscription_plan
+            else plan_row.user_plan if plan_row else "FREE"
+        )
+        plan = normalize_plan(raw_plan)
         score = get_score(email)
         entitlements = build_entitlements(plan)
         data_profile = build_data_profile(conn, user_id)

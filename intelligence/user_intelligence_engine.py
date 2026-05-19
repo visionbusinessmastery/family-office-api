@@ -51,8 +51,12 @@ def set_cache(key, value, ttl=300):
 # LEVEL ENGINE
 # =========================
 def compute_level(score: int, plan: str = "FREE"):
+    if (plan or "").upper() in ["LEGACY", "HERITAGE", "DYNASTY_OFFICE"]:
+        return "LEGACY"
     if (plan or "").upper() == "LIBERTY":
         return "LIBERTY"
+    if score >= 95:
+        return "DYNASTY ARCHITECT"
     if score >= 85:
         return "ELITE"
     if score >= 70:

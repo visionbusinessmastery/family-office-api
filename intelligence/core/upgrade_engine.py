@@ -11,7 +11,8 @@ PLAN_HIERARCHY = {
     "SILVER": 1,
     "GOLD": 2,
     "ELITE": 3,
-    "LIBERTY": 4
+    "LIBERTY": 4,
+    "LEGACY": 5
 }
 
 # =========================
@@ -20,6 +21,9 @@ PLAN_HIERARCHY = {
 def get_plan_from_score(score: int):
 
     # 🔥 LIBERTY MODE (END GAME)
+    if score >= 22000:
+        return "LEGACY"
+
     if score >= 15000:
         return "LIBERTY"
 

@@ -5,13 +5,17 @@ PLAN_ORDER = {
     "PLATINUM": 3,
     "ELITE": 4,
     "LIBERTY": 5,
+    "LEGACY": 6,
 }
 
 PLAN_ALIASES = {
     "FOUNDATION": "FREE",
     "GROWTH": "GOLD",
     "WEALTH_OS": "ELITE",
-    "LIBERTY_LEGACY": "ELITE",
+    "LIBERTY_LEGACY": "LIBERTY",
+    "HERITAGE": "LEGACY",
+    "DYNASTY": "LEGACY",
+    "DYNASTY_OFFICE": "LEGACY",
 }
 
 PLAN_COPY = {
@@ -44,6 +48,11 @@ PLAN_COPY = {
         "name": "Sovereign Wealth",
         "price": "sur mesure",
         "promise": "Tu preserves, multiplies et transmets ta liberte patrimoniale.",
+    },
+    "LEGACY": {
+        "name": "Dynasty Office",
+        "price": "sur mesure",
+        "promise": "Tu construis une architecture patrimoniale qui peut te survivre.",
     },
 }
 
@@ -214,6 +223,52 @@ PLAN_ENTITLEMENTS = {
             "forex_advanced_analytics",
         ],
     },
+    "LEGACY": {
+        "max_assets": None,
+        "ai_level": "dynasty",
+        "modules": [
+            "foundation",
+            "finance",
+            "portfolio",
+            "diversification",
+            "real_estate",
+            "yield_assets",
+            "venture_assets",
+            "analytics",
+            "command_center",
+            "opportunities",
+            "advanced_guidance",
+            "multi_user",
+            "bank_sync",
+            "governance",
+            "imports",
+            "automation",
+            "family_vault",
+            "heirs_mode",
+            "protection_layer",
+            "global_strategy",
+            "legacy_timeline",
+            "gamification",
+        ],
+        "features": [
+            "multi_user",
+            "companies",
+            "wealth_consolidation",
+            "banking_apis",
+            "live_sync",
+            "dynasty_guidance",
+            "advanced_allocations",
+            "governance",
+            "automatic_imports",
+            "wealth_architecture",
+            "family_vault",
+            "heirs_mode",
+            "asset_protection",
+            "global_strategy",
+            "legacy_timeline",
+            "forex_advanced_analytics",
+        ],
+    },
 }
 
 MODULE_REGISTRY = [
@@ -323,11 +378,51 @@ MODULE_REGISTRY = [
     },
     {
         "key": "legacy_planning",
-        "label": "Sovereign Wealth",
+        "label": "Legacy Planning",
         "stage": 8,
         "min_plan": "LIBERTY",
         "min_score": 85,
         "description": "Gouvernance avancee, transmission et architecture patrimoniale.",
+    },
+    {
+        "key": "family_vault",
+        "label": "Family Vault",
+        "stage": 9,
+        "min_plan": "LEGACY",
+        "min_score": 0,
+        "description": "Coffre-fort familial, documents, succession et notes privees.",
+    },
+    {
+        "key": "heirs_mode",
+        "label": "Heirs Mode",
+        "stage": 9,
+        "min_plan": "LEGACY",
+        "min_score": 0,
+        "description": "Preparation des heritiers, education financiere et Ethan Junior.",
+    },
+    {
+        "key": "protection_layer",
+        "label": "Protection Layer",
+        "stage": 9,
+        "min_plan": "LEGACY",
+        "min_score": 0,
+        "description": "Vulnerabilite, concentration, inflation lifestyle et protection patrimoniale.",
+    },
+    {
+        "key": "global_strategy",
+        "label": "Global Strategy",
+        "stage": 9,
+        "min_plan": "LEGACY",
+        "min_score": 0,
+        "description": "Diversification geographique, residence fiscale et strategie internationale.",
+    },
+    {
+        "key": "legacy_timeline",
+        "label": "Legacy Timeline",
+        "stage": 9,
+        "min_plan": "LEGACY",
+        "min_score": 0,
+        "description": "Projection 10 ans, 20 ans et vision generationnelle.",
     },
 ]
 
@@ -351,6 +446,13 @@ def build_entitlements(plan: str):
 
 
 def can_access_module(plan: str, score: int, module: dict) -> bool:
-    if normalize_plan(plan) == "LIBERTY":
+    normalized = normalize_plan(plan)
+    required = normalize_plan(module["min_plan"])
+
+    if normalized == "LEGACY":
         return True
-    return plan_allows(plan, module["min_plan"]) and score >= int(module.get("min_score", 0))
+
+    if normalized == "LIBERTY" and required != "LEGACY":
+        return plan_allows(normalized, required)
+
+    return plan_allows(normalized, required) and score >= int(module.get("min_score", 0))

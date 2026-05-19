@@ -20,6 +20,7 @@ from product.routes import router as product_router, ensure_product_tables
 from profile.routes import router as profile_router, ensure_profile_tables
 from referrals.routes import router as referrals_router, ensure_referral_tables
 from workspaces.routes import router as workspaces_router, ensure_workspace_tables
+from legacy.routes import router as legacy_router, ensure_legacy_tables
 
 from intelligence.routes import router as intelligence_router
 from intelligence.category_opportunities import router as category_opportunities_router
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
         ensure_billing_tables(conn)
         ensure_profile_tables(conn)
         ensure_referral_tables(conn)
+        ensure_legacy_tables(conn)
     logging.info("DB INIT OK")
     yield
 
@@ -83,7 +85,7 @@ async def lifespan(app: FastAPI):
 # APP INIT (SINGLE SOURCE OF TRUTH)
 # =========================
 app = FastAPI(
-    title="AI Family Office V4",
+    title="WHITE ROCK Wealth OS",
     version="4.0.0",
     lifespan=lifespan
 )
@@ -165,6 +167,7 @@ app.include_router(product_router, prefix="/product", tags=["Product"])
 app.include_router(profile_router, prefix="/profile", tags=["Profile"])
 app.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
 app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
+app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
 app.include_router(category_opportunities_router, prefix="/intelligence", tags=["Opportunities"])
@@ -194,7 +197,7 @@ logging.info("ROUTERS OK")
 @app.get("/")
 def root():
     return {
-        "status": "AI FAMILY OFFICE V4 ONLINE",
+        "status": "WHITE ROCK WEALTH OS ONLINE",
         "architecture": "clean_v4"
     }
 
@@ -211,15 +214,16 @@ def health():
             "portfolio",
             "real_estate",
             "stocks",
-            "global_ai",
-            "gamification"
+            "global_command_center",
+            "gamification",
+            "legacy"
         ]
     }
 
 @app.get("/info")
 def info():
     return {
-        "app": "Family Office AI",
+        "app": "WHITE ROCK Wealth OS",
         "version": "4.0",
         "status": "production_ready"
     }

@@ -32,9 +32,14 @@ PLANS = {
         "description": "Family Office OS, multi-user, gouvernance, guidance premium et consolidation.",
     },
     "liberty": {
-        "name": "Liberty - Sovereign Wealth",
+        "name": "Liberty - Financial Freedom",
         "price_env": "STRIPE_PRICE_LIBERTY",
-        "description": "Niveau ultime WHITE ROCK : autonomie patrimoniale, gouvernance avancee, optimisation globale et acces souverain.",
+        "description": "Liberte financiere, ecosysteme Wealth OS complet, guidance premium et pilotage avance.",
+    },
+    "legacy": {
+        "name": "Legacy - Dynasty Office",
+        "price_env": "STRIPE_PRICE_LEGACY",
+        "description": "Transmission, gouvernance familiale, protection patrimoniale et strategie multi-generationnelle.",
     },
 }
 
