@@ -4,7 +4,7 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import text
 
 from database import engine
@@ -17,7 +17,11 @@ from auth.utils import (
 )
 from auth.email_service import send_verification_email
 from core.cache import delete_cache_keys, delete_cache_patterns
+from core.limiter import limiter
 from product.entitlements import normalize_plan, resolve_effective_plan
+from privacy.routes import record_consents
+from security.abuse_engine import assert_ip_rate_limit
+from security.audit import ensure_security_tables, log_security_event
 
 router = APIRouter()
 
@@ -39,12 +43,16 @@ def invalidate_user_intelligence_caches(email: str):
 # REGISTER
 # =========================
 @router.post("/register")
-def register(data: UserAuth):
+@limiter.limit("3/hour")
+def register(data: UserAuth, request: Request):
 
     email = data.email.lower()
+    consents = data.model_dump(exclude={"email"}, exclude_none=True)
 
     try:
         with engine.begin() as conn:
+            ensure_security_tables(conn)
+            assert_ip_rate_limit(conn, "auth_register", 3, "hour", request)
 
             existing = conn.execute(text("""
                 SELECT id, is_verified FROM users WHERE email = :email
@@ -53,6 +61,7 @@ def register(data: UserAuth):
             if existing:
 
                 if existing.is_verified:
+                    log_security_event(conn, "register_existing_verified", request, email=email)
                     return {
                         "status": "success",
                         "action": "login"
@@ -70,8 +79,15 @@ def register(data: UserAuth):
                 """), {"email": email, "token": token})
 
                 send_verification_email(email, token)
+                log_security_event(conn, "register_verification_resent", request, email=email)
 
                 return {"status": "success", "action": "resend_verification"}
+
+            if not data.terms_accepted or not data.privacy_policy_accepted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Les CGU et la politique de confidentialite doivent etre acceptees pour creer un compte.",
+                )
 
             result = conn.execute(text("""
                 INSERT INTO users (email, is_verified, verification_attempts, profile_completed)
@@ -80,6 +96,8 @@ def register(data: UserAuth):
             """), {"email": email})
 
             user_id = result.fetchone()[0]
+            record_consents(conn, user_id, consents, request)
+            log_security_event(conn, "register_created", request, email=email, user_id=user_id)
 
             token = secrets.token_urlsafe(32)
 
@@ -100,6 +118,8 @@ def register(data: UserAuth):
             "user_id": user_id
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -108,9 +128,12 @@ def register(data: UserAuth):
 # VERIFY EMAIL
 # =========================
 @router.get("/verify-email")
-def verify_email(token: str):
+@limiter.limit("10/hour")
+def verify_email(request: Request, token: str):
 
     with engine.begin() as conn:
+        ensure_security_tables(conn)
+        assert_ip_rate_limit(conn, "auth_verify_email", 10, "hour", request)
 
         record = conn.execute(text("""
             SELECT email FROM email_verifications
@@ -120,6 +143,7 @@ def verify_email(token: str):
         """), {"token": token}).fetchone()
 
         if not record:
+            log_security_event(conn, "verify_email_failed", request, severity="warning")
             raise HTTPException(status_code=400, detail="Token invalide")
 
         email = record.email
@@ -134,6 +158,7 @@ def verify_email(token: str):
                 profile_completed = FALSE
             WHERE email = :email
         """), {"email": email})
+        log_security_event(conn, "verify_email_success", request, email=email)
 
     return {"email": email}
 
@@ -222,26 +247,34 @@ def get_me(email: str = Depends(get_current_user)):
 # LOGIN
 # =========================
 @router.post("/login")
-def login(data: LoginRequest):
+@limiter.limit("5/minute")
+def login(data: LoginRequest, request: Request):
 
     email = data.email.lower()
 
     with engine.begin() as conn:
+        ensure_security_tables(conn)
+        assert_ip_rate_limit(conn, "auth_login", 5, "minute", request)
 
         user = conn.execute(text("""
             SELECT password_hash FROM users WHERE email = :email
         """), {"email": email}).fetchone()
 
         if not user:
-            raise HTTPException(status_code=400, detail="Utilisateur introuvable")
+            log_security_event(conn, "login_failed", request, email=email, severity="warning")
+            raise HTTPException(status_code=400, detail="Identifiants incorrects")
 
         if user.password_hash is None:
+            log_security_event(conn, "login_set_password_required", request, email=email)
             return {"action": "set_password_required"}
 
         if not verify_password(data.password, user.password_hash):
-            raise HTTPException(status_code=400, detail="Mot de passe incorrect")
+            log_security_event(conn, "login_failed", request, email=email, severity="warning")
+            raise HTTPException(status_code=400, detail="Identifiants incorrects")
 
     token = create_token({"sub": email})
+    with engine.begin() as conn:
+        log_security_event(conn, "login_success", request, email=email)
 
     return {"access_token": token}
 

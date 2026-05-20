@@ -9,11 +9,15 @@ from auth.utils import get_current_user
 from core.utils import safe_execute
 from core.limiter import limiter
 from database import engine
+from security.abuse_engine import assert_ethan_limit
+from security.audit import ensure_security_tables, log_security_event
 
 from .schemas import AdvisorRequest
+from .security_engine import inspect_advisor_prompt
 
 from .service import (
     ensure_ethan_ai_tables,
+    get_user_plan,
     get_advisor_free,
     portfolio_autopilot,
     portfolio_manager,
@@ -29,13 +33,27 @@ def advisor(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
+        message = inspect_advisor_prompt(data.message)
 
-        result = get_advisor_free(user_email, data.message)
+        with engine.begin() as conn:
+            ensure_security_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            assert_ethan_limit(conn, request, user_email, plan)
+            log_security_event(
+                conn,
+                "ethan_request",
+                request,
+                email=user_email,
+                user_id=user_id,
+                metadata={"endpoint": "advisor", "chars": len(message)},
+            )
+
+        result = get_advisor_free(user_email, message)
 
         return {
             "user": user_email,
             "system": "ADVISOR_CHAT_V4",
-            "input": data.message,
+            "input": message,
             "result": result
         }
 
@@ -51,13 +69,27 @@ def advisor_portfolio(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
+        message = inspect_advisor_prompt(data.message)
 
-        result = portfolio_manager(user_email, data.message)
+        with engine.begin() as conn:
+            ensure_security_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            assert_ethan_limit(conn, request, user_email, plan)
+            log_security_event(
+                conn,
+                "ethan_request",
+                request,
+                email=user_email,
+                user_id=user_id,
+                metadata={"endpoint": "advisor_portfolio", "chars": len(message)},
+            )
+
+        result = portfolio_manager(user_email, message)
 
         return {
             "user": user_email,
             "system": "PORTFOLIO_ANALYSIS_V4",
-            "input": data.message,
+            "input": message,
             "result": result
         }
 
@@ -73,14 +105,28 @@ def advisor_autopilot(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
+        message = inspect_advisor_prompt(data.message)
 
-        result = portfolio_autopilot(user_email, data.message)
+        with engine.begin() as conn:
+            ensure_security_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            assert_ethan_limit(conn, request, user_email, plan)
+            log_security_event(
+                conn,
+                "ethan_request",
+                request,
+                email=user_email,
+                user_id=user_id,
+                metadata={"endpoint": "advisor_autopilot", "chars": len(message)},
+            )
+
+        result = portfolio_autopilot(user_email, message)
 
         return {
             "user": user_email,
             "system": "AUTOPILOT_ENGINE_V4",
             "mode": "SIMULATION",
-            "input": data.message,
+            "input": message,
             "result": result
         }
 

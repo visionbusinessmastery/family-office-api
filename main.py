@@ -9,6 +9,9 @@ from contextlib import asynccontextmanager
 from database import Base, engine
 from core.limiter import limiter
 from auth.utils import decode_token
+from security.audit import ensure_security_tables
+from security.middleware import security_middleware
+from security.routes import router as security_router
 
 # =========================
 # ROUTERS IMPORT
@@ -19,6 +22,11 @@ from advisor.service import ensure_ethan_ai_tables
 from billing.routes import router as billing_router, ensure_billing_tables
 from product.routes import router as product_router, ensure_product_tables
 from profile.routes import router as profile_router, ensure_profile_tables
+from privacy.routes import (
+    ensure_privacy_tables,
+    profile_router as privacy_profile_router,
+    router as privacy_router,
+)
 from referrals.routes import router as referrals_router, ensure_referral_tables
 from workspaces.routes import router as workspaces_router, ensure_workspace_tables
 from legacy.routes import router as legacy_router, ensure_legacy_tables
@@ -84,6 +92,8 @@ async def lifespan(app: FastAPI):
         ensure_product_tables(conn)
         ensure_billing_tables(conn)
         ensure_profile_tables(conn)
+        ensure_privacy_tables(conn)
+        ensure_security_tables(conn)
         ensure_referral_tables(conn)
         ensure_legacy_tables(conn)
         ensure_ethan_ai_tables(conn)
@@ -105,6 +115,8 @@ app = FastAPI(
 app.state.limiter = limiter
 
 logging.info("LIMITER OK")
+
+app.middleware("http")(security_middleware)
 
 # =========================
 # CORS (FIX IMPORTANT)
@@ -177,6 +189,9 @@ app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 app.include_router(product_router, prefix="/product", tags=["Product"])
 app.include_router(profile_router, prefix="/profile", tags=["Profile"])
+app.include_router(privacy_profile_router, prefix="/profile", tags=["Privacy"])
+app.include_router(privacy_router, prefix="/privacy", tags=["Privacy"])
+app.include_router(security_router, prefix="/security", tags=["Security"])
 app.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
 app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
 app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])

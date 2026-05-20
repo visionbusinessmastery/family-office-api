@@ -9,6 +9,7 @@ from auth.utils import get_current_user
 from core.cache import delete_cache_keys, delete_cache_patterns
 from database import engine
 from product.entitlements import normalize_plan, resolve_effective_plan
+from security.audit import ensure_security_tables, log_security_event
 
 
 router = APIRouter()
@@ -270,7 +271,7 @@ def current_subscription(email: str = Depends(get_current_user)):
 
 
 @router.post("/create-checkout-session")
-def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
+def create_checkout_session(data: dict, request: Request, email: str = Depends(get_current_user)):
     if not stripe.api_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
 
@@ -280,7 +281,16 @@ def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
     try:
         with engine.begin() as conn:
             ensure_billing_tables(conn)
+            ensure_security_tables(conn)
             user, _ = get_user_subscription(conn, email)
+            log_security_event(
+                conn,
+                "stripe_checkout_requested",
+                request,
+                email=email,
+                user_id=user.id,
+                metadata={"plan": plan_id},
+            )
 
         discounts = []
         founder_coupon = os.getenv("STRIPE_FOUNDER_COUPON_ID")
@@ -430,6 +440,8 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     signature = request.headers.get("stripe-signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if os.getenv("STRIPE_MODE", "sandbox").lower() == "production" and not webhook_secret:
+        raise HTTPException(status_code=500, detail="Webhook Stripe non configure")
 
     try:
         if webhook_secret:
@@ -448,7 +460,8 @@ async def stripe_webhook(request: Request):
 
     with engine.begin() as conn:
         ensure_billing_tables(conn)
-        conn.execute(text("""
+        ensure_security_tables(conn)
+        result = conn.execute(text("""
             INSERT INTO subscription_events (stripe_event_id, event_type, status, payload)
             VALUES (:stripe_event_id, :event_type, :status, :payload)
             ON CONFLICT (stripe_event_id) DO NOTHING
@@ -458,6 +471,21 @@ async def stripe_webhook(request: Request):
             "status": "received",
             "payload": str(event)[:8000],
         })
+        if result.rowcount == 0:
+            log_security_event(
+                conn,
+                "stripe_webhook_replay_ignored",
+                request,
+                severity="warning",
+                metadata={"event_id": event.get("id"), "event_type": event.get("type")},
+            )
+            return {"received": True, "duplicate": True}
+        log_security_event(
+            conn,
+            "stripe_webhook_received",
+            request,
+            metadata={"event_id": event.get("id"), "event_type": event.get("type")},
+        )
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
