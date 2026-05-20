@@ -25,6 +25,10 @@ from legacy.routes import router as legacy_router, ensure_legacy_tables
 
 from intelligence.routes import router as intelligence_router
 from intelligence.category_opportunities import router as category_opportunities_router
+from intelligence.opportunity_intelligence import (
+    ensure_opportunity_intelligence_tables,
+    router as opportunity_intelligence_router,
+)
 from intelligence.routes_finance import router as finance_router
 from intelligence.routes_score import router as intelligence_score_router
 from intelligence.routes_onboarding import router as onboarding_router
@@ -79,6 +83,7 @@ async def lifespan(app: FastAPI):
         ensure_referral_tables(conn)
         ensure_legacy_tables(conn)
         ensure_ethan_ai_tables(conn)
+        ensure_opportunity_intelligence_tables(conn)
     logging.info("DB INIT OK")
     yield
 
@@ -173,6 +178,7 @@ app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
 app.include_router(category_opportunities_router, prefix="/intelligence", tags=["Opportunities"])
+app.include_router(opportunity_intelligence_router, prefix="/intelligence", tags=["Opportunities"])
 app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(intelligence_score_router, prefix="/intelligence", tags=["Score"])
 app.include_router(onboarding_router)

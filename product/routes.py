@@ -226,6 +226,18 @@ def build_data_profile(conn, user_id: int):
 def build_modules(plan: str, score: int):
     visible = []
     locked = []
+    discoverable_modules = {
+        "real_estate",
+        "yield_assets",
+        "venture_assets",
+        "opportunities",
+        "advanced_guidance",
+        "family_vault",
+        "heirs_mode",
+        "protection_layer",
+        "global_strategy",
+        "legacy_timeline",
+    }
 
     for module in MODULE_REGISTRY:
         item = {
@@ -236,6 +248,16 @@ def build_modules(plan: str, score: int):
 
         if can_access_module(plan, score, module):
             visible.append({**item, "state": "active"})
+        elif module["key"] in discoverable_modules:
+            visible.append({
+                **item,
+                "state": "discovery",
+                "reason": (
+                    "Profondeur limitee sur ton plan actuel"
+                    if not plan_allows(plan, module["min_plan"])
+                    else f"Score {module['min_score']} requis pour les analyses avancees"
+                ),
+            })
         else:
             locked.append({
                 **item,
