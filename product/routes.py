@@ -5,7 +5,6 @@ from auth.utils import get_current_user, get_user_id
 from database import engine
 from intelligence.user_intelligence_engine import compute_user_intelligence
 from product.entitlements import (
-    DISCOVERABLE_MODULES,
     MODULE_REGISTRY,
     build_entitlements,
     can_access_module,
@@ -134,6 +133,19 @@ def compute_status(score: int, plan: str):
     return "Foundation"
 
 
+def get_next_plan(plan: str):
+    normalized = normalize_plan(plan)
+    if not plan_allows(normalized, "GOLD"):
+        return "gold"
+    if not plan_allows(normalized, "ELITE"):
+        return "elite"
+    if not plan_allows(normalized, "LIBERTY"):
+        return "liberty"
+    if not plan_allows(normalized, "LEGACY"):
+        return "legacy"
+    return None
+
+
 def build_progression(conn, user_id: int, score: int, plan: str):
     ensure_product_tables(conn)
 
@@ -230,7 +242,6 @@ def build_data_profile(conn, user_id: int):
 
 def build_modules(plan: str, score: int):
     visible = []
-    locked = []
 
     for module in MODULE_REGISTRY:
         item = {
@@ -241,7 +252,7 @@ def build_modules(plan: str, score: int):
 
         if can_access_module(plan, score, module):
             visible.append({**item, "state": "active"})
-        elif module["key"] in DISCOVERABLE_MODULES:
+        else:
             visible.append({
                 **item,
                 "state": "discovery",
@@ -251,18 +262,8 @@ def build_modules(plan: str, score: int):
                     else f"Score {module['min_score']} requis pour les analyses avancees"
                 ),
             })
-        else:
-            locked.append({
-                **item,
-                "state": "locked",
-                "reason": (
-                    f"Plan {module['min_plan']} requis"
-                    if normalize_plan(plan) != normalize_plan(module["min_plan"])
-                    else f"Score {module['min_score']} requis"
-                ),
-            })
 
-    return {"visible": visible, "locked": locked}
+    return {"visible": visible, "locked": []}
 
 
 def build_missions(data_profile: dict, score: int, plan: str):
@@ -364,6 +365,7 @@ def product_context(email: str = Depends(get_current_user)):
 
     return {
         "plan": plan,
+        "next_plan": get_next_plan(plan),
         "score": score,
         "entitlements": entitlements,
         "progression": progression,

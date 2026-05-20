@@ -12,6 +12,9 @@ from product.tiers import (
     resolve_effective_plan,
     unlocked_features_for_plan,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 PLAN_COPY = {
     "FREE": {
@@ -439,7 +442,10 @@ def build_entitlements(plan: str):
     normalized = normalize_plan(plan)
     base = dict(PLAN_ENTITLEMENTS[normalized])
     base["modules"] = inherited_values(normalized, "modules")
-    base["features"] = inherited_values(normalized, "features")
+    base["features"] = sorted(set([
+        *inherited_values(normalized, "features"),
+        *unlocked_features_for_plan(normalized),
+    ]))
 
     return {
         "plan": normalized,
@@ -456,3 +462,14 @@ def can_access_module(plan: str, score: int, module: dict) -> bool:
         return True
 
     return plan_allows(normalized, required) and score >= int(module.get("min_score", 0))
+
+
+def is_feature_enabled(user_plan: str, feature_key: str) -> bool:
+    enabled = is_feature_unlocked(user_plan, feature_key)
+    logger.info(
+        "feature_unlock_check plan=%s feature=%s enabled=%s",
+        normalize_plan(user_plan),
+        feature_key,
+        enabled,
+    )
+    return enabled

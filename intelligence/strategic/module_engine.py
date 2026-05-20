@@ -5,7 +5,8 @@
 import logging
 
 from intelligence.scoring.module_registry import MODULES
-from product.tiers import is_feature_unlocked, normalize_plan
+from intelligence.strategic.feature_engine import is_feature_enabled
+from product.tiers import normalize_plan
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,15 @@ def get_all_opportunities(user_profile):
 
     for module_name, engine in MODULES.items():
         feature = MODULE_FEATURES.get(module_name, "opportunity_discovery")
-        if not is_feature_unlocked(plan, feature):
+        enabled = is_feature_enabled(plan, feature)
+        logger.info(
+            "module_access_event module=%s feature=%s plan=%s enabled=%s",
+            module_name,
+            feature,
+            plan,
+            enabled,
+        )
+        if not enabled:
             continue
 
         try:

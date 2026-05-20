@@ -1,4 +1,5 @@
 import os
+import logging
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +13,7 @@ from product.entitlements import normalize_plan, resolve_effective_plan
 
 router = APIRouter()
 _billing_schema_ready = False
+logger = logging.getLogger(__name__)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
@@ -44,6 +46,22 @@ PLANS = {
         "description": "Transmission, gouvernance familiale, protection patrimoniale et strategie multi-generationnelle.",
     },
 }
+
+STRIPE_STATUS_MAP = {
+    "trialing": "trialing",
+    "active": "active",
+    "past_due": "past_due",
+    "canceled": "canceled",
+    "cancelled": "canceled",
+    "unpaid": "past_due",
+    "incomplete": "pending",
+    "incomplete_expired": "expired",
+    "paused": "paused",
+}
+
+
+def normalize_subscription_status(status: str | None) -> str:
+    return STRIPE_STATUS_MAP.get(str(status or "").lower(), "inactive")
 
 
 def invalidate_subscription_caches(email: str | None, user_id: int | None = None):
@@ -216,6 +234,11 @@ def current_subscription(email: str = Depends(get_current_user)):
         return {
             "plan": normalize_plan(user.plan),
             "status": "free",
+            "founder": {
+                "is_founder": bool(user.is_founder),
+                "tier": user.founder_tier,
+                "discount": int(user.founder_discount or 0),
+            },
             "current_period_end": None,
         }
 
@@ -227,7 +250,7 @@ def current_subscription(email: str = Depends(get_current_user)):
 
     return {
         "plan": effective_plan,
-        "status": subscription.status,
+        "status": normalize_subscription_status(subscription.status),
         "subscription_plan": normalize_plan(subscription.plan),
         "user_plan": normalize_plan(user.plan),
         "stripe_price_id": subscription.stripe_price_id,
@@ -442,6 +465,7 @@ async def stripe_webhook(request: Request):
         plan = str(session.get("metadata", {}).get("plan") or "").lower()
 
         if email and plan:
+            internal_status = normalize_subscription_status("active")
             with engine.begin() as conn:
                 ensure_billing_tables(conn)
                 user = conn.execute(text("""
@@ -458,7 +482,7 @@ async def stripe_webhook(request: Request):
 
                 if user:
                     conn.execute(text("""
-                        INSERT INTO subscriptions (
+                    INSERT INTO subscriptions (
                             user_id,
                             plan,
                             status,
@@ -471,7 +495,7 @@ async def stripe_webhook(request: Request):
                         VALUES (
                             :user_id,
                             :plan,
-                            'active',
+                            :status,
                             :stripe_customer_id,
                             :stripe_subscription_id,
                             :stripe_price_id,
@@ -490,6 +514,7 @@ async def stripe_webhook(request: Request):
                     """), {
                         "user_id": user.id,
                         "plan": plan.upper(),
+                        "status": internal_status,
                         "stripe_customer_id": session.get("customer"),
                         "stripe_subscription_id": session.get("subscription"),
                         "stripe_price_id": os.getenv(PLANS.get(plan, {}).get("price_env") or ""),
@@ -497,11 +522,20 @@ async def stripe_webhook(request: Request):
                     })
 
                 invalidate_subscription_caches(email, user.id if user else None)
+                logger.info(
+                    "subscription_change event=checkout_completed email=%s user_id=%s plan=%s status=%s",
+                    email,
+                    user.id if user else None,
+                    plan.upper(),
+                    internal_status,
+                )
 
     if event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
         subscription = event["data"]["object"]
         stripe_subscription_id = subscription.get("id")
-        status = subscription.get("status")
+        status = normalize_subscription_status(subscription.get("status"))
+        if event["type"] == "customer.subscription.deleted":
+            status = "canceled"
         cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
         price_id = None
         try:
@@ -552,6 +586,14 @@ async def stripe_webhook(request: Request):
             invalidate_subscription_caches(
                 current.email if current else None,
                 current.id if current else None,
+            )
+            logger.info(
+                "subscription_change event=%s user_id=%s plan=%s status=%s stripe_subscription_id=%s",
+                event["type"],
+                current.id if current else None,
+                next_plan,
+                status,
+                stripe_subscription_id,
             )
 
     if event["type"] in ["invoice.paid", "invoice.payment_failed"]:
