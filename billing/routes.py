@@ -10,6 +10,9 @@ from core.cache import delete_cache_keys, delete_cache_patterns
 from database import engine
 from product.entitlements import normalize_plan, resolve_effective_plan
 from security.audit import ensure_security_tables, log_security_event
+from analytics.analytics_events import SUBSCRIPTION_UPGRADED, FOUNDER_UPGRADE
+from analytics.posthog_service import capture_event
+from monitoring.sentry_config import capture_exception
 
 
 router = APIRouter()
@@ -326,6 +329,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
 
         session = stripe.checkout.Session.create(**session_kwargs)
     except Exception as exc:
+        capture_exception(exc, {"module": "billing", "operation": "checkout"})
         raise HTTPException(status_code=400, detail=str(exc))
 
     return {"url": session.url, "plan": plan["name"]}
@@ -456,6 +460,7 @@ async def stripe_webhook(request: Request):
                 stripe.api_key,
             )
     except Exception as exc:
+        capture_exception(exc, {"module": "billing", "operation": "webhook"})
         raise HTTPException(status_code=400, detail=str(exc))
 
     with engine.begin() as conn:
@@ -550,6 +555,14 @@ async def stripe_webhook(request: Request):
                     })
 
                 invalidate_subscription_caches(email, user.id if user else None)
+                if user:
+                    capture_event(
+                        conn,
+                        FOUNDER_UPGRADE if bool(session.get("metadata", {}).get("is_founder") == "true") else SUBSCRIPTION_UPGRADED,
+                        user_id=user.id,
+                        email=email,
+                        properties={"plan": plan.upper(), "stripe_event": event.get("id")},
+                    )
                 logger.info(
                     "subscription_change event=checkout_completed email=%s user_id=%s plan=%s status=%s",
                     email,

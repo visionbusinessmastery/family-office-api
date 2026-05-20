@@ -15,6 +15,8 @@ from database import engine
 from privacy.region_engine import detect_privacy_region
 from security.abuse_engine import assert_rate_limit
 from security.audit import log_security_event as log_security_audit
+from analytics.analytics_events import EXPORT_GENERATED
+from analytics.posthog_service import capture_event
 
 
 router = APIRouter()
@@ -558,6 +560,7 @@ def request_export(data: dict, request: Request, email: str = Depends(get_curren
         })
         log_privacy_event(conn, user_id, "data_export_requested", {"format": fmt}, request)
         log_security_audit(conn, "privacy_export_requested", request, email=email, user_id=user_id, metadata={"format": fmt})
+        capture_event(conn, EXPORT_GENERATED, user_id=user_id, email=email, properties={"format": fmt})
 
     return {
         "status": "ready",

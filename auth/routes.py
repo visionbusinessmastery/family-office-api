@@ -22,6 +22,8 @@ from product.entitlements import normalize_plan, resolve_effective_plan
 from privacy.routes import record_consents
 from security.abuse_engine import assert_ip_rate_limit
 from security.audit import ensure_security_tables, log_security_event
+from analytics.analytics_events import ONBOARDING_COMPLETED
+from analytics.posthog_service import capture_event
 
 router = APIRouter()
 
@@ -325,6 +327,8 @@ def update_plan(plan: str, email: str = Depends(get_current_user)):
         """), {"plan": normalized_plan, "email": email})
 
         invalidate_user_intelligence_caches(email)
+        user_id = conn.execute(text("SELECT id FROM users WHERE email = :email"), {"email": email}).scalar()
+        capture_event(conn, ONBOARDING_COMPLETED, user_id=user_id, email=email)
 
     return {"status": "updated"}
 
@@ -358,6 +362,8 @@ def complete_onboarding(data: dict, email: str = Depends(get_current_user)):
             return {"error": "onboarding failed"}
 
         invalidate_user_intelligence_caches(email)
+        user_id = conn.execute(text("SELECT id FROM users WHERE email = :email"), {"email": email}).scalar()
+        capture_event(conn, ONBOARDING_COMPLETED, user_id=user_id, email=email)
         
     return {"status": "completed"}
 

@@ -12,6 +12,12 @@ from auth.utils import decode_token
 from security.audit import ensure_security_tables
 from security.middleware import security_middleware
 from security.routes import router as security_router
+from monitoring.sentry_config import capture_exception, init_sentry
+from monitoring.health import check_cache, check_db, check_openai, check_stripe, system_health
+from monitoring.routes import router as monitoring_router
+from analytics.posthog_service import ensure_analytics_tables
+from feature_flags.engine import ensure_feature_flags_table
+from feature_flags.routes import router as feature_flags_router
 
 # =========================
 # ROUTERS IMPORT
@@ -94,6 +100,8 @@ async def lifespan(app: FastAPI):
         ensure_profile_tables(conn)
         ensure_privacy_tables(conn)
         ensure_security_tables(conn)
+        ensure_analytics_tables(conn)
+        ensure_feature_flags_table(conn)
         ensure_referral_tables(conn)
         ensure_legacy_tables(conn)
         ensure_ethan_ai_tables(conn)
@@ -111,6 +119,8 @@ app = FastAPI(
     version="4.0.0",
     lifespan=lifespan
 )
+
+init_sentry(app)
 
 app.state.limiter = limiter
 
@@ -146,10 +156,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @app.exception_handler(Exception)
 async def global_error_handler(request: Request, exc: Exception):
     logging.error(f"ERROR: {str(exc)}")
+    capture_exception(exc, {"path": str(request.url.path)})
 
     return JSONResponse(
         status_code=500,
-        content={"status": "error", "message": str(exc)},
+        content={"status": "error", "message": "Internal Server Error"},
     )
 
 # =========================
@@ -192,6 +203,8 @@ app.include_router(profile_router, prefix="/profile", tags=["Profile"])
 app.include_router(privacy_profile_router, prefix="/profile", tags=["Privacy"])
 app.include_router(privacy_router, prefix="/privacy", tags=["Privacy"])
 app.include_router(security_router, prefix="/security", tags=["Security"])
+app.include_router(monitoring_router, prefix="/system", tags=["System"])
+app.include_router(feature_flags_router, prefix="/feature-flags", tags=["Feature Flags"])
 app.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
 app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
 app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])
@@ -232,22 +245,27 @@ def root():
 
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "modules": [
-            "advisor",
-            "intelligence",
-            "finance",
-            "score",
-            "market",
-            "portfolio",
-            "real_estate",
-            "stocks",
-            "global_command_center",
-            "gamification",
-            "legacy"
-        ]
-    }
+    return system_health()
+
+
+@app.get("/health/db")
+def health_db():
+    return check_db()
+
+
+@app.get("/health/openai")
+def health_openai():
+    return check_openai()
+
+
+@app.get("/health/stripe")
+def health_stripe():
+    return check_stripe()
+
+
+@app.get("/health/cache")
+def health_cache():
+    return check_cache()
 
 @app.get("/info")
 def info():

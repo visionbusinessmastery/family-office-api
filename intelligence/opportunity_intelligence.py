@@ -10,6 +10,8 @@ from auth.utils import get_current_user, get_user_id
 from core.cache import redis_client
 from database import engine
 from market.service import get_market_intelligence
+from analytics.analytics_events import OPPORTUNITY_OPENED
+from analytics.posthog_service import capture_event
 from modules.ai_business.opportunity_engine import get_ai_business_opportunities
 from modules.business.opportunity_engine import get_business_opportunities
 from modules.commodities.opportunity_engine import get_commodities_opportunities
@@ -22,6 +24,7 @@ from modules.real_estate.opportunity_engine import get_real_estate_opportunities
 from modules.startup.opportunity_engine import get_startup_opportunities
 from modules.stocks.opportunity_engine import get_stock_opportunities
 from product.entitlements import plan_allows, resolve_effective_plan
+from opportunity_cache.engine import get_cached_opportunities, set_cached_opportunities
 
 
 router = APIRouter()
@@ -446,8 +449,14 @@ def get_opportunity_intelligence(
             "criteria": payload.criteria,
             "portfolio": profile.get("portfolio"),
         })
-        cache_key = f"opportunity_intelligence:{criteria_hash}"
-        cached = _cache_get(cache_key)
+        cache_payload = {
+            "user_id": user_id,
+            "plan": profile["plan"],
+            "universe": payload.universe,
+            "criteria": payload.criteria,
+            "portfolio": profile.get("portfolio"),
+        }
+        cached = get_cached_opportunities(payload.universe, cache_payload)
 
         if cached:
             conn.execute(text("""
@@ -498,5 +507,12 @@ def get_opportunity_intelligence(
             "plan": profile["plan"],
         })
 
-        _cache_set(cache_key, result, ttl=1800)
+        set_cached_opportunities(payload.universe, cache_payload, result)
+        capture_event(
+            conn,
+            OPPORTUNITY_OPENED,
+            user_id=user_id,
+            email=email,
+            properties={"universe": payload.universe, "plan": profile["plan"]},
+        )
         return result
