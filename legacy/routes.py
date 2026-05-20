@@ -3,6 +3,7 @@ from sqlalchemy import text
 
 from auth.utils import get_current_user, get_user_id
 from database import engine
+from legacy.legacy_engine import compute_legacy_engine
 
 
 router = APIRouter()
@@ -164,3 +165,29 @@ def legacy_overview(email: str = Depends(get_current_user)):
             "Legacy Timeline",
         ],
     }
+
+
+@router.get("/engine")
+def legacy_engine(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_legacy_tables(conn)
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        vault_count = int(conn.execute(text("""
+            SELECT COUNT(*) FROM legacy_family_vault WHERE user_id = :user_id
+        """), {"user_id": user_id}).scalar() or 0)
+        heirs_count = int(conn.execute(text("""
+            SELECT COUNT(*) FROM legacy_heirs WHERE user_id = :user_id
+        """), {"user_id": user_id}).scalar() or 0)
+        rules_count = int(conn.execute(text("""
+            SELECT COUNT(*) FROM legacy_governance_rules WHERE user_id = :user_id
+        """), {"user_id": user_id}).scalar() or 0)
+
+    return compute_legacy_engine({
+        "vault_count": vault_count,
+        "heirs_count": heirs_count,
+        "governance_rules": rules_count,
+    })

@@ -99,6 +99,9 @@ def ensure_billing_tables(conn):
     conn.execute(text("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id TEXT"))
     conn.execute(text("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS environment TEXT DEFAULT 'sandbox'"))
     conn.execute(text("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS founder_tier TEXT"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS founder_discount INTEGER DEFAULT 0"))
 
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS billing_invoices (
@@ -153,7 +156,7 @@ def get_plan_or_400(plan_id: str):
 
 def get_user_subscription(conn, email: str):
     user = conn.execute(text("""
-        SELECT id, plan
+        SELECT id, plan, is_founder, founder_tier, founder_discount
         FROM users
         WHERE email = :email
     """), {"email": email}).fetchone()
@@ -230,6 +233,11 @@ def current_subscription(email: str = Depends(get_current_user)):
         "stripe_price_id": subscription.stripe_price_id,
         "environment": subscription.environment or os.getenv("STRIPE_MODE", "sandbox"),
         "cancel_at_period_end": bool(subscription.cancel_at_period_end),
+        "founder": {
+            "is_founder": bool(user.is_founder),
+            "tier": user.founder_tier,
+            "discount": int(user.founder_discount or 0),
+        },
         "current_period_end": (
             subscription.current_period_end.isoformat()
             if subscription.current_period_end
@@ -247,24 +255,43 @@ def create_checkout_session(data: dict, email: str = Depends(get_current_user)):
     plan, price_id = get_plan_or_400(plan_id)
 
     try:
-        session = stripe.checkout.Session.create(
-            mode="subscription",
-            customer_email=email,
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{FRONTEND_URL}/dashboard?checkout=success",
-            cancel_url=f"{FRONTEND_URL}/dashboard?checkout=cancel",
-            allow_promotion_codes=True,
-            metadata={
+        with engine.begin() as conn:
+            ensure_billing_tables(conn)
+            user, _ = get_user_subscription(conn, email)
+
+        discounts = []
+        founder_coupon = os.getenv("STRIPE_FOUNDER_COUPON_ID")
+        if bool(user.is_founder) and int(user.founder_discount or 0) > 0 and founder_coupon:
+            discounts.append({"coupon": founder_coupon})
+
+        session_kwargs = {
+            "mode": "subscription",
+            "customer_email": email,
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": f"{FRONTEND_URL}/dashboard?checkout=success",
+            "cancel_url": f"{FRONTEND_URL}/dashboard?checkout=cancel",
+            "allow_promotion_codes": not bool(discounts),
+            "metadata": {
                 "email": email,
                 "plan": plan_id,
+                "is_founder": str(bool(user.is_founder)).lower(),
+                "founder_tier": user.founder_tier or "",
+                "founder_discount": str(int(user.founder_discount or 0)),
             },
-            subscription_data={
+            "subscription_data": {
                 "metadata": {
                     "email": email,
                     "plan": plan_id,
+                    "is_founder": str(bool(user.is_founder)).lower(),
+                    "founder_tier": user.founder_tier or "",
+                    "founder_discount": str(int(user.founder_discount or 0)),
                 }
             },
-        )
+        }
+        if discounts:
+            session_kwargs["discounts"] = discounts
+
+        session = stripe.checkout.Session.create(**session_kwargs)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

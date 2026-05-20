@@ -1,24 +1,17 @@
-PLAN_ORDER = {
-    "FREE": 0,
-    "GOLD": 1,
-    "ELITE": 2,
-    "LIBERTY": 3,
-    "LEGACY": 4,
-}
-
-PLAN_ALIASES = {
-    "FOUNDATION": "FREE",
-    "SILVER": "FREE",
-    "GROWTH": "GOLD",
-    "PLATINUM": "ELITE",
-    "WEALTH_OS": "ELITE",
-    "LIBERTY_LEGACY": "LIBERTY",
-    "HERITAGE": "LEGACY",
-    "DYNASTY": "LEGACY",
-    "DYNASTY_OFFICE": "LEGACY",
-}
-
-ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
+from product.tiers import (
+    ACTIVE_SUBSCRIPTION_STATUSES,
+    DISCOVERABLE_MODULES,
+    FEATURE_MIN_PLAN,
+    PLAN_ALIASES,
+    PLAN_ORDER,
+    highest_plan,
+    is_feature_unlocked,
+    normalize_plan,
+    plan_allows,
+    plan_rank,
+    resolve_effective_plan,
+    unlocked_features_for_plan,
+)
 
 PLAN_COPY = {
     "FREE": {
@@ -427,40 +420,6 @@ MODULE_REGISTRY = [
         "description": "Projection 10 ans, 20 ans et vision generationnelle.",
     },
 ]
-
-
-def normalize_plan(plan: str | None) -> str:
-    value = (plan or "FREE").upper()
-    return PLAN_ALIASES.get(value, value if value in PLAN_ORDER else "FREE")
-
-
-def plan_rank(plan: str | None) -> int:
-    return PLAN_ORDER[normalize_plan(plan)]
-
-
-def plan_allows(current_plan: str, required_plan: str) -> bool:
-    return plan_rank(current_plan) >= plan_rank(required_plan)
-
-
-def highest_plan(*plans: str | None) -> str:
-    normalized = [normalize_plan(plan) for plan in plans if plan]
-    if not normalized:
-        return "FREE"
-    return max(normalized, key=plan_rank)
-
-
-def resolve_effective_plan(
-    user_plan: str | None,
-    subscription_plan: str | None = None,
-    subscription_status: str | None = None,
-) -> str:
-    if (
-        subscription_plan
-        and str(subscription_status or "").lower() in ACTIVE_SUBSCRIPTION_STATUSES
-    ):
-        return highest_plan(user_plan, subscription_plan)
-
-    return normalize_plan(user_plan)
 
 
 def inherited_values(plan: str, field: str):

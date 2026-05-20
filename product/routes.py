@@ -5,6 +5,7 @@ from auth.utils import get_current_user, get_user_id
 from database import engine
 from intelligence.user_intelligence_engine import compute_user_intelligence
 from product.entitlements import (
+    DISCOVERABLE_MODULES,
     MODULE_REGISTRY,
     build_entitlements,
     can_access_module,
@@ -78,6 +79,10 @@ def ensure_product_tables(conn):
             created_at TIMESTAMP DEFAULT NOW()
         )
     """))
+
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS founder_tier TEXT"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS founder_discount INTEGER DEFAULT 0"))
 
     _product_schema_ready = True
 
@@ -226,18 +231,6 @@ def build_data_profile(conn, user_id: int):
 def build_modules(plan: str, score: int):
     visible = []
     locked = []
-    discoverable_modules = {
-        "real_estate",
-        "yield_assets",
-        "venture_assets",
-        "opportunities",
-        "advanced_guidance",
-        "family_vault",
-        "heirs_mode",
-        "protection_layer",
-        "global_strategy",
-        "legacy_timeline",
-    }
 
     for module in MODULE_REGISTRY:
         item = {
@@ -248,7 +241,7 @@ def build_modules(plan: str, score: int):
 
         if can_access_module(plan, score, module):
             visible.append({**item, "state": "active"})
-        elif module["key"] in discoverable_modules:
+        elif module["key"] in DISCOVERABLE_MODULES:
             visible.append({
                 **item,
                 "state": "discovery",
@@ -347,6 +340,9 @@ def product_context(email: str = Depends(get_current_user)):
         plan_row = conn.execute(text("""
             SELECT
                 users.plan AS user_plan,
+                users.is_founder,
+                users.founder_tier,
+                users.founder_discount,
                 subscriptions.plan AS subscription_plan,
                 subscriptions.status AS subscription_status
             FROM users
@@ -374,4 +370,9 @@ def product_context(email: str = Depends(get_current_user)):
         "data_profile": data_profile,
         "modules": modules,
         "missions": missions,
+        "founder": {
+            "is_founder": bool(plan_row.is_founder) if plan_row else False,
+            "tier": plan_row.founder_tier if plan_row else None,
+            "discount": int(plan_row.founder_discount or 0) if plan_row else 0,
+        },
     }

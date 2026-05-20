@@ -178,6 +178,9 @@ def get_me(email: str = Depends(get_current_user)):
                 users.profile_completed,
                 users.revenus_mensuels,
                 users.charges_mensuelles,
+                users.is_founder,
+                users.founder_tier,
+                users.founder_discount,
                 subscriptions.plan AS subscription_plan,
                 subscriptions.status AS subscription_status
             FROM users
@@ -203,6 +206,9 @@ def get_me(email: str = Depends(get_current_user)):
             "profile_completed": profile_completed,
             "revenus_mensuels": user.revenus_mensuels or 0,
             "charges_mensuelles": user.charges_mensuelles or 0,
+            "is_founder": bool(user.is_founder),
+            "founder_tier": user.founder_tier,
+            "founder_discount": int(user.founder_discount or 0),
         }
 
         if not profile_completed:

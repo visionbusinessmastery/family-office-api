@@ -1,5 +1,9 @@
 
-from product.entitlements import normalize_plan, plan_rank
+from product.tiers import (
+    is_feature_unlocked,
+    normalize_plan,
+    unlocked_features_for_plan,
+)
 
 def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     """
@@ -23,8 +27,6 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
         usage = {}
 
     plan = normalize_plan(profile.get("plan"))
-    level = plan_rank(plan)
-
     score = float(score_data.get("score") or 0)
 
     savings = float(profile.get("savings") or 0)
@@ -40,39 +42,22 @@ def compute_feature_access(profile: dict, score_data: dict, usage: dict = None):
     # =========================
     # 1. PLAN-BASED FEATURES
     # =========================
-    if level >= 0:
-        features.add("portfolio_basic")
-
-    if level >= 1:
-        features.add("portfolio_advanced")
-        features.add("investment_tracking")
-
-    if level >= 2:
-        features.add("ethan_full_access")
-        features.add("priority_support")
-
-    if level >= 3:
-        features.add("unlock_all")
-        features.add("sovereign_wealth")
-
-    if level >= 4:
-        features.add("family_vault")
-        features.add("heirs_mode")
-        features.add("dynasty_features")
-        features.add("legacy_dashboard")
-        features.add("asset_protection")
+    features.update(unlocked_features_for_plan(plan))
 
     # =========================
     # 2. SCORE-BASED FEATURES
     # =========================
     if score >= 50:
-        features.add("smart_recommendations")
+        if is_feature_unlocked(plan, "smart_recommendations"):
+            features.add("smart_recommendations")
 
     if score >= 70:
-        features.add("ethan_opportunities")
+        if is_feature_unlocked(plan, "ethan_opportunities"):
+            features.add("ethan_opportunities")
 
     if score >= 85:
-        features.add("elite_insights")
+        if is_feature_unlocked(plan, "advanced_analytics"):
+            features.add("elite_insights")
 
     # =========================
     # 3. WEALTH-BASED FEATURES
