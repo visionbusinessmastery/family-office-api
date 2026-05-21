@@ -23,6 +23,7 @@ from feature_flags.routes import router as feature_flags_router
 # ROUTERS IMPORT
 # =========================
 from auth.routes import router as auth_router
+from auth.oauth import router as oauth_router, ensure_oauth_tables
 from advisor.routes import router as advisor_router
 from advisor.service import ensure_ethan_ai_tables
 from billing.routes import router as billing_router, ensure_billing_tables
@@ -102,6 +103,7 @@ async def lifespan(app: FastAPI):
         ensure_security_tables(conn)
         ensure_analytics_tables(conn)
         ensure_feature_flags_table(conn)
+        ensure_oauth_tables(conn)
         ensure_referral_tables(conn)
         ensure_legacy_tables(conn)
         ensure_ethan_ai_tables(conn)
@@ -196,6 +198,7 @@ logging.info("AUTH OK")
 # ROUTES
 # =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(oauth_router, prefix="/auth/oauth", tags=["OAuth"])
 app.include_router(advisor_router, prefix="/advisor", tags=["Advisor"])
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
 app.include_router(product_router, prefix="/product", tags=["Product"])

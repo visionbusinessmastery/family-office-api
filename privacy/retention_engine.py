@@ -68,6 +68,8 @@ def run_retention_purge(conn):
             "legacy_metrics",
             "user_wealth_profiles",
             "privacy_preferences",
+            "oauth_accounts",
+            "oauth_login_sessions",
         ]:
             try:
                 conn.execute(text(f"DELETE FROM {table} WHERE user_id = :user_id"), {"user_id": user_id})

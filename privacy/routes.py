@@ -322,6 +322,7 @@ def build_export_payload(conn, user_id: int, email: str):
         "progression": _fetch_rows(conn, "SELECT * FROM progression_profiles WHERE user_id = :user_id", params),
         "subscriptions": _fetch_rows(conn, "SELECT plan, status, current_period_end, created_at, updated_at FROM subscriptions WHERE user_id = :user_id", params),
         "billing_invoices": _fetch_rows(conn, "SELECT stripe_invoice_id, amount_due, amount_paid, currency, status, created_at FROM billing_invoices WHERE user_id = :user_id", params),
+        "oauth_accounts": _fetch_rows(conn, "SELECT provider, provider_email, provider_avatar, created_at, updated_at FROM oauth_accounts WHERE user_id = :user_id", params),
         "ethan_memory": _fetch_rows(conn, "SELECT strategic_summary, session_summary, last_topic, updated_at FROM ethan_memory WHERE user_id = :user_id", params),
         "ethan_usage": _fetch_rows(conn, "SELECT task_type, complexity, model, estimated_cost_usd, created_at FROM ethan_usage_events WHERE user_id = :user_id", params),
         "legacy": {
@@ -404,6 +405,7 @@ def privacy_center(request: Request, email: str = Depends(get_current_user)):
             "ethan_memory": len(_fetch_rows(conn, "SELECT id FROM ethan_memory WHERE user_id = :user_id", {"user_id": user_id})),
             "notifications": len(_fetch_rows(conn, "SELECT id FROM notifications WHERE user_id = :user_id", {"user_id": user_id})),
             "legacy": len(_fetch_rows(conn, "SELECT id FROM legacy_family_vault WHERE user_id = :user_id", {"user_id": user_id})),
+            "oauth_accounts": len(_fetch_rows(conn, "SELECT id FROM oauth_accounts WHERE user_id = :user_id", {"user_id": user_id})),
         }
         log_privacy_event(conn, user_id, "privacy_center_opened", {}, request)
 
