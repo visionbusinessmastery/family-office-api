@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from auth.utils import get_user_id
-from intelligence.core.orchestrator import run_orchestrator
+from intelligence.user_intelligence_engine import compute_user_intelligence
 from portfolio.service import get_user_portfolio
 from product.entitlements import resolve_effective_plan
 
@@ -36,19 +36,19 @@ def centralized_user_state_builder(conn, email: str):
         user.subscription_plan,
         user.subscription_status,
     )
-    dashboard_context = run_orchestrator(email)
+    dashboard_context = compute_user_intelligence(email)
     dashboard_context["plan"] = plan
-    dashboard_context["level"] = user.level
     portfolio = get_user_portfolio(user.id)
-    opportunities = dashboard_context.get("opportunities", [])
+    opportunities = dashboard_context.get("opportunities", {})
     score = dashboard_context.get("global_score") or dashboard_context.get("score", 0)
     if isinstance(score, dict):
         score = score.get("score", 0)
+    level = dashboard_context.get("level") or user.level
 
     return {
         "user_id": user.id,
         "plan": plan,
-        "level": user.level,
+        "level": level,
         "dashboard_context": dashboard_context,
         "portfolio": portfolio,
         "opportunities": opportunities,
