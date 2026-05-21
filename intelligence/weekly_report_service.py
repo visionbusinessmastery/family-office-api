@@ -59,7 +59,6 @@ def build_weekly_report_payload(conn, user_id: int, email: str) -> dict:
     row = conn.execute(text("""
         SELECT
             users.plan AS user_plan,
-            users.level,
             subscriptions.plan AS subscription_plan,
             subscriptions.status AS subscription_status
         FROM users
@@ -113,7 +112,7 @@ def build_weekly_report_payload(conn, user_id: int, email: str) -> dict:
     return {
         "email": email,
         "plan": plan,
-        "level": row.level if row else None,
+        "level": plan,
         "portfolio_value": round(portfolio_value, 2),
         "xp": int(xp_row.xp or 0) if xp_row else 0,
         "streak": int(xp_row.streak or 0) if xp_row else 0,

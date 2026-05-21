@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -28,6 +29,7 @@ from opportunity_cache.engine import get_cached_opportunities, set_cached_opport
 
 
 router = APIRouter()
+OPPORTUNITY_CACHE_VERSION = "v3-contextual-source-links"
 
 
 DISCOVERY_DEPTH = {
@@ -97,6 +99,33 @@ BUSINESS_SOURCES = [
     "Observatoire Franchise",
     "White Rock business modules",
 ]
+
+
+SOURCE_HOME_URLS = {
+    "Leboncoin": "https://www.leboncoin.fr/recherche",
+    "SeLoger": "https://www.seloger.com",
+    "Bien'ici": "https://www.bienici.com/recherche/achat",
+    "PAP": "https://www.pap.fr/annonce/vente-immobiliere",
+    "Logic-Immo": "https://www.logic-immo.com",
+    "Orpi": "https://www.orpi.com/recherche",
+    "Agorastore": "https://www.agorastore.fr",
+    "Immobilier.notaires": "https://www.immobilier.notaires.fr",
+    "Immo Interactif": "https://www.immo-interactif.fr",
+    "Licitor": "https://www.licitor.com",
+    "Zillow": "https://www.zillow.com",
+    "Realtor": "https://www.realtor.com",
+    "Idealista": "https://www.idealista.com",
+    "Yahoo Finance": "https://finance.yahoo.com",
+    "FMP": "https://financialmodelingprep.com",
+    "Alpha Vantage": "https://www.alphavantage.co",
+    "Market engine": "https://www.tradingview.com/markets",
+    "Google Trends": "https://trends.google.com",
+    "BPI": "https://bpifrance-creation.fr",
+    "Fusacq": "https://www.fusacq.com",
+    "CRA": "https://www.cra.asso.fr",
+    "Toute la Franchise": "https://www.toute-la-franchise.com",
+    "Observatoire Franchise": "https://www.observatoiredelafranchise.fr",
+}
 
 
 class OpportunityIntelligenceRequest(BaseModel):
@@ -214,11 +243,37 @@ def _potential_score(potential: str | None) -> int:
     return mapping.get(str(potential or "").lower(), 62)
 
 
+def _source_url(source: str, title: str, universe: str, criteria: dict) -> str:
+    raw_query = " ".join(
+        str(part)
+        for part in [
+            title,
+            criteria.get("city"),
+            criteria.get("country"),
+            criteria.get("sector"),
+            criteria.get("business_type"),
+            criteria.get("strategy"),
+        ]
+        if part
+    )
+    query = quote_plus(raw_query or title or universe)
+
+    if source == "Leboncoin":
+        return f"https://www.leboncoin.fr/recherche?text={query}"
+    if source == "Google Trends":
+        return f"https://trends.google.com/trends/explore?q={query}"
+    if source == "Yahoo Finance":
+        return f"https://finance.yahoo.com/lookup?s={query}"
+    if source == "TradingView" or source == "Market engine":
+        return f"https://www.tradingview.com/search/?query={query}"
+
+    return f"https://www.google.com/search?q={quote_plus(source + ' ' + raw_query)}"
+
+
 def _build_user_profile(conn, user_id: int, email: str) -> dict:
     row = conn.execute(text("""
         SELECT
             users.plan AS user_plan,
-            users.level AS user_level,
             subscriptions.plan AS subscription_plan,
             subscriptions.status AS subscription_status
         FROM users
@@ -261,7 +316,7 @@ def _build_user_profile(conn, user_id: int, email: str) -> dict:
     return {
         "email": email,
         "plan": plan,
-        "level": row.user_level if row else None,
+        "level": plan,
         "score": 65 if capital > 0 else 35,
         "capital": capital,
         "savings": finance.get("epargne", 0),
@@ -286,6 +341,7 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
         "title": title,
         "description": raw.get("description") or "Signal priorise par Ethan selon ton profil et ta situation.",
         "source": raw.get("platform") or "White Rock engine",
+        "url": raw.get("url") or raw.get("link"),
         "image_url": raw.get("image_url"),
         "budget": budget_label,
         "price": raw.get("price"),
@@ -308,47 +364,76 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
 
     if universe == "real_estate":
         budget_max = _safe_float(criteria.get("budget_max"), 180000)
+        budget_min = _safe_float(criteria.get("budget_min"), 0)
         target_yield = _safe_float(criteria.get("target_yield"), 5.0)
+        city = criteria.get("city") or criteria.get("country") or "zone cible"
+        source = raw.get("platform") or REAL_ESTATE_SOURCES[index % len(REAL_ESTATE_SOURCES)]
+        price = raw.get("price") or round(budget_max * (0.82 + (index * 0.04)))
+        yield_percent = raw.get("yield_percent") or round(target_yield + index * 0.35, 2)
+        cashflow = raw.get("cashflow_estimate") or round((budget_max * target_yield / 100) / 12 - 450)
         item.update({
-            "source": raw.get("platform") or REAL_ESTATE_SOURCES[index % len(REAL_ESTATE_SOURCES)],
-            "price": raw.get("price") or round(budget_max * (0.82 + (index * 0.04))),
-            "yield_percent": raw.get("yield_percent") or round(target_yield + index * 0.35, 2),
-            "cashflow_estimate": raw.get("cashflow_estimate") or round((budget_max * target_yield / 100) / 12 - 450),
+            "source": source,
+            "url": item["url"] or _source_url(source, title, universe, criteria),
+            "price": price,
+            "yield_percent": yield_percent,
+            "cashflow_estimate": cashflow,
             "strengths": [
-                "Lecture rendement / valorisation separee",
-                "Compatible avec une analyse cashflow avant visite",
+                f"{source}: recherche ciblee sur {city} avec budget autour de {int(price):,} EUR".replace(",", " "),
+                f"Rendement cible {yield_percent}% a comparer au seuil demande ({target_yield}%).",
             ],
             "risks": [
-                "Verifier tension locative, travaux et fiscalite locale",
+                f"Verifier tension locative et travaux a {city} avant visite.",
+                "Cashflow estime a confirmer avec charges, fiscalite locale et vacance.",
             ],
+            "next_step": (
+                f"Ouvre {source}, filtre {city} entre {int(budget_min or 0)} et {int(budget_max)} EUR, "
+                "selectionne 2 annonces comparables puis valide loyers reels, travaux et frais."
+            ),
         })
 
     if universe == "investments":
+        source = raw.get("platform") or INVESTMENT_SOURCES[index % len(INVESTMENT_SOURCES)]
+        asset_type = raw.get("type") or "asset"
+        volatility = raw.get("volatility") or ("moderee" if profile["risk_profile"] != "high" else "elevee")
         item.update({
-            "source": raw.get("platform") or INVESTMENT_SOURCES[index % len(INVESTMENT_SOURCES)],
+            "source": source,
+            "url": item["url"] or _source_url(source, title, universe, criteria),
             "yield_percent": raw.get("yield_percent") or (3.5 if raw.get("type") in ["stocks", "etf"] else None),
-            "volatility": raw.get("volatility") or ("moderee" if profile["risk_profile"] != "high" else "elevee"),
+            "volatility": volatility,
             "momentum": raw.get("momentum") or "a confirmer",
             "strengths": [
-                "Ameliore la lecture allocation / exposition",
-                "Peut renforcer la diversification sans interface de trading",
+                f"{title}: piste {asset_type} coherente avec une strategie {criteria.get('strategy', 'diversification')}.",
+                f"Volatilite {volatility}: compatible avec un horizon {criteria.get('horizon', 'a definir')} si allocation limitee.",
             ],
             "risks": [
-                "Surveiller volatilite, devise et concentration de poche",
+                "Verifier frais, devise et liquidite avant allocation.",
+                "Limiter la concentration et comparer avec ton exposition actuelle.",
             ],
+            "next_step": (
+                f"Ouvre {source}, compare frais / volatilite / exposition devise, "
+                "puis definis une taille de position maximale avant d'agir."
+            ),
         })
 
     if universe == "business":
+        source = raw.get("platform") or BUSINESS_SOURCES[index % len(BUSINESS_SOURCES)]
+        sector = criteria.get("sector") or criteria.get("business_type") or "marche cible"
         item.update({
-            "source": raw.get("platform") or BUSINESS_SOURCES[index % len(BUSINESS_SOURCES)],
+            "source": source,
+            "url": item["url"] or _source_url(source, title, universe, criteria),
             "yield_percent": raw.get("yield_percent"),
             "strengths": [
-                "Potentiel de creation de cashflow non correle",
-                "Compatible avec une validation marche progressive",
+                f"{source}: signal utile pour tester {sector} sans engagement lourd.",
+                f"Potentiel {potential}: a valider avec budget {budget_label} et temps disponible.",
             ],
             "risks": [
-                "Verifier temps disponible, marge nette et dependance operationnelle",
+                "Verifier marge nette, dependance operationnelle et cout d'acquisition.",
+                "Eviter de lancer sans preuve de demande ou premier canal de vente.",
             ],
+            "next_step": (
+                f"Ouvre {source}, identifie 3 offres ou tendances comparables, "
+                "puis valide une hypothese marche avec un test simple cette semaine."
+            ),
         })
 
     return item
@@ -443,6 +528,7 @@ def get_opportunity_intelligence(
         profile = _build_user_profile(conn, user_id, email)
         depth = _plan_depth(profile["plan"])
         criteria_hash = _stable_hash({
+            "version": OPPORTUNITY_CACHE_VERSION,
             "user_id": user_id,
             "plan": profile["plan"],
             "universe": payload.universe,
@@ -450,6 +536,7 @@ def get_opportunity_intelligence(
             "portfolio": profile.get("portfolio"),
         })
         cache_payload = {
+            "version": OPPORTUNITY_CACHE_VERSION,
             "user_id": user_id,
             "plan": profile["plan"],
             "universe": payload.universe,
