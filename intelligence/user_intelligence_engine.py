@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from core.cache import redis_client
 from database import engine
+from intelligence.api.global_command_center import compute_global_command_center
 from intelligence.core.upgrade_engine import compute_upgrade_decision
 from intelligence.scoring.family_office_score import (
     compute_family_office_score,
@@ -16,9 +17,10 @@ from intelligence.scoring.family_office_score import (
 )
 from intelligence.service import get_user_financial_overview
 from intelligence.strategic.feature_engine import compute_feature_access
-from product.entitlements import resolve_effective_plan
+from intelligence.strategic.module_engine import get_all_opportunities
 from intelligence.strategic.opportunity_engine import compute_opportunities
 from intelligence.strategic.strategic_layer import compute_strategic_layer
+from product.entitlements import resolve_effective_plan
 
 
 # =========================
@@ -159,7 +161,7 @@ def compute_user_intelligence(user_email: str):
             user.subscription_plan,
             user.subscription_status,
         )
-        cache_key = f"intel:{user_email}:{effective_plan}"
+        cache_key = f"intel:v2-command-center:{user_email}:{effective_plan}"
         context_cache_key = f"context:{user_email}:{effective_plan}"
 
         cached = get_cache(cache_key)
@@ -302,13 +304,30 @@ def compute_user_intelligence(user_email: str):
             finance_payload
         ) or {}
 
-        score_value = int(safe_get(score_result, "score", 0))
+        command_center = compute_global_command_center(
+            user=profile_dict,
+            onboarding=onboarding,
+            portfolio=portfolio_list,
+            financial_overview=financial_features,
+        ) or {}
+
+        score_value = int(
+            safe_get(command_center, "global_score", safe_get(score_result, "score", 0))
+        )
+        profile_dict["score"] = score_value
 
         level = compute_level(score_value, effective_plan)
 
         upgrade = compute_upgrade_decision(effective_plan, score_value)
         features = compute_feature_access(profile_dict, {"score": score_value})
-        opportunities = compute_opportunities(profile_dict, portfolio_list)
+        module_opportunities = get_all_opportunities(profile_dict)
+        opportunities = {
+            "count": len(module_opportunities),
+            "opportunities": module_opportunities,
+            "analytics": {
+                "source": "command_center",
+            },
+        } if module_opportunities else compute_opportunities(profile_dict, portfolio_list)
 
         strategic_intelligence = compute_strategic_layer(
             profile_dict,
@@ -335,9 +354,9 @@ def compute_user_intelligence(user_email: str):
             "score": score_result,
             "strategic_intelligence": strategic_intelligence,
 
-            "modules": score_result.get("details", {}),
+            "modules": command_center.get("modules") or score_result.get("details", {}),
 
-            "advice": score_result.get("advice", []),
+            "advice": command_center.get("advice") or score_result.get("advice", []),
 
             "upgrade": upgrade,
             "features": features,
