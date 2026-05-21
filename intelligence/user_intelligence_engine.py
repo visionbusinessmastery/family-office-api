@@ -161,7 +161,7 @@ def compute_user_intelligence(user_email: str):
             user.subscription_plan,
             user.subscription_status,
         )
-        cache_key = f"intel:v2-command-center:{user_email}:{effective_plan}"
+        cache_key = f"intel:v3-family-score-module-opps:{user_email}:{effective_plan}"
         context_cache_key = f"context:{user_email}:{effective_plan}"
 
         cached = get_cache(cache_key)
@@ -311,9 +311,7 @@ def compute_user_intelligence(user_email: str):
             financial_overview=financial_features,
         ) or {}
 
-        score_value = int(
-            safe_get(command_center, "global_score", safe_get(score_result, "score", 0))
-        )
+        score_value = int(safe_get(score_result, "score", 0))
         profile_dict["score"] = score_value
 
         level = compute_level(score_value, effective_plan)
