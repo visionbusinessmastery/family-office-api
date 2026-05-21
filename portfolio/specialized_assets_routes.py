@@ -4,6 +4,7 @@ from sqlalchemy import text
 from auth.utils import get_current_user, get_user_id
 from core.cache import redis_client
 from database import engine
+from intelligence.gamification.progress_service import award_xp
 from .specialized_assets_schemas import YieldAssetRequest, VentureAssetRequest
 
 
@@ -225,6 +226,7 @@ def add_yield_asset(data: YieldAssetRequest, user=Depends(get_current_user)):
             "notes": data.notes,
         })
 
+        award_xp(conn, user_id, user, f"yield_{data.asset_type}_created", 60)
         invalidate_asset_caches(user, user_id)
 
     return {"status": "created"}
@@ -264,6 +266,7 @@ def update_yield_asset(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Asset not found")
 
+        award_xp(conn, user_id, user, f"yield_{data.asset_type}_updated", 15)
         invalidate_asset_caches(user, user_id)
 
     return {"status": "updated", "id": asset_id}
@@ -330,6 +333,7 @@ def add_venture_asset(data: VentureAssetRequest, user=Depends(get_current_user))
             "notes": data.notes,
         })
 
+        award_xp(conn, user_id, user, f"venture_{data.asset_type}_created", 70)
         invalidate_asset_caches(user, user_id)
 
     return {"status": "created"}
@@ -373,6 +377,7 @@ def update_venture_asset(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Asset not found")
 
+        award_xp(conn, user_id, user, f"venture_{data.asset_type}_updated", 20)
         invalidate_asset_caches(user, user_id)
 
     return {"status": "updated", "id": asset_id}

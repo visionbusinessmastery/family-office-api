@@ -12,6 +12,7 @@ from auth.utils import get_current_user
 import json
 
 from core.cache import redis_client
+from intelligence.gamification.progress_service import ensure_gamification_tables
 from product.entitlements import plan_allows, resolve_effective_plan
 
 router = APIRouter()
@@ -180,7 +181,7 @@ def get_gamification(user=Depends(get_current_user)):
 
     email = user.get("email") if isinstance(user, dict) else user
 
-    with engine.connect() as conn:
+    with engine.begin() as conn:
 
         identity = get_user_identity(conn, email)
         user_id = identity["id"] if identity else None
@@ -210,6 +211,8 @@ def get_gamification(user=Depends(get_current_user)):
         if not user_id:
             set_cache(cache_key, default_response, ttl=60)
             return default_response
+
+        ensure_gamification_tables(conn)
 
         row = conn.execute(
             text("""

@@ -4,6 +4,7 @@ from sqlalchemy import text
 from auth.utils import get_current_user, get_user_id
 from core.cache import redis_client
 from database import engine
+from intelligence.gamification.progress_service import award_xp
 from .real_estate_schemas import RealEstateRequest
 
 
@@ -215,6 +216,7 @@ def create_real_estate_asset(data: RealEstateRequest, user):
             "notes": data.notes,
         })
 
+        award_xp(conn, user_id, user, "real_estate_asset_created", 80)
         invalidate_real_estate_caches(user, user_id)
 
     return {"status": "created"}
@@ -276,6 +278,7 @@ def update_real_estate_asset(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Asset not found")
 
+        award_xp(conn, user_id, user, "real_estate_asset_updated", 20)
         invalidate_real_estate_caches(user, user_id)
 
     return {"status": "updated", "id": asset_id}

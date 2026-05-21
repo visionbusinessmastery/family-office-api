@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
+from intelligence.gamification.progress_service import award_xp
 from workspaces.routes import resolve_workspace_context
 
 from .service import (
@@ -123,6 +124,7 @@ def add_asset(request: Request, data: PortfolioRequest):
             
             user_id = workspace["user_id"]
             cache_email = workspace["email"]
+            award_xp(conn, user_id, cache_email, "portfolio_asset_created", 50)
 
         refresh_portfolio_side_effects(user_id, cache_email)
         
@@ -170,6 +172,7 @@ def update_asset(request: Request, asset_id: int, data: PortfolioRequest):
 
             user_id = workspace["user_id"]
             cache_email = workspace["email"]
+            award_xp(conn, user_id, cache_email, "portfolio_asset_updated", 15)
 
         refresh_portfolio_side_effects(user_id, cache_email)
 

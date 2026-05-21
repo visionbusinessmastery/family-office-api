@@ -12,6 +12,7 @@ from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
 from core.cache import redis_client
+from intelligence.gamification.progress_service import award_xp
 
 router = APIRouter(tags=["Finance"])
 
@@ -87,6 +88,7 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
             }
         )
 
+        award_xp(conn, user_id, email, f"finance_{data.get('type')}_created", 30)
         invalidate_finance_caches(email, user_id)
   
     return {"status": "created"}
@@ -183,6 +185,7 @@ def update_finance(item_id: int, data: dict, user=Depends(get_current_user)):
             }
         )
 
+        award_xp(conn, user_id, email, "finance_updated", 10)
         invalidate_finance_caches(email, user_id)
 
     return {"status": "updated"}
