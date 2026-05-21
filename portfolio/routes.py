@@ -61,6 +61,7 @@ def build_portfolio_db_payload(data: PortfolioRequest):
 # =========================
 # GET PORTFOLIO
 # =========================
+@router.get("")
 @router.get("/")
 @limiter.limit("10/minute")
 def get_portfolio(request: Request):
@@ -80,6 +81,7 @@ def get_portfolio(request: Request):
 # =========================
 # ADD ASSET
 # =========================
+@router.post("")
 @router.post("/")
 @limiter.limit("10/minute")
 def add_asset(request: Request, data: PortfolioRequest):

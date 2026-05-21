@@ -59,6 +59,7 @@ def get_item_name(data: dict):
 # =========================
 # CREATE ITEM
 # =========================
+@router.post("")
 @router.post("/")
 def create_finance_item(data: dict, user=Depends(get_current_user)):
 
@@ -94,6 +95,7 @@ def create_finance_item(data: dict, user=Depends(get_current_user)):
 # =========================
 # GET FINANCE
 # =========================
+@router.get("")
 @router.get("/")
 def get_finance(user=Depends(get_current_user)):
 

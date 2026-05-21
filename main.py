@@ -172,6 +172,10 @@ async def global_error_handler(request: Request, exc: Exception):
 async def auth_middleware(request: Request, call_next):
 
     try:
+        if request.method == "OPTIONS":
+            request.state.user_email = "anonymous"
+            return await call_next(request)
+
         token = request.headers.get("Authorization")
 
         if token:
@@ -179,13 +183,14 @@ async def auth_middleware(request: Request, call_next):
             try:
                 request.state.user_email = decode_token(token)
             except Exception as e:
-                logging.error(f"TOKEN ERROR: {str(e)}")
+                logging.warning("AUTH TOKEN IGNORED: %s", str(e))
                 request.state.user_email = "anonymous"
+                request.state.auth_error = "invalid_token"
         else:
             request.state.user_email = "anonymous"
 
     except Exception as e:
-        logging.error(f"MIDDLEWARE ERROR: {str(e)}")
+        logging.warning("AUTH MIDDLEWARE WARNING: %s", str(e))
         request.state.user_email = "anonymous"
 
     response = await call_next(request)

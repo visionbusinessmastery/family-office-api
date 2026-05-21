@@ -81,6 +81,9 @@ def ensure_venture_table(conn):
 
 
 def require_user_id(conn, email: str):
+    if not email or email == "anonymous":
+        raise HTTPException(status_code=401, detail="Session invalide")
+
     user_id = get_user_id(conn, email)
 
     if not user_id:

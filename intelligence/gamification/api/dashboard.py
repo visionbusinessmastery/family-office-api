@@ -173,6 +173,7 @@ def get_user_identity(conn, email: str):
 # =========================
 # READ ONLY GAMIFICATION API (CACHE OPTIMIZED)
 # =========================
+@router.get("")
 @router.get("/")
 @router.get("/gamification")
 def get_gamification(user=Depends(get_current_user)):
