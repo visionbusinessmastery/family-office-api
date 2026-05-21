@@ -17,6 +17,7 @@ from advisor.user_state import centralized_user_state_builder
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 _ethan_schema_ready = False
+ADVISOR_CACHE_VERSION = "v2"
 
 MODEL_LIGHT = os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano")
 MODEL_STANDARD = os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini")
@@ -284,12 +285,21 @@ def compact_context(context):
 
     data_profile = context.get("data_profile") or {}
     financial = context.get("financial_features") or {}
+    opportunities = context.get("opportunities") or {}
+    opportunity_count = (
+        len(opportunities)
+        if isinstance(opportunities, list)
+        else opportunities.get("count", 0)
+        if isinstance(opportunities, dict)
+        else 0
+    )
 
     return {
         "score": score,
         "level": context.get("level"),
         "plan": context.get("plan"),
         "status": context.get("state", "READY"),
+        "opportunity_count": opportunity_count,
         "completion_percent": data_profile.get("completion_percent"),
         "cashflow": financial.get("cashflow_score"),
         "debt_risk": financial.get("debt_risk_score"),
@@ -503,6 +513,7 @@ def get_llm_response(messages, model, max_output_tokens):
 
 def build_hash(user_email, message, plan, complexity, fingerprint):
     raw = {
+        "version": ADVISOR_CACHE_VERSION,
         "email": user_email,
         "message": message.strip().lower(),
         "plan": plan,
@@ -531,8 +542,17 @@ def advisor_logic(user_email, message, level=None):
         memory = get_memory(conn, user_id)
 
         fingerprint = stable_hash({
+            "version": ADVISOR_CACHE_VERSION,
+            "score": unified_state.get("score"),
             "context": compact_context(context),
             "portfolio": compact_portfolio(portfolio),
+            "opportunity_count": (
+                opportunities.get("count", 0)
+                if isinstance(opportunities, dict)
+                else len(opportunities)
+                if isinstance(opportunities, list)
+                else 0
+            ),
             "memory": memory,
         })[:16]
         cache_key = f"advisor:{build_hash(user_email, message, plan, complexity, fingerprint)}"
