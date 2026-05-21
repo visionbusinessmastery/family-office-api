@@ -1,9 +1,11 @@
 import logging
 import json
+import hashlib
 
 from core.cache import redis_client
 
 logger = logging.getLogger(__name__)
+SCORE_CACHE_VERSION = "v2-input-fingerprint"
 
 
 # =========================================================
@@ -61,6 +63,21 @@ def safe_number(value, default=0):
         return default
 
 
+def build_score_cache_key(profile: dict, portfolio: list, financial: dict):
+    raw = json.dumps(
+        {
+            "version": SCORE_CACHE_VERSION,
+            "email": profile.get("email", "unknown") if isinstance(profile, dict) else "unknown",
+            "profile": profile or {},
+            "portfolio": portfolio or [],
+            "financial": financial or {},
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return f"score:{hashlib.md5(raw.encode()).hexdigest()}"
+
+
 # =========================================================
 # MAIN ENGINE
 # =========================================================
@@ -72,7 +89,7 @@ def compute_family_office_score(
 
     financial = financial or {}
 
-    cache_key = f"score:{profile.get('email', 'unknown')}"
+    cache_key = build_score_cache_key(profile or {}, portfolio or [], financial)
 
     # =====================================================
     # CACHE CHECK
