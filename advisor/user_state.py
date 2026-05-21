@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from auth.utils import get_user_id
-from intelligence.user_intelligence_engine import compute_user_intelligence
+from intelligence.routes import build_command_center_payload
 from portfolio.service import get_user_portfolio
 from product.entitlements import resolve_effective_plan
 
@@ -36,7 +36,7 @@ def centralized_user_state_builder(conn, email: str):
         user.subscription_plan,
         user.subscription_status,
     )
-    dashboard_context = compute_user_intelligence(email)
+    dashboard_context = build_command_center_payload(email)
     dashboard_context["plan"] = plan
     portfolio = get_user_portfolio(user.id)
     opportunities = dashboard_context.get("opportunities", {})

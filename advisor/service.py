@@ -17,7 +17,7 @@ from advisor.user_state import centralized_user_state_builder
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 _ethan_schema_ready = False
-ADVISOR_CACHE_VERSION = "v2"
+ADVISOR_CACHE_VERSION = "v3-command-center"
 
 MODEL_LIGHT = os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano")
 MODEL_STANDARD = os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini")

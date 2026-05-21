@@ -101,6 +101,14 @@ def build_command_center_payload(user_email: str):
     intelligence = compute_user_intelligence(user_email)
     family_score = intelligence.get("family_office_score") or intelligence.get("score") or {}
     details = family_score.get("details", {})
+    opportunities = intelligence.get("opportunities") or {}
+    opportunities_count = (
+        len(opportunities)
+        if isinstance(opportunities, list)
+        else opportunities.get("count", 0)
+        if isinstance(opportunities, dict)
+        else 0
+    )
 
     return {
         "user": intelligence.get("user", user_email),
@@ -124,6 +132,8 @@ def build_command_center_payload(user_email: str):
         "gamification": intelligence.get("gamification", {}),
         "modules": intelligence.get("modules", {}),
         "advice": intelligence.get("advice", []),
+        "opportunities": opportunities,
+        "opportunities_count": opportunities_count,
         "strategic_intelligence": intelligence.get("strategic_intelligence", {}),
     }
 
