@@ -10,9 +10,9 @@ from advisor.autopilot_v4_engine import get_autopilot_v4
 from auth.utils import get_user_id
 from core.cache import redis_client
 from database import engine
-from intelligence.core.orchestrator import run_orchestrator
 from portfolio.service import get_user_portfolio
 from product.entitlements import normalize_plan, plan_allows, resolve_effective_plan
+from advisor.user_state import centralized_user_state_builder
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
@@ -515,7 +515,9 @@ def build_hash(user_email, message, plan, complexity, fingerprint):
 def advisor_logic(user_email, message, level=None):
     with engine.begin() as conn:
         ensure_ethan_ai_tables(conn)
-        user_id, plan = get_user_plan(conn, user_email)
+        unified_state = centralized_user_state_builder(conn, user_email)
+        user_id = unified_state["user_id"]
+        plan = unified_state["plan"]
         config = PLAN_CONFIG[plan]
         tier = config["tier"]
         complexity = classify_request(message)
@@ -523,10 +525,9 @@ def advisor_logic(user_email, message, level=None):
         deep_sessions_used = get_daily_deep_usage(conn, user_id)
         model, soft_budget_active = choose_model(plan, complexity, deep_sessions_used)
 
-        context = run_orchestrator(user_email)
-        context["plan"] = plan
-        portfolio = get_user_portfolio(user_id) if user_id else {}
-        opportunities = context.get("opportunities", [])
+        context = unified_state["dashboard_context"]
+        portfolio = unified_state["portfolio"]
+        opportunities = unified_state["opportunities"]
         memory = get_memory(conn, user_id)
 
         fingerprint = stable_hash({
@@ -638,9 +639,9 @@ def build_fallback_response(context, opportunities, tier="ESSENTIALS"):
     return {
         "analysis": (
             f"Je garde une lecture simple: ton score est {score}/100 et "
-            f"{opportunity_count} opportunite(s) ressortent. "
+            f"{opportunity_count} opportunité(s) ressortent. "
             "Action prioritaire: clarifie le cashflow disponible, reduis la plus forte "
-            "concentration, puis reinvestis progressivement dans la poche la mieux maitrisee."
+            "concentration, puis réinvestis progressivement dans la poche la mieux maîtrisée."
         ),
         "context_score": score,
         "tier": tier,

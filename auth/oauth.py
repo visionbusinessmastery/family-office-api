@@ -184,6 +184,23 @@ def _client_secret(provider: str, config: dict):
     )
 
 
+def _provider_runtime_ready(provider: str, config: dict):
+    if config.get("coming_soon"):
+        return False
+    if not os.getenv(config.get("client_id_env", "")):
+        return False
+    if provider == "apple":
+        return bool(
+            os.getenv("APPLE_CLIENT_SECRET")
+            or (
+                os.getenv("APPLE_TEAM_ID")
+                and os.getenv("APPLE_KEY_ID")
+                and os.getenv("APPLE_PRIVATE_KEY")
+            )
+        )
+    return bool(os.getenv(config.get("client_secret_env", "")))
+
+
 def _verify_id_token(id_token: str, provider: str, config: dict, nonce: str):
     try:
         header = jwt.get_unverified_header(id_token)
@@ -329,6 +346,7 @@ def oauth_providers():
         ensure_feature_flags_table(conn)
         flags = {
             provider: is_feature_enabled(conn, config.get("flag"), {"plan": "FREE"})
+            and _provider_runtime_ready(provider, config)
             for provider, config in PROVIDERS.items()
             if not config.get("coming_soon")
         }
