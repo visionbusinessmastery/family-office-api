@@ -913,6 +913,7 @@ def get_opportunity_intelligence(
         ]
         normalized = _diversity_rerank(scored or normalized, int(depth["max_results"]))
 
+        generated_at = datetime.utcnow().isoformat()
         result = {
             "version": OPPORTUNITY_CACHE_VERSION,
             "universe": payload.universe,
@@ -921,7 +922,8 @@ def get_opportunity_intelligence(
             "items": normalized,
             "sources": sources,
             "market_signal": market_signal,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": generated_at,
+            "timestamp": generated_at,
             "cache_hit": False,
         }
         result["data_hash"] = _stable_hash({

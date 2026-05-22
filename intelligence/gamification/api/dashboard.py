@@ -11,6 +11,7 @@ from database import engine
 from auth.utils import get_current_user
 import json
 import hashlib
+from datetime import datetime
 
 from core.cache import redis_client
 from intelligence.gamification.progress_service import ensure_gamification_tables
@@ -43,7 +44,12 @@ def set_cache(key, value, ttl=300):
 
 
 def stamp_state(payload: dict) -> dict:
-    stamped = {**payload, "version": GAMIFICATION_STATE_VERSION}
+    stamped = {
+        **payload,
+        "version": GAMIFICATION_STATE_VERSION,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    stamped.pop("data_hash", None)
     stamped["data_hash"] = hashlib.sha256(
         json.dumps(stamped, sort_keys=True, default=str).encode()
     ).hexdigest()

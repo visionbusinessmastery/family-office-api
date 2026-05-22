@@ -5,6 +5,7 @@
 import json
 import hashlib
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter
 
@@ -311,6 +312,7 @@ def compute_global_command_center(
             }
         }
         result["version"] = COMMAND_CENTER_VERSION
+        result["timestamp"] = datetime.utcnow().isoformat()
         result["data_hash"] = hashlib.sha256(
             json.dumps(result, sort_keys=True, default=str).encode()
         ).hexdigest()
@@ -343,6 +345,8 @@ def compute_global_command_center(
             "advice": [],
 
             "version": COMMAND_CENTER_VERSION,
+
+            "timestamp": datetime.utcnow().isoformat(),
 
             "data_hash": "error",
 
