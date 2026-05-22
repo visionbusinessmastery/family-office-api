@@ -914,6 +914,7 @@ def get_opportunity_intelligence(
         normalized = _diversity_rerank(scored or normalized, int(depth["max_results"]))
 
         result = {
+            "version": OPPORTUNITY_CACHE_VERSION,
             "universe": payload.universe,
             "plan": profile["plan"],
             "depth": depth,
@@ -923,6 +924,20 @@ def get_opportunity_intelligence(
             "generated_at": datetime.utcnow().isoformat(),
             "cache_hit": False,
         }
+        result["data_hash"] = _stable_hash({
+            "version": result["version"],
+            "universe": result["universe"],
+            "plan": result["plan"],
+            "items": [
+                {
+                    "id": item.get("id"),
+                    "signature": item.get("signature"),
+                    "score": item.get("score", {}).get("final_score"),
+                }
+                for item in normalized
+            ],
+            "criteria_hash": criteria_hash,
+        })
 
         conn.execute(text("""
             INSERT INTO opportunity_intelligence_requests

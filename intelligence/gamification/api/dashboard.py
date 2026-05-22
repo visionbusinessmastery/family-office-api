@@ -10,12 +10,14 @@ from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
 import json
+import hashlib
 
 from core.cache import redis_client
 from intelligence.gamification.progress_service import ensure_gamification_tables
 from product.entitlements import plan_allows, resolve_effective_plan
 
 router = APIRouter()
+GAMIFICATION_STATE_VERSION = "gamification-v1"
 
 
 # =========================
@@ -38,6 +40,14 @@ def set_cache(key, value, ttl=300):
             redis_client.setex(key, ttl, json.dumps(value))
     except:
         pass
+
+
+def stamp_state(payload: dict) -> dict:
+    stamped = {**payload, "version": GAMIFICATION_STATE_VERSION}
+    stamped["data_hash"] = hashlib.sha256(
+        json.dumps(stamped, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    return stamped
 
 
 def build_affiliations(conn, user_id: int):
@@ -207,6 +217,7 @@ def get_gamification(user=Depends(get_current_user)):
                 "affiliations": [],
             },
         }
+        default_response = stamp_state(default_response)
 
         if not user_id:
             set_cache(cache_key, default_response, ttl=60)
@@ -225,6 +236,7 @@ def get_gamification(user=Depends(get_current_user)):
 
         if not row:
             default_response["ai_coach"]["affiliations"] = build_affiliations(conn, user_id)
+            default_response = stamp_state(default_response)
             set_cache(cache_key, default_response, ttl=60)
             return default_response
 
@@ -259,6 +271,7 @@ def get_gamification(user=Depends(get_current_user)):
                 "affiliations": build_affiliations(conn, user_id),
             }
         }
+        result = stamp_state(result)
 
         # =========================
         # CACHE STORE
