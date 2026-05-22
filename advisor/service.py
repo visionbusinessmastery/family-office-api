@@ -17,7 +17,7 @@ from advisor.user_state import centralized_user_state_builder
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 _ethan_schema_ready = False
-ADVISOR_CACHE_VERSION = "v3-command-center"
+ADVISOR_CACHE_VERSION = "v4-question-aware-fallback"
 
 MODEL_LIGHT = os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano")
 MODEL_STANDARD = os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini")
@@ -581,7 +581,13 @@ def advisor_logic(user_email, message, level=None):
         )
 
         if not llm_text:
-            result = build_fallback_response(context, opportunities, tier)
+            result = build_fallback_response(
+                context,
+                opportunities,
+                tier,
+                message=message,
+                portfolio=portfolio,
+            )
             record_usage(conn, user_id, user_email, plan, tier, task_type, complexity, actual_model, False, input_tokens, 0)
             set_cache(cache_key, result, ttl=180)
             return result
@@ -665,6 +671,109 @@ def build_fallback_response(context, opportunities, tier="ESSENTIALS"):
         ),
         "context_score": score,
         "tier": tier,
+        "autopilot": None,
+    }
+
+
+def _fallback_focus(message: str) -> str:
+    normalized = (message or "").lower()
+    if any(word in normalized for word in ["immobilier", "residence", "locatif", "loyer", "travaux"]):
+        return "real_estate"
+    if any(word in normalized for word in ["opportunite", "opportunites", "deal", "signal", "source"]):
+        return "opportunities"
+    if any(word in normalized for word in ["cashflow", "revenu", "charge", "epargne", "budget"]):
+        return "cashflow"
+    if any(word in normalized for word in ["risque", "concentration", "exposition", "diversification"]):
+        return "risk"
+    if any(word in normalized for word in ["portfolio", "portefeuille", "action", "etf", "crypto", "forex"]):
+        return "portfolio"
+    if any(word in normalized for word in ["business", "entreprise", "startup", "franchise", "reprise"]):
+        return "business"
+    if any(word in normalized for word in ["legacy", "heritage", "transmission", "famille", "gouvernance"]):
+        return "legacy"
+    if any(word in normalized for word in ["score", "progression", "xp", "badge", "mission"]):
+        return "progression"
+    return "general"
+
+
+def _opportunity_count(opportunities) -> int:
+    return (
+        len(opportunities)
+        if isinstance(opportunities, list)
+        else opportunities.get("count", 0)
+        if isinstance(opportunities, dict)
+        else 0
+    )
+
+
+def _top_portfolio_exposure(portfolio) -> str:
+    compact = compact_portfolio(portfolio)
+    exposures = compact.get("exposures") or {}
+    if not exposures:
+        return "aucune poche dominante encore visible"
+
+    top_name, top_value = next(iter(exposures.items()))
+    total = compact.get("total_value") or 0
+    share = round((float(top_value or 0) / float(total or 1)) * 100)
+    return f"{top_name} ({share}% environ)"
+
+
+def build_fallback_response(context, opportunities, tier="ESSENTIALS", message=None, portfolio=None):
+    score = get_context_score(context)
+    opportunity_count = _opportunity_count(opportunities)
+    focus = _fallback_focus(message or "")
+    top_exposure = _top_portfolio_exposure(portfolio or {})
+
+    responses = {
+        "real_estate": (
+            f"Sur l'immobilier, je pars de ton score {score}/100. "
+            "Priorite: rendement net, travaux, vacance locative et fiscalite locale avant de comparer les annonces. "
+            "Action simple: selectionne 2 biens similaires dans la meme zone, puis calcule le cashflow net avec charges et marge de securite."
+        ),
+        "opportunities": (
+            f"Je vois {opportunity_count} opportunite(s) dans le moteur. Ne les traite pas comme une liste a suivre aveuglement: "
+            "classe-les par strategie cashflow, valorisation et diversification, puis garde seulement celles qui reduisent une faiblesse actuelle. "
+            "Action utile: ouvre la meilleure source, compare 2 alternatives et note pourquoi elle est vraiment nouvelle pour ton portefeuille."
+        ),
+        "cashflow": (
+            f"Pour le cashflow, ton score {score}/100 indique qu'il faut d'abord clarifier la capacite mensuelle disponible. "
+            "Priorite: revenus recurrents, charges fixes, epargne automatique, puis marge de securite. "
+            "Action simple: isole le montant investissable mensuel prudent avant toute nouvelle allocation."
+        ),
+        "risk": (
+            f"Le point de risque principal semble etre la concentration: ta poche dominante est {top_exposure}. "
+            "Priorite: ne pas ajouter une opportunite qui renforce cette concentration, meme si elle parait attractive. "
+            "Action utile: fixe une limite par classe d'actifs puis cherche une opportunite qui apporte une vraie diversification."
+        ),
+        "portfolio": (
+            f"Pour le portefeuille, je regarderais d'abord l'allocation plutot que le prochain actif. Ta poche la plus visible est {top_exposure}. "
+            "Action simple: compare chaque nouvelle position a son role exact: stabiliser, diversifier, produire du cashflow ou chercher de la valorisation."
+        ),
+        "business": (
+            "Sur le business, je privilegie une lecture tres terrain: marge nette, temps disponible, canal d'acquisition et dependance operationnelle. "
+            "Action simple: choisis une seule piste, teste la demande avec une offre minimale, puis decide seulement apres un premier signal concret."
+        ),
+        "legacy": (
+            "Pour la partie Legacy, l'objectif n'est pas d'aller vite mais de rendre le patrimoine plus transmissible et moins dependant de toi. "
+            "Action simple: clarifie beneficiaires, documents essentiels, roles familiaux et risques de concentration avant toute optimisation avancee."
+        ),
+        "progression": (
+            f"Pour faire progresser ton score {score}/100, l'action la plus rentable est souvent la donnee manquante la plus simple. "
+            "Priorite: completer cashflow, objectifs, horizon, puis documenter les actifs majeurs. "
+            "Action utile: choisis une mission concrete et mesurable aujourd'hui plutot qu'une grande refonte."
+        ),
+        "general": (
+            f"Je garde une lecture simple: ton score est {score}/100 et {opportunity_count} opportunite(s) ressortent. "
+            "Pour te repondre plus precisement, je partirais de trois axes: cashflow disponible, concentration actuelle, puis opportunite qui apporte la meilleure diversification. "
+            "Action prioritaire: formule la decision a prendre en une phrase, puis on la transforme en prochaine etape executable."
+        ),
+    }
+
+    return {
+        "analysis": responses.get(focus, responses["general"]),
+        "context_score": score,
+        "tier": tier,
+        "focus": focus,
         "autopilot": None,
     }
 
