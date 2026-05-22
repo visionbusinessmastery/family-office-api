@@ -5,6 +5,10 @@
 # =========================
 # IMPORTS
 # =========================
+import hashlib
+import json
+from datetime import datetime
+
 from fastapi import APIRouter, Request
 from core.limiter import limiter
 from core.utils import safe_execute
@@ -19,6 +23,7 @@ from .service import (
 from intelligence.user_intelligence_engine import compute_user_intelligence
 
 router = APIRouter()
+COMMAND_CENTER_PAYLOAD_VERSION = "gcc-payload-v1"
 
 
 # =========================
@@ -110,7 +115,7 @@ def build_command_center_payload(user_email: str):
         else 0
     )
 
-    return {
+    payload = {
         "user": intelligence.get("user", user_email),
         "plan": intelligence.get("plan", "FREE"),
         "global_score": intelligence.get("global_score", family_score.get("score", 0)),
@@ -136,6 +141,12 @@ def build_command_center_payload(user_email: str):
         "opportunities_count": opportunities_count,
         "strategic_intelligence": intelligence.get("strategic_intelligence", {}),
     }
+    payload["version"] = COMMAND_CENTER_PAYLOAD_VERSION
+    payload["timestamp"] = datetime.utcnow().isoformat()
+    payload["data_hash"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    return payload
 
 
 # =========================

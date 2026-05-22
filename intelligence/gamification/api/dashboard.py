@@ -19,6 +19,7 @@ from product.entitlements import plan_allows, resolve_effective_plan
 
 router = APIRouter()
 GAMIFICATION_STATE_VERSION = "gamification-v1"
+XP_TO_NEXT_LEVEL = 1000
 
 
 # =========================
@@ -44,6 +45,16 @@ def set_cache(key, value, ttl=300):
 
 
 def stamp_state(payload: dict) -> dict:
+    xp = int(payload.get("xp") or 0)
+    payload = {
+        **payload,
+        "xp_to_next_level": payload.get("xp_to_next_level", XP_TO_NEXT_LEVEL),
+        "progress_xp": payload.get("progress_xp", xp % XP_TO_NEXT_LEVEL),
+        "progress_percent": payload.get(
+            "progress_percent",
+            min(100, ((xp % XP_TO_NEXT_LEVEL) / XP_TO_NEXT_LEVEL) * 100),
+        ),
+    }
     stamped = {
         **payload,
         "version": GAMIFICATION_STATE_VERSION,
