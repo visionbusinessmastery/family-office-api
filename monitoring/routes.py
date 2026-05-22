@@ -12,6 +12,65 @@ from security.audit import require_security_admin
 router = APIRouter()
 
 
+HYBRID_SOURCE_MAP = {
+    "score": {
+        "primary_view": "/intelligence/global-command-center",
+        "parallel_sources": [
+            "/intelligence/user-intelligence",
+            "/intelligence/score/recalculate",
+        ],
+        "frontend_fallbacks": "preserved",
+        "notes": "Global Command Center is the dashboard view, but legacy score sources remain active.",
+    },
+    "opportunities": {
+        "primary_view": "/intelligence/global-command-center",
+        "parallel_sources": [
+            "/intelligence/category-opportunities",
+            "/intelligence/opportunity-intelligence",
+        ],
+        "frontend_fallbacks": "preserved",
+        "notes": "Category and deal-flow opportunity systems intentionally coexist.",
+    },
+    "gamification": {
+        "primary_view": "/gamification/",
+        "parallel_sources": [
+            "/product/context",
+            "/intelligence/global-command-center",
+        ],
+        "frontend_fallbacks": "preserved",
+        "notes": "Dedicated gamification API is the progression view; product context and command center keep auxiliary state.",
+    },
+    "portfolio_finance": {
+        "primary_view": "domain services",
+        "parallel_sources": [
+            "/portfolio/",
+            "/portfolio/history",
+            "/finance/",
+            "/real-estate/",
+            "/yield-assets/",
+            "/venture-assets/",
+        ],
+        "frontend_fallbacks": "preserved",
+        "notes": "Backend domain totals and frontend consolidated portfolio calculations intentionally coexist.",
+    },
+}
+
+
+def safe_mode_payload():
+    return {
+        "mode": "safe_stabilization",
+        "live_comparison": "not_executed_safe_mode",
+        "behavior": "read_only_observability",
+        "source_map": HYBRID_SOURCE_MAP,
+        "guarantees": [
+            "no business logic execution",
+            "no source unification",
+            "no fallback removal",
+            "no API contract changes to existing endpoints",
+        ],
+    }
+
+
 @router.get("/admin/diagnostics")
 def admin_diagnostics(request: Request, email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -52,6 +111,30 @@ def admin_diagnostics(request: Request, email: str = Depends(get_current_user)):
             }
             for row in models
         ],
+    }
+
+
+@router.get("/admin/system-state")
+def admin_system_state(request: Request, email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        require_security_admin(conn, email, request)
+
+    return {
+        "health": system_health(),
+        **safe_mode_payload(),
+    }
+
+
+@router.get("/admin/mismatch-report")
+def admin_mismatch_report(request: Request, email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        require_security_admin(conn, email, request)
+
+    return {
+        **safe_mode_payload(),
+        "findings": [],
+        "status": "no_live_mismatch_check_performed",
+        "instructions": "Use this endpoint as a passive source map. Manual review is required before any correction.",
     }
 
 

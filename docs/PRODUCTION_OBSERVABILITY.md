@@ -5,6 +5,19 @@
 - `/health` returns aggregated platform status.
 - `/health/db`, `/health/cache`, `/health/openai`, `/health/stripe` are ready for UptimeRobot or Render checks.
 - `/system/admin/diagnostics` exposes dependency status, feature flags and Ethan cost summaries for security admins.
+- `/system/admin/system-state` exposes the current hybrid source map for security admins without executing business logic.
+- `/system/admin/mismatch-report` returns a passive safe-mode mismatch report scaffold. It does not auto-compare or correct production data.
+
+## Hybrid consistency audit
+
+WHITE ROCK currently runs in a safe hybrid state:
+
+- Score: `/intelligence/global-command-center` is the dashboard view while `/intelligence/user-intelligence` and recalculation endpoints remain active.
+- Opportunities: command center, category opportunities and deal-flow generation intentionally coexist.
+- Gamification: `/gamification/`, `/product/context` and command center keep overlapping state for resilience.
+- Portfolio and finance: backend domain services return raw and domain totals while the frontend still keeps legacy consolidated calculations.
+
+The mismatch report is intentionally passive. It preserves all sources, performs no automatic correction and requires manual review before any remediation.
 
 ## Sentry
 
