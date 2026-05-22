@@ -29,7 +29,7 @@ from opportunity_cache.engine import get_cached_opportunities, set_cached_opport
 
 
 router = APIRouter()
-OPPORTUNITY_CACHE_VERSION = "v3-contextual-source-links"
+OPPORTUNITY_CACHE_VERSION = "v4-multi-objective-deal-flow"
 
 
 DISCOVERY_DEPTH = {
@@ -151,6 +151,31 @@ def ensure_opportunity_intelligence_tables(conn):
         ON opportunity_intelligence_requests(user_id, created_at DESC)
     """))
 
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS opportunity_intelligence_seen (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            universe TEXT NOT NULL,
+            signature TEXT NOT NULL,
+            title TEXT,
+            opportunity_type TEXT,
+            location TEXT,
+            strategy_type TEXT,
+            profile_cluster TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_opportunity_seen_unique
+        ON opportunity_intelligence_seen(user_id, universe, signature)
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_opportunity_seen_recent
+        ON opportunity_intelligence_seen(user_id, universe, created_at DESC)
+    """))
+
 
 def _safe_float(value, default=0.0):
     try:
@@ -162,6 +187,143 @@ def _safe_float(value, default=0.0):
 def _stable_hash(payload: dict) -> str:
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _clamp(value: float, minimum: int = 0, maximum: int = 100) -> int:
+    return int(max(minimum, min(maximum, round(value))))
+
+
+def _risk_level_from_score(score: float) -> str:
+    if score >= 70:
+        return "low"
+    if score >= 45:
+        return "medium"
+    return "high"
+
+
+def _risk_score_from_level(level: str) -> int:
+    return {"low": 82, "medium": 62, "high": 38}.get(str(level or "").lower(), 58)
+
+
+def _horizon_from_strategy(strategy: str, universe: str) -> str:
+    if strategy == "cashflow":
+        return "short"
+    if strategy == "capital_appreciation":
+        return "long"
+    if universe == "business":
+        return "medium"
+    return "medium"
+
+
+def _strategy_from_item(raw: dict, universe: str, criteria: dict, index: int) -> str:
+    requested = str(criteria.get("strategy") or criteria.get("ambition") or "").lower()
+    title = str(raw.get("title") or "").lower()
+    projection = str(raw.get("projection") or "").lower()
+    combined = f"{requested} {title} {projection}"
+
+    if any(token in combined for token in ["cashflow", "dividende", "dividend", "loyer", "rent", "side business"]):
+        return "cashflow"
+    if any(token in combined for token in ["valorisation", "croissance", "growth", "startup", "value"]):
+        return "capital_appreciation"
+    if universe == "real_estate" and index % 3 == 0:
+        return "cashflow"
+    if universe == "investments" and index % 3 == 1:
+        return "capital_appreciation"
+    return "hybrid"
+
+
+def _portfolio_asset_types(profile: dict) -> set[str]:
+    return {
+        str(item.get("category") or "").lower()
+        for item in profile.get("portfolio", [])
+        if item.get("category")
+    }
+
+
+def _token_set(value: str) -> set[str]:
+    return {
+        token
+        for token in str(value or "").lower().replace("/", " ").replace("-", " ").split()
+        if len(token) > 2
+    }
+
+
+def _opportunity_signature(item: dict) -> str:
+    return _stable_hash({
+        "title": item.get("title"),
+        "type": item.get("type"),
+        "location": item.get("location"),
+        "strategy_type": item.get("strategy_type"),
+        "source": item.get("source"),
+    })
+
+
+def _profile_cluster(item: dict) -> str:
+    return "|".join([
+        str(item.get("universe") or ""),
+        str(item.get("type") or ""),
+        str(item.get("location") or ""),
+        str(item.get("risk_level") or ""),
+        str(item.get("investment_horizon") or ""),
+        str(item.get("strategy_type") or ""),
+    ]).lower()
+
+
+def _similarity(first: dict, second: dict) -> float:
+    if first.get("profile_cluster") and first.get("profile_cluster") == second.get("profile_cluster"):
+        return 1.0
+
+    first_tokens = _token_set(" ".join(str(first.get(key) or "") for key in ["title", "type", "location", "strategy_type"]))
+    second_tokens = _token_set(" ".join(str(second.get(key) or "") for key in ["title", "type", "location", "strategy_type"]))
+    if not first_tokens or not second_tokens:
+        return 0.0
+    return len(first_tokens & second_tokens) / max(1, len(first_tokens | second_tokens))
+
+
+def _load_seen_opportunities(conn, user_id: int, universe: str, limit: int = 80) -> list[dict]:
+    rows = conn.execute(text("""
+        SELECT signature, title, opportunity_type, location, strategy_type, profile_cluster
+        FROM opportunity_intelligence_seen
+        WHERE user_id = :user_id
+          AND universe = :universe
+          AND created_at >= NOW() - INTERVAL '90 days'
+        ORDER BY created_at DESC
+        LIMIT :limit
+    """), {"user_id": user_id, "universe": universe, "limit": limit}).fetchall()
+
+    return [
+        {
+            "signature": row.signature,
+            "title": row.title,
+            "type": row.opportunity_type,
+            "location": row.location,
+            "strategy_type": row.strategy_type,
+            "profile_cluster": row.profile_cluster,
+        }
+        for row in rows
+    ]
+
+
+def _remember_opportunities(conn, user_id: int, universe: str, items: list[dict]):
+    for item in items:
+        conn.execute(text("""
+            INSERT INTO opportunity_intelligence_seen
+                (user_id, universe, signature, title, opportunity_type, location, strategy_type, profile_cluster, created_at)
+            VALUES
+                (:user_id, :universe, :signature, :title, :type, :location, :strategy_type, :profile_cluster, NOW())
+            ON CONFLICT (user_id, universe, signature) DO UPDATE SET
+                created_at = NOW(),
+                profile_cluster = EXCLUDED.profile_cluster
+        """), {
+            "user_id": user_id,
+            "universe": universe,
+            "signature": item.get("signature"),
+            "title": item.get("title"),
+            "type": item.get("type"),
+            "location": item.get("location"),
+            "strategy_type": item.get("strategy_type"),
+            "profile_cluster": item.get("profile_cluster"),
+        })
 
 
 def _cache_get(key: str):
@@ -268,6 +430,164 @@ def _source_url(source: str, title: str, universe: str, criteria: dict) -> str:
         return f"https://www.tradingview.com/search/?query={query}"
 
     return f"https://www.google.com/search?q={quote_plus(source + ' ' + raw_query)}"
+
+
+def _deal_flow_features(raw: dict, item: dict, universe: str, index: int, criteria: dict, profile: dict) -> dict:
+    location = (
+        criteria.get("city")
+        or criteria.get("country")
+        or criteria.get("sector")
+        or item.get("source")
+        or "global"
+    )
+    strategy_type = _strategy_from_item(raw, universe, criteria, index)
+    investment_horizon = _horizon_from_strategy(strategy_type, universe)
+    item_type = str(item.get("type") or universe).lower()
+    yield_percent = _safe_float(item.get("yield_percent"), 0)
+    base_return = _potential_score(raw.get("potential")) if raw.get("potential") else item.get("ethan_score", 60)
+
+    if yield_percent:
+        return_score = _clamp((yield_percent * 9) + 28)
+        expected_return = f"{round(yield_percent, 2)}% cible"
+    elif universe == "business":
+        return_score = _clamp(base_return + (8 if strategy_type == "cashflow" else 0))
+        expected_return = "cashflow / croissance a valider"
+    else:
+        return_score = _clamp(base_return)
+        expected_return = "potentiel relatif a confirmer"
+
+    risk_level = str(criteria.get("risk") or raw.get("risk_level") or "").lower()
+    if risk_level not in {"low", "medium", "high"}:
+        if universe == "crypto" or "crypto" in item_type or strategy_type == "capital_appreciation":
+            risk_level = "high"
+        elif universe == "real_estate" or strategy_type == "cashflow":
+            risk_level = "medium"
+        else:
+            risk_level = _risk_level_from_score(base_return)
+
+    if universe == "real_estate":
+        liquidity_score = 42
+    elif universe == "business":
+        liquidity_score = 35
+    elif item_type in {"etf", "stocks", "stock", "commodities"}:
+        liquidity_score = 82
+    elif item_type == "crypto":
+        liquidity_score = 75
+    else:
+        liquidity_score = 58
+
+    owned_types = _portfolio_asset_types(profile)
+    diversification_score = 86 if item_type not in owned_types else 52
+    if location and str(location).lower() not in {"global", "france"}:
+        diversification_score += 5
+
+    user_risk = str(profile.get("risk_profile") or "medium").lower()
+    risk_distance = abs({"low": 1, "medium": 2, "high": 3}.get(user_risk, 2) - {"low": 1, "medium": 2, "high": 3}.get(risk_level, 2))
+    portfolio_fit_score = _clamp(86 - risk_distance * 20)
+    if strategy_type == str(criteria.get("strategy") or criteria.get("ambition") or "").lower():
+        portfolio_fit_score += 8
+
+    momentum_score = _clamp(base_return + (10 if item.get("momentum") not in [None, "", "a confirmer"] else 0))
+
+    return {
+        "location": str(location),
+        "expected_return": expected_return,
+        "risk_level": risk_level,
+        "investment_horizon": investment_horizon,
+        "strategy_type": strategy_type,
+        "return_score": _clamp(return_score),
+        "risk_score": _risk_score_from_level(risk_level),
+        "liquidity_score": _clamp(liquidity_score),
+        "diversification_score": _clamp(diversification_score),
+        "portfolio_fit_score": _clamp(portfolio_fit_score),
+        "momentum_score": _clamp(momentum_score),
+    }
+
+
+def _score_deal_flow_item(item: dict, seen: list[dict]) -> dict:
+    candidate = {
+        "title": item.get("title"),
+        "type": item.get("type"),
+        "location": item.get("location"),
+        "strategy_type": item.get("strategy_type"),
+        "profile_cluster": item.get("profile_cluster"),
+    }
+    max_similarity = max((_similarity(candidate, past) for past in seen), default=0.0)
+    novelty_score = _clamp(100 - max_similarity * 100)
+    weights = {
+        "return_score": 0.20,
+        "risk_score": 0.15,
+        "liquidity_score": 0.12,
+        "diversification_score": 0.18,
+        "portfolio_fit_score": 0.18,
+        "momentum_score": 0.10,
+        "novelty_score": 0.07,
+    }
+    final_score = _clamp(
+        item["return_score"] * weights["return_score"]
+        + item["risk_score"] * weights["risk_score"]
+        + item["liquidity_score"] * weights["liquidity_score"]
+        + item["diversification_score"] * weights["diversification_score"]
+        + item["portfolio_fit_score"] * weights["portfolio_fit_score"]
+        + item["momentum_score"] * weights["momentum_score"]
+        + novelty_score * weights["novelty_score"]
+    )
+    breakdown = {
+        "return_score": item["return_score"],
+        "risk_score": item["risk_score"],
+        "liquidity_score": item["liquidity_score"],
+        "diversification_score": item["diversification_score"],
+        "portfolio_fit_score": item["portfolio_fit_score"],
+        "momentum_score": item["momentum_score"],
+        "novelty_score": novelty_score,
+    }
+    item.update({
+        "ethan_score": final_score,
+        "score": {
+            "final_score": final_score,
+            "breakdown": breakdown,
+        },
+        "why_this_is_new_vs_previous": (
+            "Profil distinct des dernieres opportunites analysees."
+            if max_similarity < 0.45
+            else "Proche d'un signal deja vu: conserve uniquement si les chiffres sont meilleurs."
+        ),
+    })
+    return item
+
+
+def _diversity_rerank(items: list[dict], max_results: int) -> list[dict]:
+    selected: list[dict] = []
+    used_clusters: set[str] = set()
+    strategy_counts: dict[str, int] = {}
+    risk_counts: dict[str, int] = {}
+
+    for item in sorted(items, key=lambda value: value.get("score", {}).get("final_score", 0), reverse=True):
+        cluster = item.get("profile_cluster")
+        strategy = item.get("strategy_type") or "hybrid"
+        risk = item.get("risk_level") or "medium"
+        too_similar = any(_similarity(item, current) > 0.72 for current in selected)
+
+        if cluster in used_clusters or too_similar:
+            continue
+        if strategy_counts.get(strategy, 0) >= 2:
+            continue
+        if risk_counts.get(risk, 0) >= 3:
+            continue
+
+        selected.append(item)
+        used_clusters.add(cluster)
+        strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
+        risk_counts[risk] = risk_counts.get(risk, 0) + 1
+
+        if len(selected) >= max_results:
+            return selected
+
+    for item in sorted(items, key=lambda value: value.get("score", {}).get("final_score", 0), reverse=True):
+        if item not in selected and len(selected) < max_results:
+            selected.append(item)
+
+    return selected
 
 
 def _build_user_profile(conn, user_id: int, email: str) -> dict:
@@ -436,6 +756,16 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
             ),
         })
 
+    features = _deal_flow_features(raw, item, universe, index, criteria, profile)
+    item.update(features)
+    item["profile_cluster"] = _profile_cluster(item)
+    item["signature"] = _opportunity_signature(item)
+    item["link_or_source"] = item.get("url") or item.get("source")
+    item["explanation"] = (
+        f"Ethan retient ce signal pour son equilibre {item['strategy_type']} / {item['risk_level']} "
+        f"et sa contribution a la diversification du portefeuille."
+    )
+
     return item
 
 
@@ -527,8 +857,13 @@ def get_opportunity_intelligence(
 
         profile = _build_user_profile(conn, user_id, email)
         depth = _plan_depth(profile["plan"])
+        seen_opportunities = _load_seen_opportunities(conn, user_id, payload.universe)
+        seen_fingerprint = _stable_hash({
+            "seen": [item.get("signature") for item in seen_opportunities[:12]],
+        })
         criteria_hash = _stable_hash({
             "version": OPPORTUNITY_CACHE_VERSION,
+            "seen": seen_fingerprint,
             "user_id": user_id,
             "plan": profile["plan"],
             "universe": payload.universe,
@@ -537,6 +872,7 @@ def get_opportunity_intelligence(
         })
         cache_payload = {
             "version": OPPORTUNITY_CACHE_VERSION,
+            "seen": seen_fingerprint,
             "user_id": user_id,
             "plan": profile["plan"],
             "universe": payload.universe,
@@ -544,8 +880,9 @@ def get_opportunity_intelligence(
             "portfolio": profile.get("portfolio"),
         }
         cached = get_cached_opportunities(payload.universe, cache_payload)
+        use_cached_final_selection = False
 
-        if cached:
+        if cached and use_cached_final_selection:
             conn.execute(text("""
                 INSERT INTO opportunity_intelligence_requests
                     (user_id, universe, criteria_hash, plan, cache_hit)
@@ -569,8 +906,12 @@ def get_opportunity_intelligence(
             for index, item in enumerate(collected)
             if isinstance(item, dict)
         ]
-        normalized.sort(key=lambda item: item.get("ethan_score", 0), reverse=True)
-        normalized = normalized[: int(depth["max_results"])]
+        scored = [
+            _score_deal_flow_item(item, seen_opportunities)
+            for item in normalized
+            if item.get("score", {}).get("breakdown", {}).get("novelty_score", 0) >= 22
+        ]
+        normalized = _diversity_rerank(scored or normalized, int(depth["max_results"]))
 
         result = {
             "universe": payload.universe,
@@ -595,6 +936,7 @@ def get_opportunity_intelligence(
         })
 
         set_cached_opportunities(payload.universe, cache_payload, result)
+        _remember_opportunities(conn, user_id, payload.universe, normalized)
         capture_event(
             conn,
             OPPORTUNITY_OPENED,
