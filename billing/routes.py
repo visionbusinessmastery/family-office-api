@@ -51,6 +51,50 @@ PLANS = {
     },
 }
 
+PLAN_INTERVALS = ("monthly", "yearly")
+
+PLAN_PRICE_ENVS = {
+    "gold": {
+        "monthly": "STRIPE_PRICE_GOLD_MONTHLY",
+        "yearly": "STRIPE_PRICE_GOLD_YEARLY",
+        "legacy": "STRIPE_PRICE_GOLD",
+    },
+    "elite": {
+        "monthly": "STRIPE_PRICE_ELITE_MONTHLY",
+        "yearly": "STRIPE_PRICE_ELITE_YEARLY",
+        "legacy": "STRIPE_PRICE_ELITE",
+    },
+    "liberty": {
+        "monthly": "STRIPE_PRICE_LIBERTY_MONTHLY",
+        "yearly": "STRIPE_PRICE_LIBERTY_YEARLY",
+        "legacy": "STRIPE_PRICE_LIBERTY",
+    },
+    "legacy": {
+        "monthly": "STRIPE_PRICE_LEGACY_MONTHLY",
+        "yearly": "STRIPE_PRICE_LEGACY_YEARLY",
+        "legacy": "STRIPE_PRICE_LEGACY",
+    },
+}
+
+FOUNDER_PRICE_ENVS = {
+    "gold": {
+        "monthly": "STRIPE_PRICE_FOUNDER_GOLD_MONTHLY",
+        "yearly": "STRIPE_PRICE_FOUNDER_GOLD_YEARLY",
+    },
+    "elite": {
+        "monthly": "STRIPE_PRICE_FOUNDER_ELITE_MONTHLY",
+        "yearly": "STRIPE_PRICE_FOUNDER_ELITE_YEARLY",
+    },
+    "liberty": {
+        "monthly": "STRIPE_PRICE_FOUNDER_LIBERTY_MONTHLY",
+        "yearly": "STRIPE_PRICE_FOUNDER_LIBERTY_YEARLY",
+    },
+    "legacy": {
+        "monthly": "STRIPE_PRICE_FOUNDER_LEGACY_MONTHLY",
+        "yearly": "STRIPE_PRICE_FOUNDER_LEGACY_YEARLY",
+    },
+}
+
 STRIPE_STATUS_MAP = {
     "trialing": "trialing",
     "active": "active",
@@ -90,10 +134,17 @@ def plan_from_price_id(price_id: str | None):
     if not price_id:
         return None
 
-    for plan_id, plan in PLANS.items():
-        configured = os.getenv(plan["price_env"] or "")
-        if configured and configured == price_id:
-            return plan_id.upper()
+    for plan_id, envs in PLAN_PRICE_ENVS.items():
+        for env_name in envs.values():
+            configured = os.getenv(env_name or "")
+            if configured and configured == price_id:
+                return plan_id.upper()
+
+    for plan_id, envs in FOUNDER_PRICE_ENVS.items():
+        for env_name in envs.values():
+            configured = os.getenv(env_name or "")
+            if configured and configured == price_id:
+                return plan_id.upper()
 
     return None
 
@@ -159,22 +210,39 @@ def ensure_billing_tables(conn):
     _billing_schema_ready = True
 
 
-def get_plan_or_400(plan_id: str):
+def normalize_interval(value: str | None):
+    interval = str(value or "monthly").lower()
+    return interval if interval in PLAN_INTERVALS else "monthly"
+
+
+def get_price_env(plan_id: str, interval: str, founder: bool = False):
+    envs = FOUNDER_PRICE_ENVS if founder else PLAN_PRICE_ENVS
+    plan_envs = envs.get(plan_id) or {}
+    return plan_envs.get(interval)
+
+
+def get_plan_or_400(plan_id: str, interval: str | None = None, founder: bool = False):
     plan_id = (plan_id or "").lower()
     plan = PLANS.get(plan_id)
 
     if not plan or plan_id == "free":
         raise HTTPException(status_code=400, detail="Plan inconnu")
 
-    price_id = os.getenv(plan["price_env"] or "")
+    billing_interval = normalize_interval(interval)
+    price_env = get_price_env(plan_id, billing_interval, founder)
+    price_id = os.getenv(price_env or "")
+
+    if not price_id and not founder:
+        price_env = PLAN_PRICE_ENVS.get(plan_id, {}).get("legacy")
+        price_id = os.getenv(price_env or "")
 
     if not price_id:
         raise HTTPException(
             status_code=400,
-            detail=f"Price Stripe manquant: {plan['price_env']}",
+            detail=f"Price Stripe manquant: {price_env}",
         )
 
-    return plan, price_id
+    return plan, price_id, price_env, billing_interval
 
 
 def get_user_subscription(conn, email: str):
@@ -199,13 +267,41 @@ def get_user_subscription(conn, email: str):
 
 @router.get("/plans")
 def get_plans():
+    def is_plan_configured(plan_id: str, plan: dict):
+        if plan_id == "free":
+            return True
+        return bool(os.getenv(plan["price_env"] or "")) or any(
+            os.getenv(get_price_env(plan_id, interval) or "")
+            for interval in PLAN_INTERVALS
+        )
+
     return {
         "plans": [
             {
                 "id": plan_id,
                 "name": plan["name"],
                 "description": plan["description"],
-                "configured": plan_id == "free" or bool(os.getenv(plan["price_env"] or "")),
+                "configured": is_plan_configured(plan_id, plan),
+                "prices": {
+                    interval: {
+                        "configured": bool(
+                            os.getenv(get_price_env(plan_id, interval) or "")
+                        ),
+                        "price_env": get_price_env(plan_id, interval),
+                    }
+                    for interval in PLAN_INTERVALS
+                    if plan_id != "free"
+                },
+                "founder_prices": {
+                    interval: {
+                        "configured": bool(
+                            os.getenv(get_price_env(plan_id, interval, founder=True) or "")
+                        ),
+                        "price_env": get_price_env(plan_id, interval, founder=True),
+                    }
+                    for interval in PLAN_INTERVALS
+                    if plan_id != "free"
+                },
             }
             for plan_id, plan in PLANS.items()
         ]
@@ -214,13 +310,41 @@ def get_plans():
 
 @router.get("/config")
 def billing_config():
+    def is_plan_configured(plan_id: str, plan: dict):
+        if plan_id == "free":
+            return True
+        return bool(os.getenv(plan["price_env"] or "")) or any(
+            os.getenv(get_price_env(plan_id, interval) or "")
+            for interval in PLAN_INTERVALS
+        )
+
     return {
         "mode": os.getenv("STRIPE_MODE", "sandbox"),
         "stripe_ready": bool(stripe.api_key),
         "plans": {
             plan_id: {
-                "configured": plan_id == "free" or bool(os.getenv(plan["price_env"] or "")),
+                "configured": is_plan_configured(plan_id, plan),
                 "price_env": plan["price_env"],
+                "prices": {
+                    interval: {
+                        "configured": bool(
+                            os.getenv(get_price_env(plan_id, interval) or "")
+                        ),
+                        "price_env": get_price_env(plan_id, interval),
+                    }
+                    for interval in PLAN_INTERVALS
+                    if plan_id != "free"
+                },
+                "founder_prices": {
+                    interval: {
+                        "configured": bool(
+                            os.getenv(get_price_env(plan_id, interval, founder=True) or "")
+                        ),
+                        "price_env": get_price_env(plan_id, interval, founder=True),
+                    }
+                    for interval in PLAN_INTERVALS
+                    if plan_id != "free"
+                },
             }
             for plan_id, plan in PLANS.items()
         },
@@ -280,7 +404,13 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
 
     plan_id = str(data.get("plan", "elite")).lower()
-    plan, price_id = get_plan_or_400(plan_id)
+    interval = normalize_interval(data.get("interval") or data.get("billing_interval"))
+    founder_checkout = bool(data.get("founder") or data.get("founder_plan"))
+    plan, price_id, price_env, interval = get_plan_or_400(
+        plan_id,
+        interval=interval,
+        founder=founder_checkout,
+    )
 
     try:
         with engine.begin() as conn:
@@ -293,7 +423,12 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                 request,
                 email=email,
                 user_id=user.id,
-                metadata={"plan": plan_id},
+                metadata={
+                    "plan": plan_id,
+                    "interval": interval,
+                    "founder_checkout": founder_checkout,
+                    "price_env": price_env,
+                },
             )
 
         discounts = []
@@ -311,7 +446,11 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
             "metadata": {
                 "email": email,
                 "plan": plan_id,
-                "is_founder": str(bool(user.is_founder)).lower(),
+                "interval": interval,
+                "stripe_price_id": price_id,
+                "price_env": price_env or "",
+                "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
+                "founder_checkout": str(founder_checkout).lower(),
                 "founder_tier": user.founder_tier or "",
                 "founder_discount": str(int(user.founder_discount or 0)),
             },
@@ -319,7 +458,11 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                 "metadata": {
                     "email": email,
                     "plan": plan_id,
-                    "is_founder": str(bool(user.is_founder)).lower(),
+                    "interval": interval,
+                    "stripe_price_id": price_id,
+                    "price_env": price_env or "",
+                    "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
+                    "founder_checkout": str(founder_checkout).lower(),
                     "founder_tier": user.founder_tier or "",
                     "founder_discount": str(int(user.founder_discount or 0)),
                 }
@@ -333,7 +476,12 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
         capture_exception(exc, {"module": "billing", "operation": "checkout"})
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"url": session.url, "plan": plan["name"]}
+    return {
+        "url": session.url,
+        "plan": plan["name"],
+        "interval": interval,
+        "founder": founder_checkout,
+    }
 
 
 @router.post("/customer-portal")
@@ -495,8 +643,10 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        email = session.get("metadata", {}).get("email") or session.get("customer_email")
-        plan = str(session.get("metadata", {}).get("plan") or "").lower()
+        metadata = session.get("metadata", {}) or {}
+        email = metadata.get("email") or session.get("customer_email")
+        plan = str(metadata.get("plan") or "").lower()
+        founder_checkout = str(metadata.get("founder_checkout") or "").lower() == "true"
 
         if email and plan:
             internal_status = normalize_subscription_status("active")
@@ -510,9 +660,16 @@ async def stripe_webhook(request: Request):
 
                 conn.execute(text("""
                     UPDATE users
-                    SET plan = :plan
+                    SET plan = :plan,
+                        is_founder = CASE WHEN :founder_checkout THEN TRUE ELSE is_founder END,
+                        founder_tier = CASE WHEN :founder_checkout THEN :founder_tier ELSE founder_tier END
                     WHERE email = :email
-                """), {"plan": plan.upper(), "email": email})
+                """), {
+                    "plan": plan.upper(),
+                    "founder_checkout": founder_checkout,
+                    "founder_tier": plan.upper(),
+                    "email": email,
+                })
 
                 if user:
                     conn.execute(text("""
@@ -551,7 +708,8 @@ async def stripe_webhook(request: Request):
                         "status": internal_status,
                         "stripe_customer_id": session.get("customer"),
                         "stripe_subscription_id": session.get("subscription"),
-                        "stripe_price_id": os.getenv(PLANS.get(plan, {}).get("price_env") or ""),
+                        "stripe_price_id": session.get("metadata", {}).get("stripe_price_id")
+                        or os.getenv(PLANS.get(plan, {}).get("price_env") or ""),
                         "environment": os.getenv("STRIPE_MODE", "sandbox"),
                     })
 

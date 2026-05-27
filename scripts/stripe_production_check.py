@@ -6,10 +6,17 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from product.tiers import PLAN_ORDER, plan_allows
 
 PRICE_ENVS = {
-    "gold": "STRIPE_PRICE_GOLD",
-    "elite": "STRIPE_PRICE_ELITE",
-    "liberty": "STRIPE_PRICE_LIBERTY",
-    "legacy": "STRIPE_PRICE_LEGACY",
+    "gold": ["STRIPE_PRICE_GOLD_MONTHLY", "STRIPE_PRICE_GOLD_YEARLY"],
+    "elite": ["STRIPE_PRICE_ELITE_MONTHLY", "STRIPE_PRICE_ELITE_YEARLY"],
+    "liberty": ["STRIPE_PRICE_LIBERTY_MONTHLY", "STRIPE_PRICE_LIBERTY_YEARLY"],
+    "legacy": ["STRIPE_PRICE_LEGACY_MONTHLY", "STRIPE_PRICE_LEGACY_YEARLY"],
+}
+
+FOUNDER_PRICE_ENVS = {
+    "gold": ["STRIPE_PRICE_FOUNDER_GOLD_MONTHLY", "STRIPE_PRICE_FOUNDER_GOLD_YEARLY"],
+    "elite": ["STRIPE_PRICE_FOUNDER_ELITE_MONTHLY", "STRIPE_PRICE_FOUNDER_ELITE_YEARLY"],
+    "liberty": ["STRIPE_PRICE_FOUNDER_LIBERTY_MONTHLY", "STRIPE_PRICE_FOUNDER_LIBERTY_YEARLY"],
+    "legacy": ["STRIPE_PRICE_FOUNDER_LEGACY_MONTHLY", "STRIPE_PRICE_FOUNDER_LEGACY_YEARLY"],
 }
 
 
@@ -22,9 +29,15 @@ def main():
             if not os.getenv(key):
                 failures.append(f"{key} manquant")
 
-    for price_env in PRICE_ENVS.values():
-        if not os.getenv(price_env):
-            warnings.append(f"{price_env} non configure")
+    for price_envs in PRICE_ENVS.values():
+        for price_env in price_envs:
+            if not os.getenv(price_env):
+                warnings.append(f"{price_env} non configure")
+
+    for price_envs in FOUNDER_PRICE_ENVS.values():
+        for price_env in price_envs:
+            if not os.getenv(price_env):
+                warnings.append(f"{price_env} non configure")
 
     expected = ["FREE", "GOLD", "ELITE", "LIBERTY", "LEGACY"]
     if list(PLAN_ORDER.keys()) != expected:
