@@ -265,6 +265,29 @@ def get_user_subscription(conn, email: str):
     return user, subscription
 
 
+def stripe_value(obj, key: str, default=None):
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def stripe_nested_value(obj, *keys, default=None):
+    current = obj
+    for key in keys:
+        if current is None:
+            return default
+        if isinstance(key, int):
+            try:
+                current = current[key]
+            except (IndexError, KeyError, TypeError):
+                return default
+            continue
+        current = stripe_value(current, key, default)
+    return default if current is None else current
+
+
 @router.get("/plans")
 def get_plans():
     def is_plan_configured(plan_id: str, plan: dict):
@@ -593,24 +616,21 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     signature = request.headers.get("stripe-signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    if os.getenv("STRIPE_MODE", "sandbox").lower() == "production" and not webhook_secret:
+    if not webhook_secret:
         raise HTTPException(status_code=500, detail="Webhook Stripe non configure")
 
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(
-                payload=payload,
-                sig_header=signature,
-                secret=webhook_secret,
-            )
-        else:
-            event = stripe.Event.construct_from(
-                await request.json(),
-                stripe.api_key,
-            )
+        event = stripe.Webhook.construct_event(
+            payload=payload,
+            sig_header=signature,
+            secret=webhook_secret,
+        )
     except Exception as exc:
         capture_exception(exc, {"module": "billing", "operation": "webhook"})
         raise HTTPException(status_code=400, detail=str(exc))
+
+    event_id = event.id
+    event_type = event.type
 
     with engine.begin() as conn:
         ensure_billing_tables(conn)
@@ -620,8 +640,8 @@ async def stripe_webhook(request: Request):
             VALUES (:stripe_event_id, :event_type, :status, :payload)
             ON CONFLICT (stripe_event_id) DO NOTHING
         """), {
-            "stripe_event_id": event.get("id"),
-            "event_type": event.get("type"),
+            "stripe_event_id": event_id,
+            "event_type": event_type,
             "status": "received",
             "payload": str(event)[:8000],
         })
@@ -631,22 +651,22 @@ async def stripe_webhook(request: Request):
                 "stripe_webhook_replay_ignored",
                 request,
                 severity="warning",
-                metadata={"event_id": event.get("id"), "event_type": event.get("type")},
+                metadata={"event_id": event_id, "event_type": event_type},
             )
             return {"received": True, "duplicate": True}
         log_security_event(
             conn,
             "stripe_webhook_received",
             request,
-            metadata={"event_id": event.get("id"), "event_type": event.get("type")},
+            metadata={"event_id": event_id, "event_type": event_type},
         )
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        metadata = session.get("metadata", {}) or {}
-        email = metadata.get("email") or session.get("customer_email")
-        plan = str(metadata.get("plan") or "").lower()
-        founder_checkout = str(metadata.get("founder_checkout") or "").lower() == "true"
+    if event_type == "checkout.session.completed":
+        session = event.data.object
+        metadata = stripe_value(session, "metadata", {}) or {}
+        email = stripe_value(metadata, "email") or stripe_value(session, "customer_email")
+        plan = str(stripe_value(metadata, "plan") or "").lower()
+        founder_checkout = str(stripe_value(metadata, "founder_checkout") or "").lower() == "true"
 
         if email and plan:
             internal_status = normalize_subscription_status("active")
@@ -658,7 +678,7 @@ async def stripe_webhook(request: Request):
                     WHERE email = :email
                 """), {"email": email}).fetchone()
 
-                conn.execute(text("""
+                user_update = conn.execute(text("""
                     UPDATE users
                     SET plan = :plan,
                         is_founder = CASE WHEN :founder_checkout THEN TRUE ELSE is_founder END,
@@ -670,9 +690,16 @@ async def stripe_webhook(request: Request):
                     "founder_tier": plan.upper(),
                     "email": email,
                 })
+                logger.info(
+                    "billing_webhook_user_plan_updated event_id=%s email=%s plan=%s rowcount=%s",
+                    event_id,
+                    email,
+                    plan.upper(),
+                    user_update.rowcount,
+                )
 
                 if user:
-                    conn.execute(text("""
+                    subscription_upsert = conn.execute(text("""
                     INSERT INTO subscriptions (
                             user_id,
                             plan,
@@ -706,21 +733,29 @@ async def stripe_webhook(request: Request):
                         "user_id": user.id,
                         "plan": plan.upper(),
                         "status": internal_status,
-                        "stripe_customer_id": session.get("customer"),
-                        "stripe_subscription_id": session.get("subscription"),
-                        "stripe_price_id": session.get("metadata", {}).get("stripe_price_id")
+                        "stripe_customer_id": stripe_value(session, "customer"),
+                        "stripe_subscription_id": stripe_value(session, "subscription"),
+                        "stripe_price_id": stripe_value(metadata, "stripe_price_id")
                         or os.getenv(PLANS.get(plan, {}).get("price_env") or ""),
                         "environment": os.getenv("STRIPE_MODE", "sandbox"),
                     })
+                    logger.info(
+                        "billing_webhook_subscription_upserted event_id=%s user_id=%s plan=%s status=%s rowcount=%s",
+                        event_id,
+                        user.id,
+                        plan.upper(),
+                        internal_status,
+                        subscription_upsert.rowcount,
+                    )
 
                 invalidate_subscription_caches(email, user.id if user else None)
                 if user:
                     capture_event(
                         conn,
-                        FOUNDER_UPGRADE if bool(session.get("metadata", {}).get("is_founder") == "true") else SUBSCRIPTION_UPGRADED,
+                        FOUNDER_UPGRADE if bool(stripe_value(metadata, "is_founder") == "true") else SUBSCRIPTION_UPGRADED,
                         user_id=user.id,
                         email=email,
-                        properties={"plan": plan.upper(), "stripe_event": event.get("id")},
+                        properties={"plan": plan.upper(), "stripe_event": event_id},
                     )
                 logger.info(
                     "subscription_change event=checkout_completed email=%s user_id=%s plan=%s status=%s",
@@ -730,18 +765,14 @@ async def stripe_webhook(request: Request):
                     internal_status,
                 )
 
-    if event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
-        subscription = event["data"]["object"]
-        stripe_subscription_id = subscription.get("id")
-        status = normalize_subscription_status(subscription.get("status"))
-        if event["type"] == "customer.subscription.deleted":
+    if event_type in ["customer.subscription.updated", "customer.subscription.deleted"]:
+        subscription = event.data.object
+        stripe_subscription_id = stripe_value(subscription, "id")
+        status = normalize_subscription_status(stripe_value(subscription, "status"))
+        if event_type == "customer.subscription.deleted":
             status = "canceled"
-        cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
-        price_id = None
-        try:
-            price_id = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-        except Exception:
-            price_id = None
+        cancel_at_period_end = bool(stripe_value(subscription, "cancel_at_period_end"))
+        price_id = stripe_nested_value(subscription, "items", "data", 0, "price", "id")
         next_plan = plan_from_price_id(price_id)
 
         with engine.begin() as conn:
@@ -776,7 +807,7 @@ async def stripe_webhook(request: Request):
                     WHERE id = :user_id
                 """), {"plan": next_plan, "user_id": current.id})
 
-            if current and event["type"] == "customer.subscription.deleted":
+            if current and event_type == "customer.subscription.deleted":
                 conn.execute(text("""
                     UPDATE users
                     SET plan = 'FREE'
@@ -789,15 +820,15 @@ async def stripe_webhook(request: Request):
             )
             logger.info(
                 "subscription_change event=%s user_id=%s plan=%s status=%s stripe_subscription_id=%s",
-                event["type"],
+                event_type,
                 current.id if current else None,
                 next_plan,
                 status,
                 stripe_subscription_id,
             )
 
-    if event["type"] in ["invoice.paid", "invoice.payment_failed"]:
-        invoice = event["data"]["object"]
+    if event_type in ["invoice.paid", "invoice.payment_failed"]:
+        invoice = event.data.object
         with engine.begin() as conn:
             ensure_billing_tables(conn)
             subscription = conn.execute(text("""
@@ -806,8 +837,8 @@ async def stripe_webhook(request: Request):
                 WHERE stripe_subscription_id = :stripe_subscription_id
                    OR stripe_customer_id = :stripe_customer_id
             """), {
-                "stripe_subscription_id": invoice.get("subscription"),
-                "stripe_customer_id": invoice.get("customer"),
+                "stripe_subscription_id": stripe_value(invoice, "subscription"),
+                "stripe_customer_id": stripe_value(invoice, "customer"),
             }).fetchone()
 
             conn.execute(text("""
@@ -830,14 +861,14 @@ async def stripe_webhook(request: Request):
                     updated_at = NOW()
             """), {
                 "user_id": subscription.user_id if subscription else None,
-                "stripe_invoice_id": invoice.get("id"),
-                "stripe_customer_id": invoice.get("customer"),
-                "stripe_subscription_id": invoice.get("subscription"),
-                "amount_due": invoice.get("amount_due") or 0,
-                "amount_paid": invoice.get("amount_paid") or 0,
-                "currency": invoice.get("currency") or "eur",
-                "status": invoice.get("status"),
-                "hosted_invoice_url": invoice.get("hosted_invoice_url"),
+                "stripe_invoice_id": stripe_value(invoice, "id"),
+                "stripe_customer_id": stripe_value(invoice, "customer"),
+                "stripe_subscription_id": stripe_value(invoice, "subscription"),
+                "amount_due": stripe_value(invoice, "amount_due") or 0,
+                "amount_paid": stripe_value(invoice, "amount_paid") or 0,
+                "currency": stripe_value(invoice, "currency") or "eur",
+                "status": stripe_value(invoice, "status"),
+                "hosted_invoice_url": stripe_value(invoice, "hosted_invoice_url"),
             })
 
     return {"received": True}
