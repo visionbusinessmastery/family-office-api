@@ -152,7 +152,7 @@ PLAN_ENTITLEMENTS = {
         ],
     },
     "ELITE": {
-        "max_assets": None,
+        "max_assets": 30,
         "ai_level": "premium",
         "modules": [
             "foundation",
