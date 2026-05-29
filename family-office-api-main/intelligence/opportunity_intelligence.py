@@ -659,7 +659,7 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
         "universe": universe,
         "type": raw.get("type") or universe,
         "title": title,
-        "description": raw.get("description") or "Signal priorise par Ethan selon ton profil et ta situation.",
+        "description": raw.get("description") or "Signal priorise par le backend selon le profil et les criteres.",
         "source": raw.get("platform") or "White Rock engine",
         "url": raw.get("url") or raw.get("link"),
         "image_url": raw.get("image_url"),
@@ -678,8 +678,8 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
             raw.get("risk") or "Verifier liquidite, frais et horizon avant decision",
         ],
         "projection": raw.get("projection")
-        or f"Analyse {depth['depth']} sur {location}: prochaine etape, verifier chiffres reels et contraintes.",
-        "next_step": "Comparer 2 alternatives, valider les frais, puis definir une action executable cette semaine.",
+        or f"Lecture {depth['depth']} sur {location}: chiffres reels et contraintes a verifier.",
+        "next_step": "Donnees a comparer: 2 alternatives, frais, contraintes et horizon.",
     }
 
     if universe == "real_estate":
@@ -707,7 +707,7 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
             ],
             "next_step": (
                 f"Ouvre {source}, filtre {city} entre {int(budget_min or 0)} et {int(budget_max)} EUR, "
-                "selectionne 2 annonces comparables puis valide loyers reels, travaux et frais."
+                "selectionne 2 annonces comparables puis releve loyers reels, travaux et frais."
             ),
         })
 
@@ -731,7 +731,7 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
             ],
             "next_step": (
                 f"Ouvre {source}, compare frais / volatilite / exposition devise, "
-                "puis definis une taille de position maximale avant d'agir."
+                "puis renseigne une taille de position maximale dans ton analyse."
             ),
         })
 
@@ -752,7 +752,7 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
             ],
             "next_step": (
                 f"Ouvre {source}, identifie 3 offres ou tendances comparables, "
-                "puis valide une hypothese marche avec un test simple cette semaine."
+                "puis documente une hypothese marche et un test simple."
             ),
         })
 
@@ -762,8 +762,8 @@ def _normalize_item(raw: dict, universe: str, index: int, criteria: dict, profil
     item["signature"] = _opportunity_signature(item)
     item["link_or_source"] = item.get("url") or item.get("source")
     item["explanation"] = (
-        f"Ethan retient ce signal pour son equilibre {item['strategy_type']} / {item['risk_level']} "
-        f"et sa contribution a la diversification du portefeuille."
+        f"Signal classe pour son equilibre {item['strategy_type']} / {item['risk_level']} "
+        f"et sa contribution potentielle a la diversification du portefeuille."
     )
 
     return item

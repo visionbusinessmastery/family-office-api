@@ -10,7 +10,7 @@ from product.entitlements import normalize_plan, plan_allows
 DAILY_QUESTS = [
     {"id": 1, "type": "finance", "task": "Ajouter un revenu", "xp": 20},
     {"id": 2, "type": "portfolio", "task": "Analyser ton portefeuille", "xp": 15},
-    {"id": 3, "type": "advisor", "task": "Poser une question a Ethan", "xp": 25},
+    {"id": 3, "type": "advisor", "task": "Ouvrir le copilote", "xp": 25},
     {"id": 4, "type": "optimization", "task": "Reduire une depense", "xp": 20},
     {"id": 5, "type": "growth", "task": "Identifier une opportunite", "xp": 30},
 ]
@@ -59,7 +59,7 @@ def generate_daily_quests(user_profile: dict):
         quests.append({
             "id": 100,
             "type": "analysis",
-            "task": "Lire la guidance Ethan du jour",
+            "task": "Lire les signaux du jour",
             "xp": 15,
         })
 

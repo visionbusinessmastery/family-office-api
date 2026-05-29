@@ -226,7 +226,7 @@ export default function OpportunityDiscoveryPanel({
       setError(
         err instanceof Error && err.message.includes("Failed to fetch")
           ? "Connexion API impossible. Vérifie la configuration NEXT_PUBLIC_API_URL et le backend."
-          : "Ethan n'a pas pu analyser cet univers pour le moment."
+          : "Les signaux de cet univers sont indisponibles pour le moment."
       );
     } finally {
       setLoading(false);
@@ -475,7 +475,7 @@ export default function OpportunityDiscoveryPanel({
         </div>
       ) : (
         <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-gray-400">
-          Lance une recherche pour obtenir jusqu&apos;à 6 opportunités priorisées par Ethan.
+          Lance une recherche pour obtenir jusqu&apos;à 6 signaux priorises par le backend.
         </div>
       )}
 
@@ -495,14 +495,14 @@ export default function OpportunityDiscoveryPanel({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-                  Guidance Ethan
+                  Filtres de signaux
                 </p>
                 <h3 className="mt-2 text-2xl font-black text-white">
                   {title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                  Renseigne quelques critères. Ethan garde une lecture simple:
-                  potentiel, risque, cohérence et prochaine action.
+                  Renseigne quelques critères. Le backend renvoie des signaux:
+                  potentiel, risque, coherence et donnees disponibles.
                 </p>
               </div>
               <button

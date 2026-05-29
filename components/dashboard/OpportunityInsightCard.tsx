@@ -24,21 +24,21 @@ export default function OpportunityInsightCard({
         </div>
 
         <span className="rounded-full border border-[#3fa9f5]/30 bg-black/30 px-3 py-1 text-xs text-[#3fa9f5]">
-          Ethan
+          Signal
         </span>
       </div>
 
       <div className="mt-3 space-y-3 text-sm">
         {opportunity.analysis && (
           <div>
-            <p className="text-xs uppercase text-gray-500">Lecture du contexte</p>
+            <p className="text-xs uppercase text-gray-500">Donnee contexte</p>
             <p className="text-gray-300">{opportunity.analysis}</p>
           </div>
         )}
 
         {opportunity.quick_action && (
           <div>
-            <p className="text-xs uppercase text-gray-500">Action rapide</p>
+            <p className="text-xs uppercase text-gray-500">Signal operationnel</p>
             <p className="text-gray-300">{opportunity.quick_action}</p>
           </div>
         )}

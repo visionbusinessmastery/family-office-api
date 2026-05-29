@@ -118,7 +118,7 @@ def build_upgrade(score: float, level, plan: str = "FREE"):
     return {
         "recommended_plan": "gold",
         "title": "Debloquer Gold - Growth",
-        "description": "Acceder au portefeuille avance, immobilier, analytics, opportunites et recommandations Ethan.",
+        "description": "Acceder au portefeuille avance, immobilier, analytics et signaux enrichis.",
     }
 
 

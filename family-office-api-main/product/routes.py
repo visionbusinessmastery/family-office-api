@@ -327,7 +327,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "xp": 100,
             "module": "finance",
             "validation": "finance_count > 0",
-            "ethan_reason": "Cette mission alimente le contexte backend utilise par Ethan.",
+            "context_reason": "Cette mission alimente le contexte backend.",
         })
 
     if data_profile["portfolio_count"] == 0:
@@ -338,7 +338,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "xp": 120,
             "module": "portfolio",
             "validation": "portfolio_count > 0",
-            "ethan_reason": "Cette mission rend le portefeuille lisible par le backend.",
+            "context_reason": "Cette mission rend le portefeuille lisible par le backend.",
         })
 
     if data_profile["portfolio_count"] > 0 and data_profile["portfolio_count"] < 3:
@@ -349,7 +349,7 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "xp": 90,
             "module": "portfolio",
             "validation": "portfolio_count >= 3",
-            "ethan_reason": "Cette mission donne plus de matiere au suivi de progression.",
+            "context_reason": "Cette mission donne plus de matiere au suivi de progression.",
         })
 
     visible_missions = []
@@ -428,32 +428,32 @@ def build_strategic_brief(data_profile: dict, score: int, plan: str, life_profil
 
     if wants_income and ("marketing" in professional.lower() or data_profile.get("venture_count", 0) > 0):
         priority = "Monetiser une competence deja presente"
-        action = "Structurer une offre simple, premium et peu chronophage avant d'ajouter de nouvelles allocations."
+        action = "Donnee contextuelle: competence business existante et temps limite."
     elif has_children and plan_allows(normalized, "LIBERTY"):
         priority = "Relier patrimoine et protection familiale"
-        action = "Documenter une decision de transmission ou de protection familiale cette semaine."
+        action = "Donnee contextuelle: famille et transmission disponibles dans le profil."
     elif finance_count == 0:
         priority = "Completer le contexte financier"
-        action = "Ajouter une ligne revenu et une ligne charge pour fiabiliser le contexte backend."
+        action = "Donnee manquante: revenu ou charge a renseigner."
     elif portfolio_count == 0:
         priority = "Créer la premiere ligne patrimoniale mesurable"
-        action = "Ajouter un actif financier avec quantite et prix d'achat."
+        action = "Donnee manquante: actif financier a renseigner."
     else:
         priority = "Qualifier le prochain signal utile"
-        action = "Comparer une nouvelle opportunite aux objectifs, au temps disponible et au risque accepte."
+        action = "Signal disponible: objectifs, temps et risque peuvent etre compares par le moteur central."
 
     if plan_allows(normalized, "LEGACY"):
-        opportunity = "Formaliser une premiere regle de transmission ou de gouvernance familiale."
-        risk = "Dependance excessive au fondateur ou absence de roles familiaux explicites."
+        opportunity = "Signal familial: gouvernance ou transmission renseignee."
+        risk = "Signal de vigilance: roles familiaux incomplets."
     elif plan_allows(normalized, "LIBERTY"):
-        opportunity = "Construire un scenario patrimoine sur 12 mois."
-        risk = "Accumuler des actifs sans intention explicite."
+        opportunity = "Signal de profondeur: scenario 12 mois disponible."
+        risk = "Signal de vigilance: intention patrimoniale a expliciter."
     elif plan_allows(normalized, "GOLD"):
-        opportunity = "Utiliser Ethan globalement pour relier portefeuille, objectifs et opportunites."
-        risk = "Multiplier les lignes sans verifier la concentration."
+        opportunity = "Signal produit: contexte portefeuille et objectifs disponibles pour le moteur central."
+        risk = "Signal de vigilance: concentration a mesurer."
     else:
-        opportunity = "Passer d'une guidance simple a une base de donnees fiable."
-        risk = "Decisions prises avec trop peu de contexte mesure."
+        opportunity = "Signal produit: base de donnees a enrichir."
+        risk = "Signal de vigilance: contexte encore incomplet."
 
     return {
         "priority": priority,

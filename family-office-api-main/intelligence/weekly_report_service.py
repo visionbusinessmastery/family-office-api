@@ -114,41 +114,41 @@ def build_weekly_report_payload(conn, user_id: int, email: str) -> dict:
     except Exception:
         opportunities = []
 
-    risk_alerts = []
+    data_alerts = []
     if portfolio_value == 0:
-        risk_alerts.append("Ton portefeuille financier reste a construire.")
+        data_alerts.append("Portefeuille financier non renseigne.")
     if real_estate_count == 0:
-        risk_alerts.append("Aucune poche immobiliere renseignee pour l'instant.")
+        data_alerts.append("Poche immobiliere non renseignee.")
     if venture_count == 0 and plan in ["ELITE", "LIBERTY", "LEGACY"]:
-        risk_alerts.append("Ton espace business peut encore enrichir la consolidation patrimoniale.")
+        data_alerts.append("Espace business disponible mais non renseigne.")
 
     if has_children and plan in ["LIBERTY", "LEGACY"]:
-        risk_alerts.append("Ta strategie familiale merite une action simple de transmission ou de protection.")
+        data_alerts.append("Contexte familial disponible pour consolidation.")
 
     if "marketing" in str(professional_context or "").lower() or "revenu" in " ".join(goals).lower():
         main_opportunity = {
             "title": "Offre premium basee sur ton expertise",
-            "why": "Elle part de tes competences existantes et limite le temps d'apprentissage.",
-            "next_action": "Ecrire une promesse simple et contacter 3 prospects proches cette semaine.",
+            "why": "Signal issu du contexte professionnel renseigne.",
+            "next_action": "Disponible dans le cockpit.",
         }
     elif opportunities:
         first = opportunities[0]
         main_opportunity = {
-            "title": first.get("title", "Opportunite prioritaire"),
-            "why": first.get("analysis") or first.get("quick_action") or "Signal coherent avec ton cockpit actuel.",
-            "next_action": first.get("quick_action") or "Qualifier cette opportunite en une action mesurable.",
+            "title": first.get("title", "Signal prioritaire"),
+            "why": first.get("analysis") or first.get("quick_action") or "Signal coherent avec le cockpit actuel.",
+            "next_action": "Disponible dans le cockpit.",
         }
     else:
         main_opportunity = {
-            "title": "Clarifier le prochain levier",
-            "why": "Une seule action bien choisie vaut mieux qu'une liste de pistes.",
-            "next_action": "Choisir le levier prioritaire: revenu, protection ou allocation.",
+            "title": "Contexte a enrichir",
+            "why": "Signal neutre: donnees encore partielles.",
+            "next_action": "Disponible dans le cockpit.",
         }
 
     mission = (
-        "Documenter une decision familiale simple."
+        "Mission disponible: contexte familial a completer."
         if has_children and plan in ["LIBERTY", "LEGACY"]
-        else "Finaliser une action revenue ou patrimoine avant dimanche."
+        else "Mission disponible: contexte revenu ou patrimoine a completer."
     )
 
     return {
@@ -166,23 +166,24 @@ def build_weekly_report_payload(conn, user_id: int, email: str) -> dict:
         "streak": int(xp_row.streak or 0) if xp_row else 0,
         "opportunities": opportunities,
         "main_opportunity": main_opportunity,
-        "risk_alerts": risk_alerts[:3],
+        "data_alerts": data_alerts[:3],
+        "risk_alerts": data_alerts[:3],
         "challenge": mission,
-        "ethan_tip": "Synthese basee sur le contexte renseigne cette semaine.",
+        "context_note": "Synthese de distribution basee sur les donnees renseignees cette semaine.",
         "generated_at": datetime.utcnow().isoformat(),
     }
 
 
 def _render_report_html(payload: dict) -> str:
     opportunities = "".join(
-        f"<li><strong>{item.get('title', 'Opportunite')}</strong> - {item.get('quick_action', 'Action a verifier')}</li>"
+        f"<li><strong>{item.get('title', 'Signal')}</strong> - {item.get('quick_action', 'Donnee a verifier')}</li>"
         for item in payload.get("opportunities", [])
     ) or "<li>Aucune opportunite urgente cette semaine. Continue a enrichir tes donnees.</li>"
 
     alerts = "".join(
         f"<li>{alert}</li>"
-        for alert in payload.get("risk_alerts", [])
-    ) or "<li>Aucune alerte prioritaire.</li>"
+        for alert in payload.get("data_alerts", payload.get("risk_alerts", []))
+    ) or "<li>Aucun signal prioritaire.</li>"
     main_opportunity = payload.get("main_opportunity") or {}
 
     return f"""
@@ -196,18 +197,18 @@ def _render_report_html(payload: dict) -> str:
           <div><small>XP</small><br><strong>{payload.get('xp')}</strong></div>
           <div><small>Portefeuille</small><br><strong>{payload.get('portfolio_value')} EUR</strong></div>
         </div>
-        <h3>Opportunite principale</h3>
+        <h3>Signal principal</h3>
         <p><strong>{main_opportunity.get('title', 'Signal prioritaire')}</strong></p>
         <p style="color:#cbd5e1;">{main_opportunity.get('why', '')}</p>
         <p style="color:#93c5fd;">{main_opportunity.get('next_action', '')}</p>
         <h3>Autres signaux</h3>
         <ul>{opportunities}</ul>
-        <h3>Alertes calmes</h3>
+        <h3>Signaux de vigilance</h3>
         <ul>{alerts}</ul>
         <h3>Challenge</h3>
         <p>{payload.get('challenge')}</p>
         <blockquote style="border-left:3px solid #f4c95d;padding-left:14px;color:#e5e7eb;">
-          {payload.get('ethan_tip')}
+          {payload.get('context_note', '')}
         </blockquote>
         <p><a href="{FRONTEND_URL}/dashboard" style="color:#3fa9f5;">Ouvrir mon cockpit</a></p>
       </div>
@@ -246,7 +247,7 @@ def preview_weekly_report(email: str = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="User not found")
         payload = build_weekly_report_payload(conn, user_id, email)
         if not plan_allows(payload["plan"], "GOLD"):
-            raise HTTPException(status_code=403, detail="Weekly Ethan insights require GOLD or higher")
+            raise HTTPException(status_code=403, detail="Weekly insights require GOLD or higher")
         return payload
 
 
@@ -259,7 +260,7 @@ def send_current_user_weekly_report(email: str = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="User not found")
         payload = build_weekly_report_payload(conn, user_id, email)
         if not plan_allows(payload["plan"], "GOLD"):
-            raise HTTPException(status_code=403, detail="Weekly Ethan insights require GOLD or higher")
+            raise HTTPException(status_code=403, detail="Weekly insights require GOLD or higher")
 
         recent = conn.execute(text("""
             SELECT id

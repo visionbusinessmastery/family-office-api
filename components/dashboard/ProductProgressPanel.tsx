@@ -115,7 +115,7 @@ export default function ProductProgressPanel({
       {brief && (
         <div className="rounded-2xl border border-[#3fa9f5]/20 bg-zinc-950 p-5 transition duration-300 hover:border-[#3fa9f5]/35">
           <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Strategic Brief
+            Signaux de contexte
           </p>
           <h3 className="mt-2 text-xl font-black text-white">
             {brief.priority || "Priorite du moment"}
@@ -123,9 +123,9 @@ export default function ProductProgressPanel({
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             {[
               ["Levier", brief.main_lever],
-              ["Risque", brief.main_risk],
-              ["Opportunite", brief.opportunity],
-              ["Action", brief.next_action],
+              ["Vigilance", brief.main_risk],
+              ["Signal", brief.opportunity],
+              ["Donnee", brief.next_action],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border border-white/10 bg-black/30 p-3">
                 <p className="text-xs font-black uppercase tracking-widest text-gray-500">{label}</p>
@@ -139,8 +139,8 @@ export default function ProductProgressPanel({
       {missions.length > 0 && (
         <div className="rounded-2xl border border-white/10 bg-zinc-950 p-5 transition duration-300 hover:border-white/20">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-bold text-white">Prochaines actions</h3>
-                <span className="text-xs text-gray-500">Guidance douce</span>
+                <h3 className="font-bold text-white">Missions de progression</h3>
+                <span className="text-xs text-gray-500">Validation backend</span>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {missions.map((mission) => {
@@ -167,9 +167,9 @@ export default function ProductProgressPanel({
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-gray-400">{mission.description}</p>
-                      {mission.ethan_reason && (
+                      {(mission.context_reason || mission.ethan_reason) && (
                         <p className="mt-2 text-xs leading-relaxed text-[#8bd0ff]">
-                          Ethan: {mission.ethan_reason}
+                          Contexte: {mission.context_reason || mission.ethan_reason}
                         </p>
                       )}
                       <div className="mt-3 flex items-center justify-between gap-2">
