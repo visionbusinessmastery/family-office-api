@@ -95,6 +95,11 @@ function hasLegacyResponse(messages: ChatMessage[]) {
   );
 }
 
+function isLegacyAssistantText(content?: string) {
+  if (!content) return false;
+  return hasLegacyResponse([{ role: "assistant", content }]);
+}
+
 function clearConversationCache() {
   if (typeof window === "undefined") return;
 
@@ -185,6 +190,11 @@ export default function AdvisorChat({
 
   useEffect(() => {
     if (!cacheReady) return;
+    if (hasLegacyResponse(messages)) {
+      clearConversationCache();
+      setMessages(initialMessages);
+      return;
+    }
     writeCachedMessages(messages);
   }, [cacheReady, messages]);
 
@@ -209,16 +219,24 @@ export default function AdvisorChat({
     try {
       const data = await apiRequest<AdvisorResponse>("/advisor/advisor", token, {
         method: "POST",
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Ethan-Client-Version": CONVERSATION_CACHE_VERSION,
+        },
         body: JSON.stringify({ message: question }),
       });
+
+      const analysis = data.result?.analysis || "";
+      const safeAnalysis = isLegacyAssistantText(analysis)
+        ? "Ethan vient d'ecarter une ancienne reponse mise en cache. Relance ta question: la prochaine reponse repartira du contexte actuel."
+        : analysis ||
+          "Le moteur Ethan n'a pas renvoye de reponse exploitable pour le moment.";
 
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content:
-            data.result?.analysis ||
-            "Le moteur Ethan n'a pas renvoye de reponse exploitable pour le moment.",
+          content: safeAnalysis,
         },
       ]);
     } catch (err) {
