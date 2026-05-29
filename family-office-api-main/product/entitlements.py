@@ -410,7 +410,7 @@ MODULE_REGISTRY = [
         "stage": 9,
         "min_plan": "LEGACY",
         "min_score": 0,
-        "description": "Preparation des heritiers, education financiere et Ethan Junior.",
+        "description": "Preparation des heritiers, education financiere et module junior.",
     },
     {
         "key": "protection_layer",

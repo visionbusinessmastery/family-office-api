@@ -118,7 +118,7 @@ const plans: Plan[] = [
       },
       {
         label: "AI Strategic Guidance",
-        items: ["Ethan avancé", "Guidance contextuelle", "Synthèses exécutives"],
+        items: ["Copilote avance", "Guidance contextuelle", "Syntheses executives"],
       },
     ],
   },

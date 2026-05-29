@@ -40,12 +40,3 @@ def run_ethan_chat(user_email: str, message: str, *, bypass_cache: bool = False)
         mode="chat",
         bypass_cache=bypass_cache,
     )
-
-
-def run_ethan_portfolio(user_email: str, message: str, *, bypass_cache: bool = False):
-    return run_ethan_core(
-        user_email,
-        message,
-        mode="portfolio",
-        bypass_cache=bypass_cache,
-    )

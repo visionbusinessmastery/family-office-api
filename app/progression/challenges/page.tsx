@@ -96,7 +96,7 @@ export default function ChallengesPage() {
                   Récompense
                 </p>
                 <p className="mt-1 text-sm font-bold text-white">
-                  +{mission.xp || 80} XP · meilleure personnalisation Ethan
+                  +{mission.xp || 80} XP · meilleur contexte backend
                 </p>
               </div>
               <p className="mt-4 text-xs leading-relaxed text-gray-500">

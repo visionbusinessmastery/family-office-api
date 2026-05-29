@@ -418,10 +418,10 @@ def privacy_center(request: Request, email: str = Depends(get_current_user)):
         "deletion_request": deletion[0] if deletion else None,
         "ai_disclosure": {
             "provider": "OpenAI",
-            "purpose": "Ethan analyse ton contexte patrimonial pour formuler des explications, priorites et opportunites.",
-            "training": "Les donnees envoyees a Ethan ne sont pas destinees a entrainer un modele public de WHITE ROCK.",
-            "retention": "La memoire Ethan est compressee et peut etre supprimee sur demande.",
-            "human_note": "Ethan ne remplace pas un conseil legal, fiscal ou financier reglemente.",
+            "purpose": "Le moteur IA analyse ton contexte patrimonial pour formuler des explications, priorites et opportunites.",
+            "training": "Les donnees envoyees au moteur IA ne sont pas destinees a entrainer un modele public de WHITE ROCK.",
+            "retention": "La memoire IA est compressee et peut etre supprimee sur demande.",
+            "human_note": "Le moteur IA ne remplace pas un conseil legal, fiscal ou financier reglemente.",
         },
         "legal_links": {
             "privacy_policy": f"{FRONTEND_URL}/privacy-center#policy",

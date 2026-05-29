@@ -70,7 +70,7 @@ export default function OpportunitiesPage() {
         <section className="grid gap-3 sm:grid-cols-3">
           <MetricCard label="Signaux" value={total} tone="primary" />
           <MetricCard label="Univers" value={categories.length} />
-          <MetricCard label="Source" value="Ethan + Strategic Layer" />
+          <MetricCard label="Source" value="Backend signals" />
         </section>
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-xl">
@@ -114,7 +114,7 @@ export default function OpportunitiesPage() {
               </div>
 
               <p className="mt-4 text-sm leading-relaxed text-gray-300">
-                {item.analysis || "Ethan attend plus de données pour affiner ce signal."}
+                {item.analysis || "Le backend attend plus de données pour affiner ce signal."}
               </p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -171,7 +171,7 @@ def get_category_opportunities(user=Depends(get_current_user)):
                 count=int(row.count or 0),
                 analysis=(
                     f"Taux moyen renseigne: {round(float(row.rate or 0), 2)}%. "
-                    "Ethan arbitre rendement attendu, duree de blocage et risque de defaut."
+                    "Signal data-only: rendement attendu, duree de blocage et risque de defaut."
                 ),
                 quick_action="Verifier les garanties, la duree et la part maximale par dossier.",
                 opportunity=first_opportunity(

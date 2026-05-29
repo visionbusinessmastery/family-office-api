@@ -19,5 +19,5 @@ def analyze_sentiment(news_list):
     return {
         "label": label,
         "score": score,
-        "summary": "Signal marche calcule localement. Interpretation strategique reservee a Ethan Core.",
+        "summary": "Signal marche calcule localement. Interpretation strategique reservee au moteur central.",
     }

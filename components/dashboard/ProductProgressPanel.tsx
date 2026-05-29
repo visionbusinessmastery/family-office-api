@@ -167,9 +167,9 @@ export default function ProductProgressPanel({
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-gray-400">{mission.description}</p>
-                      {(mission.context_reason || mission.ethan_reason) && (
+                      {mission.context_reason && (
                         <p className="mt-2 text-xs leading-relaxed text-[#8bd0ff]">
-                          Contexte: {mission.context_reason || mission.ethan_reason}
+                          Contexte: {mission.context_reason}
                         </p>
                       )}
                       <div className="mt-3 flex items-center justify-between gap-2">

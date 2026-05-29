@@ -41,8 +41,8 @@ export default function DailyWealthCheck({
             Tu avances vers une situation plus claire.
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-gray-400">
-            Ethan garde le cap avec toi: progression, point d&apos;attention et
-            prochaine action utile, sans bruit inutile.
+            Le cockpit garde le cap: progression, point d&apos;attention et
+            prochain signal utile, sans bruit inutile.
           </p>
         </div>
 

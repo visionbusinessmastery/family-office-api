@@ -25,7 +25,7 @@ from feature_flags.routes import router as feature_flags_router
 from auth.routes import router as auth_router
 from auth.oauth import router as oauth_router, ensure_oauth_tables
 from advisor.routes import router as advisor_router
-from advisor.service import ensure_ethan_ai_tables
+from advisor.ethan.persistence_engine import ensure_ethan_ai_tables
 from billing.routes import router as billing_router, ensure_billing_tables
 from product.routes import router as product_router, ensure_product_tables
 from profile.routes import router as profile_router, ensure_profile_tables

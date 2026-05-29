@@ -23,7 +23,7 @@ const legacyModules = [
   },
   {
     title: "Heirs",
-    description: "Preparation des heritiers, education financiere et Ethan Junior.",
+    description: "Preparation des heritiers, education financiere et module junior.",
   },
   {
     title: "Protection Layer",
@@ -113,7 +113,7 @@ export default function LegacyOfficePanel({
 
       <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-4">
-          <h3 className="font-bold text-amber-100">Ethan</h3>
+          <h3 className="font-bold text-amber-100">Signaux Legacy</h3>
           <div className="mt-3 space-y-3">
             {insights.slice(0, 3).map((insight) => (
               <p key={insight} className="text-sm leading-relaxed text-gray-300">

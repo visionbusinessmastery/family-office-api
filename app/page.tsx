@@ -142,7 +142,7 @@ export default function Home() {
                 {[
                   ["terms_accepted", "J'accepte les conditions generales."],
                   ["privacy_policy_accepted", "J'accepte la politique de confidentialite."],
-                  ["ai_processing_accepted", "J'autorise Ethan a traiter mes donnees pour personnaliser l'accompagnement."],
+                  ["ai_processing_accepted", "J'autorise le moteur IA a traiter mes donnees pour personnaliser l'accompagnement."],
                   ["weekly_reports_accepted", "Je souhaite recevoir mes rapports patrimoniaux hebdomadaires."],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-start gap-2">

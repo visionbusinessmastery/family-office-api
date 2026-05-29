@@ -161,7 +161,7 @@ def ensure_plan_opportunity_depth(opportunities, profile, analytics=None):
             "priority": "high" if savings < max(3000, monthly_income) else "medium",
             "score": 82,
             "premium": False,
-            "why_this_opportunity": "Avant d'ajouter du risque, Ethan verifie si la base de securite protege la vie quotidienne.",
+            "why_this_opportunity": "Avant d'ajouter du risque, le backend verifie si la base de securite protege la vie quotidienne.",
             "why_now": "La reserve conditionne la serenite des prochaines decisions.",
             "impact_potential": "Stabilite et baisse de stress financier.",
             "difficulty": "faible",
@@ -190,7 +190,7 @@ def ensure_plan_opportunity_depth(opportunities, profile, analytics=None):
             "score": 74,
             "premium": False,
             "why_this_opportunity": "Chaque actif doit etre relie a un role concret: revenu, protection ou valorisation.",
-            "why_now": "Ethan detecte un besoin de relier allocation et trajectoire de vie.",
+            "why_now": "Le backend detecte un besoin de relier allocation et trajectoire de vie.",
             "impact_potential": "Meilleure coherence entre revenus actifs, epargne et investissement.",
             "difficulty": "moyenne",
             "profile_compatibility": "adaptable a tes revenus actuels",
@@ -715,7 +715,7 @@ def compute_opportunities(
                     "ai_rebalance",
 
                 "title":
-                    "Reequilibrage Ethan",
+                    "Reequilibrage data-only",
 
                 "description":
                     "Concentration crypto excessive détectée",

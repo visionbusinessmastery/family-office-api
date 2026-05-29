@@ -84,7 +84,7 @@ export default function FamilyOfficeScore() {
 
       <p className="text-sm text-white/50">
         Le score reste un indicateur de lecture. Les decisions et priorites
-        passent par Ethan Core.
+        passent par le moteur central.
       </p>
     </div>
   );

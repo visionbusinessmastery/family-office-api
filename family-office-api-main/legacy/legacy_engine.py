@@ -35,8 +35,8 @@ def compute_legacy_engine(payload: dict) -> dict:
             "wealth_transmission": round((succession + governance + protection) / 3),
         },
         "priorities": priorities[:5],
-        "ethan_positioning": (
-            "Conceptuel et strategique: Ethan prepare les bonnes questions, "
+        "core_positioning": (
+            "Conceptuel et strategique: ce module prepare les bonnes questions, "
             "sans remplacer un conseil legal, fiscal ou patrimonial reglemente."
         ),
     }

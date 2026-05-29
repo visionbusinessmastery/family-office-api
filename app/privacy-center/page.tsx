@@ -50,7 +50,7 @@ type PrivacyCenterData = {
 const consentLabels: Record<string, string> = {
   terms_accepted: "Conditions generales",
   privacy_policy_accepted: "Politique de confidentialite",
-  ai_processing_accepted: "Traitement Ethan",
+  ai_processing_accepted: "Traitement IA",
   marketing_emails_accepted: "Emails marketing",
   analytics_accepted: "Mesure d'usage",
   personalized_opportunities_accepted: "Opportunites personnalisees",
@@ -71,7 +71,7 @@ const emailLabels: Record<string, string> = {
 const dataLabels: Record<string, string> = {
   portfolio: "Actifs portefeuille",
   real_estate: "Actifs immobiliers",
-  ethan_memory: "Memoires Ethan",
+  ethan_memory: "Memoires IA",
   notifications: "Notifications",
   legacy: "Elements Legacy",
   oauth_accounts: "Comptes sociaux",
@@ -345,7 +345,7 @@ export default function PrivacyCenterPage() {
                 <h2 className="text-2xl font-black">Export de donnees</h2>
                 <p className="mt-2 text-sm leading-relaxed text-gray-400">
                   Genere une copie securisee de ton profil, patrimoine, historique,
-                  progression, abonnements et memoire Ethan.
+                  progression, abonnements et memoire IA.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <ActionButton onClick={() => requestExport("json")}>JSON</ActionButton>
@@ -403,7 +403,7 @@ export default function PrivacyCenterPage() {
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-black/45 p-5 backdrop-blur-xl">
-              <h2 className="text-2xl font-black">Ethan et traitement des donnees</h2>
+              <h2 className="text-2xl font-black">IA et traitement des donnees</h2>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {data?.ai_disclosure &&
                   Object.entries(data.ai_disclosure).map(([key, value]) => (

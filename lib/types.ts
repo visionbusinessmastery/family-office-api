@@ -88,7 +88,6 @@ export type ProductMission = {
   recommended_plan?: string;
   validation?: string;
   context_reason?: string;
-  ethan_reason?: string;
   completed?: boolean;
   status?: "pending" | "completed" | "verified" | string;
 };

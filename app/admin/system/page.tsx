@@ -66,7 +66,7 @@ export default function SystemAdminPage() {
               Readiness production
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-300">
-              Sante des dependances, feature flags, cache, Stripe, OpenAI et couts Ethan.
+              Sante des dependances, feature flags, cache, Stripe, OpenAI et couts IA.
             </p>
           </div>
           <CockpitBackLink />
@@ -87,7 +87,7 @@ export default function SystemAdminPage() {
               <MetricCard label="Statut systeme" value={data.health.status} tone={data.health.status === "ok" ? "success" : "danger"} />
               <MetricCard label="Dependances degradees" value={degraded} tone={degraded ? "danger" : "success"} />
               <MetricCard label="Feature flags" value={data.feature_flags.length} tone="primary" />
-              <MetricCard label="Cout Ethan 7j" value={`$${data.ethan_costs_7d.reduce((sum, item) => sum + item.estimated_cost_usd, 0).toFixed(4)}`} />
+              <MetricCard label="Cout IA 7j" value={`$${data.ethan_costs_7d.reduce((sum, item) => sum + item.estimated_cost_usd, 0).toFixed(4)}`} />
             </section>
 
             <section className="grid gap-6 lg:grid-cols-2">
@@ -125,7 +125,7 @@ export default function SystemAdminPage() {
 
             <section className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-black/45 p-5 backdrop-blur-xl">
-                <h2 className="text-2xl font-black">Ethan par plan</h2>
+                <h2 className="text-2xl font-black">IA par plan</h2>
                 <div className="mt-4 space-y-2">
                   {data.ethan_costs_7d.map((row) => (
                     <div key={row.plan} className="flex justify-between rounded-xl bg-white/[0.04] px-4 py-3 text-sm">
