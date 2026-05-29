@@ -105,7 +105,7 @@ PLAN_ENTITLEMENTS = {
         ],
     },
     "SILVER": {
-        "max_assets": 15,
+        "max_assets": 10,
         "ai_level": "standard",
         "modules": [
             "foundation",
@@ -124,7 +124,7 @@ PLAN_ENTITLEMENTS = {
         ],
     },
     "PLATINUM": {
-        "max_assets": 100,
+        "max_assets": 30,
         "ai_level": "advanced",
         "modules": [
             "foundation",
