@@ -23,6 +23,7 @@ from .autopilot_service import portfolio_autopilot
 from .schemas import AdvisorRequest
 from .security_engine import inspect_advisor_prompt
 
+from .ethan.contract_validator import validate_ethan_frontend_contract
 from .ethan.persistence_engine import (
     ensure_ethan_ai_tables,
     get_user_plan,
@@ -58,12 +59,14 @@ def advisor_core(request: Request, data: AdvisorRequest):
 
         result = run_ethan_chat(user_email, message, bypass_cache=data.bypass_cache)
 
-        return {
-            "user": user_email,
-            "system": "ETHAN_CORE_V4",
-            "input": message,
-            "result": result
-        }
+        return validate_ethan_frontend_contract({
+            "analysis": result.get("analysis", ""),
+            "metadata": {
+                **(result.get("metadata") or {}),
+                "mode": result.get("mode", "chat"),
+                "system": result.get("system", "ETHAN_CORE_V4"),
+            },
+        })
 
     return safe_execute(_run, module_name="ADVISOR_CORE")
 

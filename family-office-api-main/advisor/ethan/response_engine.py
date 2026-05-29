@@ -1,6 +1,8 @@
 import json
 import unicodedata
 
+from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
+
 
 ETHAN_CORE_SYSTEM = "ETHAN_CORE_V4"
 CORE_EMPTY_STATUS = "empty"
@@ -102,7 +104,12 @@ def get_llm_response(
 ):
     import json
 
-    prompt_hash = stable_hash_fn({"messages": messages, "model": model, "max": max_output_tokens})
+    prompt_hash = stable_hash_fn({
+        "version": ETHAN_GLOBAL_CACHE_VERSION,
+        "messages": messages,
+        "model": model,
+        "max": max_output_tokens,
+    })
     llm_cache_key = f"llm:{prompt_hash}"
 
     cached = get_cache_fn(llm_cache_key)

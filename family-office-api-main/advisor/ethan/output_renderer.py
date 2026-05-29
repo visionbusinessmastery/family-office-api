@@ -20,6 +20,8 @@ LEGACY_CONTENT_PATTERNS = [
     "capacite mensuelle disponible",
 ]
 
+ETHAN_TEXT_ORIGIN = "ethan_output_renderer"
+
 
 def _stable_index(seed, size):
     if size <= 0:

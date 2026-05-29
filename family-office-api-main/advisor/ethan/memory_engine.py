@@ -2,7 +2,31 @@ import json
 
 from sqlalchemy import text
 
+from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
 from advisor.ethan.strategy_engine import safe_int
+
+
+def _versioned_context_profile(profile):
+    profile = profile if isinstance(profile, dict) else {}
+    if profile.get("cache_version") == ETHAN_GLOBAL_CACHE_VERSION:
+        return profile
+
+    preserved_keys = [
+        "priority_goal",
+        "goals",
+        "time_constraint",
+        "family_constraint",
+        "has_children",
+        "expertise",
+        "professional_context",
+        "business_context",
+        "businesses",
+    ]
+    return {
+        key: profile[key]
+        for key in preserved_keys
+        if profile.get(key)
+    }
 
 
 def get_memory(conn, user_id):
@@ -22,7 +46,7 @@ def get_memory(conn, user_id):
         "strategic_summary": row.strategic_summary,
         "session_summary": row.session_summary,
         "last_topic": row.last_topic,
-        "context_profile": row.context_profile or {},
+        "context_profile": _versioned_context_profile(row.context_profile or {}),
         "key_signals": row.key_signals,
     }
 
@@ -149,6 +173,7 @@ def update_memory(
     if isinstance(memory, dict) and isinstance(memory.get("context_profile"), dict):
         existing_profile = dict(memory.get("context_profile") or {})
     next_profile = {**existing_profile, **extract_context_signals(message)}
+    next_profile["cache_version"] = ETHAN_GLOBAL_CACHE_VERSION
     if response_strategy:
         next_profile["_last_primary_intent"] = response_strategy.get("primary_intent")
         next_profile["_last_strategic_angle"] = response_strategy.get("strategic_angle")

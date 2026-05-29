@@ -9,6 +9,11 @@ type ChatMessage = {
 };
 
 type AdvisorResponse = {
+  analysis?: string;
+  metadata?: {
+    cache_version?: string;
+    text_origin?: string;
+  };
   result?: {
     analysis?: string;
     context_score?: number;
@@ -25,7 +30,7 @@ const initialMessages: ChatMessage[] = [
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED_MESSAGES = 40;
-const CONVERSATION_CACHE_VERSION = "v5-core-contract";
+const CONVERSATION_CACHE_VERSION = "v16-final-lock";
 const LEGACY_RESPONSE_PATTERNS = [
   "ton score est",
   "score 39/100",
@@ -210,22 +215,21 @@ export default function AdvisorChat() {
 
     try {
       const data = await requestAdvisorResponse(token, question);
-      let analysis = data.result?.analysis || "";
+      let analysis = data.analysis || data.result?.analysis || "";
 
       if (isLegacyAssistantText(analysis)) {
         clearConversationCache();
         const refreshed = await requestAdvisorResponse(token, question, true);
-        analysis = refreshed.result?.analysis || "";
+        analysis = refreshed.analysis || refreshed.result?.analysis || "";
       }
 
-      const safeAnalysis =
-        !analysis || isLegacyAssistantText(analysis)
-          ? "Je n'ai pas assez de contexte exploitable pour produire une reponse fiable maintenant. Repose ta question en une phrase simple."
-          : analysis;
+      if (!analysis || isLegacyAssistantText(analysis)) {
+        throw new Error("Contrat Ethan invalide");
+      }
 
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: safeAnalysis },
+        { role: "assistant", content: analysis },
       ]);
     } catch (err) {
       console.error(err);

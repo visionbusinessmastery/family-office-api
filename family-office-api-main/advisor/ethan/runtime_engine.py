@@ -2,10 +2,11 @@ import hashlib
 import json
 import os
 
+from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
 from product.entitlements import normalize_plan, plan_allows
 
 
-ADVISOR_CACHE_VERSION = "v15-output-renderer"
+ADVISOR_CACHE_VERSION = ETHAN_GLOBAL_CACHE_VERSION
 
 MODEL_LIGHT = os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano")
 MODEL_STANDARD = os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini")

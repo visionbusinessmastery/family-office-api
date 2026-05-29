@@ -1,7 +1,8 @@
 from advisor.ethan.context_engine import compact_context, compact_portfolio
+from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
 from advisor.ethan.memory_engine import build_life_context, get_memory, update_memory
 from advisor.ethan.openai_gateway import ethan_chat_completion, is_ethan_openai_configured
-from advisor.ethan.output_renderer import render_ethan_output
+from advisor.ethan.output_renderer import ETHAN_TEXT_ORIGIN, render_ethan_output
 from advisor.ethan.persistence_engine import (
     ensure_ethan_ai_tables,
     get_cache,
@@ -158,12 +159,16 @@ def advisor_logic(user_email, message, level=None, bypass_cache=False):
         result = {
             "status": response_data.get("status", "empty"),
             "analysis": rendered_text,
-            "context_score": response_get_context_score(context),
-            "tier": tier,
-            "complexity": complexity,
-            "soft_budget_active": soft_budget_active,
-            "cache_hit": llm_cache_hit,
-            "autopilot": None,
+            "metadata": {
+                "status": response_data.get("status", "empty"),
+                "context_score": response_get_context_score(context),
+                "tier": tier,
+                "complexity": complexity,
+                "soft_budget_active": soft_budget_active,
+                "cache_hit": llm_cache_hit,
+                "text_origin": ETHAN_TEXT_ORIGIN,
+                "cache_version": ETHAN_GLOBAL_CACHE_VERSION,
+            },
         }
 
         if not bypass_cache:
