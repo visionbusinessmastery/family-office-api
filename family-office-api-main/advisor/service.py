@@ -843,7 +843,7 @@ def build_hash(user_email, message, plan, complexity, fingerprint):
     return stable_hash(raw)
 
 
-def advisor_logic(user_email, message, level=None):
+def advisor_logic(user_email, message, level=None, bypass_cache=False):
     with engine.begin() as conn:
         ensure_ethan_ai_tables(conn)
         unified_state = centralized_user_state_builder(conn, user_email)
@@ -880,7 +880,7 @@ def advisor_logic(user_email, message, level=None):
         })[:16]
         cache_key = f"advisor:{build_hash(user_email, message, plan, complexity, fingerprint)}"
 
-        cached = get_cache(cache_key)
+        cached = None if bypass_cache else get_cache(cache_key)
         if cached and not is_legacy_ethan_response(cached):
             record_usage(conn, user_id, user_email, plan, tier, task_type, complexity, model, True)
             cached["cache_hit"] = True
@@ -915,7 +915,8 @@ def advisor_logic(user_email, message, level=None):
             )
             update_memory(conn, user_id, message, result.get("analysis"), context, memory, response_strategy)
             record_usage(conn, user_id, user_email, plan, tier, task_type, complexity, actual_model, False, input_tokens, 0)
-            set_cache(cache_key, result, ttl=180)
+            if not bypass_cache:
+                set_cache(cache_key, result, ttl=180)
             return result
 
         update_memory(conn, user_id, message, llm_text, context, memory, response_strategy)
@@ -943,7 +944,8 @@ def advisor_logic(user_email, message, level=None):
             "autopilot": None,
         }
 
-        set_cache(cache_key, result, ttl=900 if complexity != "high" else 300)
+        if not bypass_cache:
+            set_cache(cache_key, result, ttl=900 if complexity != "high" else 300)
         return result
 
 
@@ -1153,16 +1155,16 @@ def build_fallback_response(
     }
 
 
-def get_advisor_free(user_email, message):
-    return advisor_logic(user_email, message)
+def get_advisor_free(user_email, message, bypass_cache=False):
+    return advisor_logic(user_email, message, bypass_cache=bypass_cache)
 
 
-def get_advisor_premium(user_email, message):
-    return advisor_logic(user_email, message)
+def get_advisor_premium(user_email, message, bypass_cache=False):
+    return advisor_logic(user_email, message, bypass_cache=bypass_cache)
 
 
-def get_advisor_elite(user_email, message):
-    return advisor_logic(user_email, message)
+def get_advisor_elite(user_email, message, bypass_cache=False):
+    return advisor_logic(user_email, message, bypass_cache=bypass_cache)
 
 
 def portfolio_manager(user_email, message):

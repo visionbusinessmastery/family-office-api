@@ -58,7 +58,7 @@ def advisor(request: Request, data: AdvisorRequest):
             )
             capture_event(conn, ETHAN_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor", "plan": plan})
 
-        result = get_advisor_free(user_email, message)
+        result = get_advisor_free(user_email, message, bypass_cache=data.bypass_cache)
 
         return {
             "user": user_email,

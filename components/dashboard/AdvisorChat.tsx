@@ -32,7 +32,7 @@ const initialMessages: ChatMessage[] = [
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED_MESSAGES = 40;
-const CONVERSATION_CACHE_VERSION = "v2-zero-template-guard";
+const CONVERSATION_CACHE_VERSION = "v3-retry-clean-response";
 const LEGACY_RESPONSE_PATTERNS = [
   "ton score est",
   "score 39/100",
@@ -42,6 +42,7 @@ const LEGACY_RESPONSE_PATTERNS = [
   "priorite:",
   "priorité:",
   "clarifier la capacite",
+  "ethan vient d'ecarter",
   "capacité mensuelle disponible",
 ];
 
@@ -160,6 +161,21 @@ function writeCachedMessages(messages: ChatMessage[]) {
   localStorage.setItem(getUserCacheKey(), JSON.stringify(payload));
 }
 
+async function requestAdvisorResponse(
+  token: string | null,
+  question: string,
+  bypassCache = false
+) {
+  return apiRequest<AdvisorResponse>("/advisor/advisor", token, {
+    method: "POST",
+    headers: {
+      "Cache-Control": "no-store",
+      "X-Ethan-Client-Version": CONVERSATION_CACHE_VERSION,
+    },
+    body: JSON.stringify({ message: question, bypass_cache: bypassCache }),
+  });
+}
+
 export default function AdvisorChat({
   recommendations = [],
   aiCoach,
@@ -217,18 +233,17 @@ export default function AdvisorChat({
     setLoading(true);
 
     try {
-      const data = await apiRequest<AdvisorResponse>("/advisor/advisor", token, {
-        method: "POST",
-        headers: {
-          "Cache-Control": "no-store",
-          "X-Ethan-Client-Version": CONVERSATION_CACHE_VERSION,
-        },
-        body: JSON.stringify({ message: question }),
-      });
+      const data = await requestAdvisorResponse(token, question);
+      let analysis = data.result?.analysis || "";
 
-      const analysis = data.result?.analysis || "";
+      if (isLegacyAssistantText(analysis)) {
+        clearConversationCache();
+        const refreshed = await requestAdvisorResponse(token, question, true);
+        analysis = refreshed.result?.analysis || "";
+      }
+
       const safeAnalysis = isLegacyAssistantText(analysis)
-        ? "Ethan vient d'ecarter une ancienne reponse mise en cache. Relance ta question: la prochaine reponse repartira du contexte actuel."
+        ? "Ethan refuse une ancienne reponse non conforme. Le moteur doit finir de se synchroniser avant de repondre proprement."
         : analysis ||
           "Le moteur Ethan n'a pas renvoye de reponse exploitable pour le moment.";
 
