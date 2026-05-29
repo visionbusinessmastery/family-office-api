@@ -10,6 +10,20 @@ Backend source of truth rule:
 from advisor.service import advisor_logic
 
 
+ETHAN_CORE_SYSTEM = "ETHAN_CORE_V4"
+
+
+def _with_core_contract(result, mode: str):
+    if not isinstance(result, dict):
+        return result
+
+    next_result = dict(result)
+    next_result["source"] = "ethan_core"
+    next_result["mode"] = mode
+    next_result["system"] = ETHAN_CORE_SYSTEM
+    return next_result
+
+
 def run_ethan_core(user_email: str, message: str, *, mode: str = "chat", bypass_cache: bool = False):
     """
     Run Ethan's canonical backend cognition flow.
@@ -22,11 +36,12 @@ def run_ethan_core(user_email: str, message: str, *, mode: str = "chat", bypass_
     if mode == "portfolio":
         cleaned_message = f"Analyse portefeuille: {cleaned_message}"
 
-    return advisor_logic(
+    result = advisor_logic(
         user_email,
         cleaned_message,
         bypass_cache=bypass_cache,
     )
+    return _with_core_contract(result, mode)
 
 
 def run_ethan_chat(user_email: str, message: str, *, bypass_cache: bool = False):

@@ -1,8 +1,3 @@
-import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 def calculate_ai_score(sentiment_score, trend_score, price_change, pe_ratio=None):
 
     score = 50  # base neutre

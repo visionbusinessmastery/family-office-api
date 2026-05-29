@@ -1,6 +1,5 @@
 import requests
 import os
-from openai import OpenAI
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
@@ -9,8 +8,6 @@ import xml.etree.ElementTree as ET  # 🔥 ajout
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 
 
 # =========================

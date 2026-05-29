@@ -1,10 +1,7 @@
-import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+from core.openai_gateway import chat_completion, is_openai_configured
 
 def analyze_sentiment(news_list):
-    if not client:
+    if not is_openai_configured():
         return {
             "label": "neutral",
             "score": 50,
@@ -27,7 +24,7 @@ def analyze_sentiment(news_list):
     - résumé en 3 lignes
     """
 
-    response = client.chat.completions.create(
+    response = chat_completion(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
     )

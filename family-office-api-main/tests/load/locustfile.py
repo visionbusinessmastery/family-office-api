@@ -37,7 +37,7 @@ class WhiteRockUser(HttpUser):
     def ethan(self):
         if self.token:
             self.client.post(
-                "/advisor/advisor",
+                "/advisor/core",
                 headers=self.headers,
                 json={"message": "Quelle est mon action patrimoniale prioritaire ?"},
                 name="ethan",

@@ -1,15 +1,10 @@
 import requests
-import os
-from openai import OpenAI
 
 from market.sentiment import analyze_sentiment
 from market.trends import get_trends
 from market.scoring import calculate_ai_score, get_signal, get_risk
 
 from data_engine.news_service import get_market_news, get_google_news
-
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # =========================
