@@ -17,7 +17,21 @@ from advisor.user_state import centralized_user_state_builder
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
 _ethan_schema_ready = False
-ADVISOR_CACHE_VERSION = "v12-response-diversity-lens"
+ADVISOR_CACHE_VERSION = "v13-stale-response-guard"
+
+LEGACY_ETHAN_RESPONSE_PATTERNS = [
+    "ton score est",
+    "ton score ",
+    "score 39/100",
+    "pour le cashflow",
+    "action simple",
+    "action prioritaire",
+    "priorite:",
+    "priorité:",
+    "clarifier la capacite",
+    "capacite mensuelle disponible",
+    "capacité mensuelle disponible",
+]
 
 MODEL_LIGHT = os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano")
 MODEL_STANDARD = os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini")
@@ -504,6 +518,33 @@ def _safe_int(value, default=0):
         return default
 
 
+def _normalize_legacy_text(value) -> str:
+    if isinstance(value, (dict, list)):
+        raw = json.dumps(value, ensure_ascii=False, default=str)
+    else:
+        raw = str(value or "")
+
+    return (
+        raw.lower()
+        .replace("é", "e")
+        .replace("è", "e")
+        .replace("ê", "e")
+        .replace("à", "a")
+        .replace("â", "a")
+        .replace("î", "i")
+        .replace("ô", "o")
+        .replace("û", "u")
+    )
+
+
+def is_legacy_ethan_response(value) -> bool:
+    normalized = _normalize_legacy_text(value)
+    return any(
+        _normalize_legacy_text(pattern) in normalized
+        for pattern in LEGACY_ETHAN_RESPONSE_PATTERNS
+    )
+
+
 def _select_cognitive_lens(primary_intent, previous_lens, diversity_counter, message):
     if previous_lens == "action":
         candidates = ["insight", "question"]
@@ -749,7 +790,7 @@ def get_llm_response(messages, model, max_output_tokens):
     llm_cache_key = f"llm:{prompt_hash}"
 
     cached = get_cache(llm_cache_key)
-    if cached:
+    if cached and not is_legacy_ethan_response(cached):
         return cached, True, estimate_tokens(json.dumps(messages)), estimate_tokens(cached), model
 
     if not client:
@@ -783,7 +824,8 @@ def get_llm_response(messages, model, max_output_tokens):
         usage = getattr(response, "usage", None)
         input_tokens = getattr(usage, "prompt_tokens", None) or estimate_tokens(json.dumps(messages))
         output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens(llm_text)
-        set_cache(llm_cache_key, llm_text, ttl=1800)
+        if not is_legacy_ethan_response(llm_text):
+            set_cache(llm_cache_key, llm_text, ttl=1800)
         return llm_text, False, input_tokens, output_tokens, model
     except Exception:
         return None, False, estimate_tokens(json.dumps(messages)), 0, model
@@ -839,7 +881,7 @@ def advisor_logic(user_email, message, level=None):
         cache_key = f"advisor:{build_hash(user_email, message, plan, complexity, fingerprint)}"
 
         cached = get_cache(cache_key)
-        if cached:
+        if cached and not is_legacy_ethan_response(cached):
             record_usage(conn, user_id, user_email, plan, tier, task_type, complexity, model, True)
             cached["cache_hit"] = True
             return cached
@@ -862,7 +904,7 @@ def advisor_logic(user_email, message, level=None):
             config["max_output_tokens"],
         )
 
-        if not llm_text:
+        if not llm_text or is_legacy_ethan_response(llm_text):
             result = build_fallback_response(
                 context,
                 opportunities,
@@ -935,14 +977,28 @@ def _fallback_focus(message: str) -> str:
         return "real_estate"
     if any(word in normalized for word in ["opportunite", "opportunites", "deal", "signal", "source"]):
         return "opportunities"
-    if any(word in normalized for word in ["cashflow", "revenu", "charge", "epargne", "budget"]):
+    if any(word in normalized for word in [
+        "business",
+        "entreprise",
+        "startup",
+        "franchise",
+        "reprise",
+        "marketing",
+        "communication",
+        "commerce",
+        "client",
+        "offre",
+        "vente",
+        "revenu",
+        "revenus",
+    ]):
+        return "business"
+    if any(word in normalized for word in ["cashflow", "charge", "charges", "epargne", "budget", "liquidite", "tresorerie"]):
         return "cashflow"
     if any(word in normalized for word in ["risque", "concentration", "exposition", "diversification"]):
         return "risk"
     if any(word in normalized for word in ["portfolio", "portefeuille", "action", "etf", "crypto", "forex"]):
         return "portfolio"
-    if any(word in normalized for word in ["business", "entreprise", "startup", "franchise", "reprise"]):
-        return "business"
     if any(word in normalized for word in ["legacy", "heritage", "transmission", "famille", "gouvernance"]):
         return "legacy"
     if any(word in normalized for word in ["score", "progression", "xp", "badge", "mission"]):
@@ -1045,7 +1101,7 @@ def build_fallback_response(
         "business": (
             "Si une expertise existe deja, le meilleur levier est souvent une offre plus nette, pas un nouveau projet. "
             f"{revenue_lever}. "
-            "Je testerais une promesse d'offre en une phrase avant de construire quoi que ce soit de plus lourd."
+            "Je testerais une promesse courte orientee PME ou independants: un audit marketing express, limite dans le temps, qui peut se vendre sans alourdir tes soirees."
         ),
         "legacy": (
             "En Legacy, la vraie performance est la continuite, pas seulement la croissance. "

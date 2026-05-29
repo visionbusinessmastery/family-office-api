@@ -788,7 +788,7 @@ def _collect_real_estate(criteria: dict, profile: dict) -> list[dict]:
             "type": "real_estate",
             "potential": "medium",
             "budget": criteria.get("budget_min") or "low",
-            "projection": "Priorite: loyers reels, vacance, travaux et charges non recuperables.",
+            "projection": "A verifier: loyers reels, vacance, travaux et charges non recuperables.",
         },
     ]
     return enriched + base

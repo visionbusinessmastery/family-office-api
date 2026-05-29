@@ -32,17 +32,32 @@ const initialMessages: ChatMessage[] = [
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED_MESSAGES = 40;
+const CONVERSATION_CACHE_VERSION = "v2-zero-template-guard";
+const LEGACY_RESPONSE_PATTERNS = [
+  "ton score est",
+  "score 39/100",
+  "pour le cashflow",
+  "action simple",
+  "action prioritaire",
+  "priorite:",
+  "priorité:",
+  "clarifier la capacite",
+  "capacité mensuelle disponible",
+];
 
 type CachedConversation = {
+  version?: string;
   updatedAt: number;
   messages: ChatMessage[];
 };
 
 function getUserCacheKey() {
-  if (typeof window === "undefined") return "ethanConversation:anonymous";
+  if (typeof window === "undefined") {
+    return `ethanConversation:${CONVERSATION_CACHE_VERSION}:anonymous`;
+  }
 
   const token = localStorage.getItem("token");
-  if (!token) return "ethanConversation:anonymous";
+  if (!token) return `ethanConversation:${CONVERSATION_CACHE_VERSION}:anonymous`;
 
   try {
     const tokenPayload = token.split(".")[1];
@@ -53,10 +68,39 @@ function getUserCacheKey() {
     const payload = JSON.parse(
       atob(paddedPayload.replace(/-/g, "+").replace(/_/g, "/"))
     );
-    return `ethanConversation:${payload.sub || payload.email || payload.user_id || "user"}`;
+    return `ethanConversation:${CONVERSATION_CACHE_VERSION}:${
+      payload.sub || payload.email || payload.user_id || "user"
+    }`;
   } catch {
-    return "ethanConversation:user";
+    return `ethanConversation:${CONVERSATION_CACHE_VERSION}:user`;
   }
+}
+
+function normalizeConversationText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function hasLegacyResponse(messages: ChatMessage[]) {
+  const normalizedMessages = messages.map((message) =>
+    normalizeConversationText(message.content)
+  );
+
+  return normalizedMessages.some((content) =>
+    LEGACY_RESPONSE_PATTERNS.some((pattern) =>
+      content.includes(normalizeConversationText(pattern))
+    )
+  );
+}
+
+function clearConversationCache() {
+  if (typeof window === "undefined") return;
+
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith("ethanConversation:"))
+    .forEach((key) => localStorage.removeItem(key));
 }
 
 function trimMessages(messages: ChatMessage[]) {
@@ -80,12 +124,18 @@ function readCachedMessages() {
     if (!raw) return initialMessages;
 
     const cached = JSON.parse(raw) as CachedConversation;
-    if (!cached.updatedAt || Date.now() - cached.updatedAt > CACHE_TTL_MS) {
-      localStorage.removeItem(getUserCacheKey());
+    if (
+      cached.version !== CONVERSATION_CACHE_VERSION ||
+      !cached.updatedAt ||
+      Date.now() - cached.updatedAt > CACHE_TTL_MS ||
+      !Array.isArray(cached.messages) ||
+      hasLegacyResponse(cached.messages)
+    ) {
+      clearConversationCache();
       return initialMessages;
     }
 
-    return Array.isArray(cached.messages) && cached.messages.length > 0
+    return cached.messages.length > 0
       ? trimMessages(cached.messages)
       : initialMessages;
   } catch {
@@ -97,6 +147,7 @@ function writeCachedMessages(messages: ChatMessage[]) {
   if (typeof window === "undefined") return;
 
   const payload: CachedConversation = {
+    version: CONVERSATION_CACHE_VERSION,
     updatedAt: Date.now(),
     messages: trimMessages(messages),
   };
@@ -138,9 +189,7 @@ export default function AdvisorChat({
   }, [cacheReady, messages]);
 
   const clearConversation = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(getUserCacheKey());
-    }
+    clearConversationCache();
     setMessages(initialMessages);
   };
 
