@@ -18,27 +18,26 @@ from advisor.observability import (
     ensure_ethan_observability_tables,
     top_expensive_users,
 )
+from .autopilot_service import portfolio_autopilot
 
 from .schemas import AdvisorRequest
 from .security_engine import inspect_advisor_prompt
 
-from .service import (
+from .ethan.contract_validator import validate_ethan_frontend_contract
+from .ethan.persistence_engine import (
     ensure_ethan_ai_tables,
     get_user_plan,
-    get_advisor_free,
-    portfolio_autopilot,
-    portfolio_manager,
 )
-from analytics.analytics_events import ETHAN_USED
+from .ethan_core import run_ethan_chat
+from analytics.analytics_events import AUTOPILOT_SIMULATION_USED, ETHAN_USED
 from analytics.posthog_service import capture_event
 
 router = APIRouter()
 
 
-@router.post("/")
-@router.post("/advisor")
+@router.post("/core")
 @limiter.limit("10/minute")
-def advisor(request: Request, data: AdvisorRequest):
+def advisor_core(request: Request, data: AdvisorRequest):
 
     def _run():
         user_email = request.state.user_email
@@ -54,20 +53,31 @@ def advisor(request: Request, data: AdvisorRequest):
                 request,
                 email=user_email,
                 user_id=user_id,
-                metadata={"endpoint": "advisor", "chars": len(message)},
+                metadata={"endpoint": "advisor_core", "chars": len(message)},
             )
-            capture_event(conn, ETHAN_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor", "plan": plan})
+            capture_event(conn, ETHAN_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor_core", "plan": plan})
 
-        result = get_advisor_free(user_email, message)
+        result = run_ethan_chat(user_email, message, bypass_cache=data.bypass_cache)
 
-        return {
-            "user": user_email,
-            "system": "ADVISOR_CHAT_V4",
-            "input": message,
-            "result": result
-        }
+        return validate_ethan_frontend_contract({
+            "analysis": result.get("analysis", ""),
+            "metadata": {
+                **(result.get("metadata") or {}),
+                "mode": result.get("mode", "chat"),
+                "system": result.get("system", "ETHAN_CORE_V4"),
+            },
+        })
 
-    return safe_execute(_run, module_name="ADVISOR_CHAT")
+    return safe_execute(_run, module_name="ADVISOR_CORE")
+
+
+@router.post("/")
+@router.post("/advisor")
+def advisor_legacy_route():
+    raise HTTPException(
+        status_code=410,
+        detail="Conversation endpoint moved to /advisor/core",
+    )
 
 
 # =========================
@@ -76,39 +86,14 @@ def advisor(request: Request, data: AdvisorRequest):
 @router.post("/advisor/portfolio")
 @limiter.limit("10/minute")
 def advisor_portfolio(request: Request, data: AdvisorRequest):
-
-    def _run():
-        user_email = request.state.user_email
-        message = inspect_advisor_prompt(data.message)
-
-        with engine.begin() as conn:
-            ensure_security_tables(conn)
-            user_id, plan = get_user_plan(conn, user_email)
-            assert_ethan_limit(conn, request, user_email, plan)
-            log_security_event(
-                conn,
-                "ethan_request",
-                request,
-                email=user_email,
-                user_id=user_id,
-                metadata={"endpoint": "advisor_portfolio", "chars": len(message)},
-            )
-            capture_event(conn, ETHAN_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor_portfolio", "plan": plan})
-
-        result = portfolio_manager(user_email, message)
-
-        return {
-            "user": user_email,
-            "system": "PORTFOLIO_ANALYSIS_V4",
-            "input": message,
-            "result": result
-        }
-
-    return safe_execute(_run, module_name="PORTFOLIO_MANAGER")
+    raise HTTPException(
+        status_code=410,
+        detail="Portfolio conversation moved to /advisor/core",
+    )
 
 
 # =========================
-# 3. AUTOPILOT ENGINE (SIMULATION / DECISION)
+# 3. AUTOPILOT ENGINE (SIMULATION SATELLITE ONLY)
 # =========================
 @router.post("/advisor/autopilot")
 @limiter.limit("10/minute")
@@ -124,20 +109,21 @@ def advisor_autopilot(request: Request, data: AdvisorRequest):
             assert_ethan_limit(conn, request, user_email, plan)
             log_security_event(
                 conn,
-                "ethan_request",
+                "autopilot_simulation_request",
                 request,
                 email=user_email,
                 user_id=user_id,
                 metadata={"endpoint": "advisor_autopilot", "chars": len(message)},
             )
-            capture_event(conn, ETHAN_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor_autopilot", "plan": plan})
+            capture_event(conn, AUTOPILOT_SIMULATION_USED, user_id=user_id, email=user_email, properties={"endpoint": "advisor_autopilot", "plan": plan})
 
         result = portfolio_autopilot(user_email, message)
 
         return {
             "user": user_email,
-            "system": "AUTOPILOT_ENGINE_V4",
+            "system": "AUTOPILOT_SIMULATION_SATELLITE_V4",
             "mode": "SIMULATION",
+            "authority": "no_decision_authority",
             "input": message,
             "result": result
         }

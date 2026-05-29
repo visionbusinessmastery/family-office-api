@@ -56,6 +56,7 @@ FEATURE_MIN_PLAN = {
     "fiscal_optimization": "LIBERTY",
     "automation": "LIBERTY",
     "unlock_all": "LIBERTY",
+    "child_accounts": "LIBERTY",
     "family_vault": "LEGACY",
     "heirs_mode": "LEGACY",
     "dynasty_features": "LEGACY",

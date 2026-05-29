@@ -56,7 +56,7 @@ PLAN_COPY = {
 
 PLAN_ENTITLEMENTS = {
     "FREE": {
-        "max_assets": 5,
+        "max_assets": 10,
         "ai_level": "basic",
         "modules": [
             "foundation",
@@ -75,7 +75,7 @@ PLAN_ENTITLEMENTS = {
         ],
     },
     "GOLD": {
-        "max_assets": 50,
+        "max_assets": 20,
         "ai_level": "advanced",
         "modules": [
             "foundation",
@@ -96,6 +96,8 @@ PLAN_ENTITLEMENTS = {
             "real_estate",
             "business_assets",
             "portfolio_chart",
+            "ethan_floating_chat",
+            "weekly_email_insights",
             "smart_notifications",
             "category_opportunities",
             "projections",
@@ -184,7 +186,7 @@ PLAN_ENTITLEMENTS = {
         ],
     },
     "LIBERTY": {
-        "max_assets": None,
+        "max_assets": 50,
         "ai_level": "sovereign",
         "modules": [
             "foundation",
@@ -204,6 +206,7 @@ PLAN_ENTITLEMENTS = {
             "imports",
             "automation",
             "legacy_planning",
+            "child_accounts",
             "gamification",
         ],
         "features": [
@@ -218,6 +221,7 @@ PLAN_ENTITLEMENTS = {
             "automatic_imports",
             "wealth_architecture",
             "legacy_planning",
+            "child_accounts",
             "forex_advanced_analytics",
         ],
     },
@@ -243,6 +247,7 @@ PLAN_ENTITLEMENTS = {
             "automation",
             "family_vault",
             "heirs_mode",
+            "child_accounts",
             "protection_layer",
             "global_strategy",
             "legacy_timeline",
@@ -261,6 +266,7 @@ PLAN_ENTITLEMENTS = {
             "wealth_architecture",
             "family_vault",
             "heirs_mode",
+            "child_accounts",
             "asset_protection",
             "global_strategy",
             "legacy_timeline",
@@ -383,6 +389,14 @@ MODULE_REGISTRY = [
         "description": "Gouvernance avancee, transmission et architecture patrimoniale.",
     },
     {
+        "key": "child_accounts",
+        "label": "Comptes enfants",
+        "stage": 8,
+        "min_plan": "LIBERTY",
+        "min_score": 0,
+        "description": "Portefeuille enfant, objectifs education et score generationnel.",
+    },
+    {
         "key": "family_vault",
         "label": "Family Vault",
         "stage": 9,
@@ -396,7 +410,7 @@ MODULE_REGISTRY = [
         "stage": 9,
         "min_plan": "LEGACY",
         "min_score": 0,
-        "description": "Preparation des heritiers, education financiere et Ethan Junior.",
+        "description": "Preparation des heritiers, education financiere et module junior.",
     },
     {
         "key": "protection_layer",
