@@ -1172,6 +1172,117 @@ def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency
     }
 
 
+def build_hidden_wealth(data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_income = float(data_profile.get("monthly_income") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    business_value = float(data_profile.get("business_value") or 0)
+    items = []
+    if monthly_income > 0:
+        items.append({"key": "expertise", "label": "Expertise professionnelle", "potential_value": round(max(monthly_income * 36, 75000), 2), "confidence": "contextual", "description": "Valeur potentielle de monetisation d'une competence deja presente."})
+        items.append({"key": "network", "label": "Reseau professionnel", "potential_value": round(max(monthly_income * 12, 50000), 2), "confidence": "light", "description": "Potentiel commercial lie aux contacts et marches accessibles."})
+    if business_value > 0:
+        items.append({"key": "business", "label": "Business existant", "potential_value": round(max(business_value * 2, business_value), 2), "confidence": "asset_based", "description": "Potentiel de valorisation ou de systematisation du bloc business."})
+    if monthly_capacity > 0:
+        items.append({"key": "borrowing_capacity", "label": "Capacite d'emprunt theorique", "potential_value": round(monthly_capacity * 240, 2), "confidence": "simulation", "description": "Simulation prudente basee sur la capacite mensuelle, sans validation bancaire."})
+    activable = sum(float(item.get("potential_value") or 0) for item in items)
+    return {"title": "Patrimoine cache", "visible_wealth": round(current_wealth, 2), "activable_wealth": round(activable, 2), "total_potential": round(current_wealth + activable, 2), "items": items, "basis": "Estimation backend de valeur activable, non comptabilisee comme patrimoine acquis."}
+
+
+def build_gravity_center(data_profile: dict, hidden_wealth: dict):
+    visible_domains = [("investments", "Financier", float(data_profile.get("portfolio_value") or 0)), ("real_estate", "Immobilier", float(data_profile.get("real_estate_value") or 0)), ("business", "Business", float(data_profile.get("business_value") or 0))]
+    visible_total = sum(value for _, _, value in visible_domains)
+    future_domains = visible_domains + [("hidden", "Patrimoine activable", float(hidden_wealth.get("activable_wealth") or 0))]
+    future_total = sum(value for _, _, value in future_domains)
+    dominant_visible = max(visible_domains, key=lambda item: item[2], default=("none", "Aucun", 0))
+    dominant_future = max(future_domains, key=lambda item: item[2], default=("none", "Aucun", 0))
+    return {
+        "title": "Centre de gravite",
+        "visible": [{"key": key, "label": label, "value": round(value, 2), "weight": round((value / visible_total) * 100, 1) if visible_total > 0 else 0} for key, label, value in visible_domains],
+        "future": [{"key": key, "label": label, "value": round(value, 2), "weight": round((value / future_total) * 100, 1) if future_total > 0 else 0} for key, label, value in future_domains],
+        "dominant_visible": dominant_visible[1],
+        "dominant_future": dominant_future[1],
+        "reading": f"Le patrimoine visible depend surtout de {dominant_visible[1].lower()}, mais le potentiel futur peut basculer vers {dominant_future[1].lower()}." if future_total > 0 else "Le centre de gravite sera lisible quand davantage de donnees seront renseignees.",
+        "hidden_count": len(hidden_wealth.get("items") or []),
+    }
+
+
+def build_stress_tests(data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    real_estate_value = float(data_profile.get("real_estate_value") or 0)
+    business_value = float(data_profile.get("business_value") or 0)
+    portfolio_value = float(data_profile.get("portfolio_value") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    return {"title": "Stress tests Family Office", "base_value": round(current_wealth, 2), "tests": [
+        {"key": "real_estate_down_20", "label": "Immobilier -20%", "result_value": round(current_wealth - real_estate_value * 0.2, 2), "delta": round(-real_estate_value * 0.2, 2), "reading": "Mesure la sensibilite a une baisse immobiliere."},
+        {"key": "markets_down_15", "label": "Marches financiers -15%", "result_value": round(current_wealth - portfolio_value * 0.15, 2), "delta": round(-portfolio_value * 0.15, 2), "reading": "Mesure la sensibilite aux actifs financiers liquides."},
+        {"key": "business_double", "label": "Business x2", "result_value": round(current_wealth + business_value, 2), "delta": round(business_value, 2), "reading": "Mesure l'effet d'une acceleration business."},
+        {"key": "extra_500_month", "label": "+500 EUR/mois sur 10 ans", "result_value": round(current_wealth + (monthly_capacity + 500) * 12 * 10, 2), "delta": round(500 * 12 * 10, 2), "reading": "Mesure la puissance d'un effort mensuel additionnel avant rendement."},
+    ]}
+
+
+def build_leverage_engine(data_profile: dict, hidden_wealth: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    hidden_value = float(hidden_wealth.get("activable_wealth") or 0)
+    levers = [
+        {"key": "business", "label": "Developper le business", "impact_score": min(100, 45 + int(hidden_value / max(current_wealth or 1, 1) * 35)), "reason": "Fort si une expertise ou une valeur activable existe."},
+        {"key": "real_estate", "label": "Immobilier", "impact_score": 70 if monthly_capacity > 0 else 45, "reason": "Pertinent si la capacite mensuelle permet de soutenir le levier."},
+        {"key": "markets", "label": "Marches financiers", "impact_score": 60 if monthly_capacity > 0 else 40, "reason": "Robuste si l'investissement reste automatique et diversifie."},
+        {"key": "crypto", "label": "Crypto / actifs risques", "impact_score": 35, "reason": "Levier secondaire tant que la base patrimoniale n'est pas stabilisee."},
+    ]
+    levers = sorted(levers, key=lambda item: item["impact_score"], reverse=True)
+    return {"title": "Moteur de leviers", "main_lever": levers[0] if levers else None, "levers": levers, "hidden_assets_count": len(hidden_wealth.get("items") or [])}
+
+
+def build_life_wealth(data_profile: dict):
+    monthly_income = float(data_profile.get("monthly_income") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    domains = sum(1 for value in [data_profile.get("portfolio_value", 0), data_profile.get("real_estate_value", 0), data_profile.get("business_value", 0)] if float(value or 0) > 0)
+    security = min(100, round((monthly_capacity * 6 / max(monthly_income or 1, 1)) * 100)) if monthly_income else 35
+    return {"title": "Patrimoine de vie", "dimensions": [
+        {"key": "security", "label": "Securite", "score": security},
+        {"key": "freedom", "label": "Liberte", "score": min(100, round((current_wealth / 1000000) * 100, 1))},
+        {"key": "transmission", "label": "Transmission", "score": 20},
+        {"key": "diversification", "label": "Diversification", "score": min(100, 25 + domains * 20)},
+        {"key": "growth", "label": "Croissance", "score": 70 if monthly_capacity > 0 or data_profile.get("business_value", 0) else 40},
+    ]}
+
+
+def build_future_film(data_profile: dict, digital_twin: dict, leverage_engine: dict):
+    current_year = date.today().year
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    best = (digital_twin.get("scenarios") or [{}])[0]
+    main_lever = leverage_engine.get("main_lever") or {}
+    value_5y = float(best.get("value_5y") or current_wealth)
+    value_10y = float(best.get("value_10y") or value_5y)
+    return {"title": "Film du futur patrimonial", "chapters": [
+        {"year": current_year, "title": "La base devient visible", "wealth": round(current_wealth, 2), "narrative": "White Rock transforme la photo actuelle en point de depart mesurable."},
+        {"year": current_year + 2, "title": "Le levier prioritaire s'active", "wealth": round((current_wealth + value_5y) / 2, 2), "narrative": f"Le levier {str(main_lever.get('label') or 'principal').lower()} commence a peser dans la trajectoire."},
+        {"year": current_year + 5, "title": "La trajectoire change d'echelle", "wealth": round(value_5y, 2), "narrative": "Les efforts recurrents et les actifs suivis commencent a creer une trajectoire composee."},
+        {"year": current_year + 10, "title": "Le futur alternatif devient tangible", "wealth": round(value_10y, 2), "narrative": "Le patrimoine projete n'est plus seulement une valeur: c'est une architecture de vie."},
+    ]}
+
+
+def build_family_office_scorecard(data_profile: dict, life_wealth: dict):
+    dimensions = {item.get("key"): item.get("score") for item in life_wealth.get("dimensions") or []}
+    return {"title": "Family Office Scorecard", "dimensions": [
+        {"key": "capital", "label": "Capital", "score": min(100, round((float(data_profile.get("current_wealth") or 0) / 1000000) * 100, 1))},
+        {"key": "income", "label": "Revenus", "score": min(100, round((float(data_profile.get("monthly_income") or 0) / 10000) * 100, 1))},
+        {"key": "resilience", "label": "Resilience", "score": dimensions.get("security", 0)},
+        {"key": "diversification", "label": "Diversification", "score": dimensions.get("diversification", 0)},
+        {"key": "growth", "label": "Croissance", "score": dimensions.get("growth", 0)},
+        {"key": "transmission", "label": "Transmission", "score": dimensions.get("transmission", 0)},
+    ]}
+
+
+def build_board_briefing(personal_command_center: dict, gravity_center: dict, stress_tests: dict):
+    tests = stress_tests.get("tests") or []
+    downside = min(tests, key=lambda item: float(item.get("delta") or 0), default=None)
+    return {"title": "Conseil d'administration personnel", "headline": personal_command_center.get("situation"), "what_changed": gravity_center.get("reading"), "main_risk": (personal_command_center.get("threat") or {}).get("title"), "main_opportunity": (personal_command_center.get("opportunity") or {}).get("title"), "stress_watch": downside, "next_step": personal_command_center.get("next_step")}
+
+
 @router.get("/context")
 def product_context(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -1228,6 +1339,14 @@ def product_context(email: str = Depends(get_current_user)):
         wealth_map = build_wealth_map(data_profile, wealth_timeline)
         invisible_wealth = build_invisible_wealth(data_profile, digital_twin)
         family_office_radar = build_family_office_radar(data_profile, weak_signals, dependency_detector)
+        hidden_wealth = build_hidden_wealth(data_profile)
+        gravity_center = build_gravity_center(data_profile, hidden_wealth)
+        stress_tests = build_stress_tests(data_profile)
+        leverage_engine = build_leverage_engine(data_profile, hidden_wealth)
+        life_wealth = build_life_wealth(data_profile)
+        future_film = build_future_film(data_profile, digital_twin, leverage_engine)
+        family_office_scorecard = build_family_office_scorecard(data_profile, life_wealth)
+        board_briefing = build_board_briefing(personal_command_center, gravity_center, stress_tests)
 
     return {
         "plan": plan,
@@ -1257,6 +1376,14 @@ def product_context(email: str = Depends(get_current_user)):
         "wealth_map": wealth_map,
         "invisible_wealth": invisible_wealth,
         "family_office_radar": family_office_radar,
+        "hidden_wealth": hidden_wealth,
+        "gravity_center": gravity_center,
+        "stress_tests": stress_tests,
+        "leverage_engine": leverage_engine,
+        "life_wealth": life_wealth,
+        "future_film": future_film,
+        "family_office_scorecard": family_office_scorecard,
+        "board_briefing": board_briefing,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,
