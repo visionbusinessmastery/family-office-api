@@ -5,6 +5,7 @@ from auth.utils import get_current_user, get_user_id
 from core.cache import redis_client
 from database import engine
 from intelligence.gamification.progress_service import award_xp
+from product.asset_access import build_asset_access, enforce_asset_creation_allowed
 from .specialized_assets_schemas import YieldAssetRequest, VentureAssetRequest
 
 
@@ -165,7 +166,7 @@ def build_venture_asset(row):
     }
 
 
-def build_venture_response(rows):
+def build_venture_response(rows, access=None):
     assets = [build_venture_asset(row) for row in rows]
     total_revenue = sum(asset["revenue"] for asset in assets)
     total_charges = sum(asset["charges"] for asset in assets)
@@ -174,6 +175,7 @@ def build_venture_response(rows):
 
     return {
         "assets": assets,
+        "access": access,
         "totals": {
             "total_revenue": round(total_revenue, 2),
             "total_charges": round(total_charges, 2),
@@ -302,8 +304,9 @@ def get_venture_assets(user=Depends(get_current_user)):
             WHERE user_id = :user_id
             ORDER BY created_at DESC, id DESC
         """), {"user_id": user_id}).fetchall()
+        access = build_asset_access(conn, user_id, "business", "venture_assets")
 
-    return build_venture_response(rows)
+    return build_venture_response(rows, access)
 
 
 @router.post("/venture-assets/")
@@ -312,6 +315,7 @@ def add_venture_asset(data: VentureAssetRequest, user=Depends(get_current_user))
     with engine.begin() as conn:
         user_id = require_user_id(conn, user)
         ensure_venture_table(conn)
+        enforce_asset_creation_allowed(conn, user_id, "business", "venture_assets")
         conn.execute(text("""
             INSERT INTO venture_assets (
                 user_id, asset_type, name, revenue, charges, fundraising,

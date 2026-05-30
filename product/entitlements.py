@@ -57,6 +57,10 @@ PLAN_COPY = {
 PLAN_ENTITLEMENTS = {
     "FREE": {
         "max_assets": 10,
+        "max_real_estate_assets": 1,
+        "real_estate_depth": "simple",
+        "max_business_assets": 1,
+        "business_depth": "simple",
         "ai_level": "basic",
         "modules": [
             "foundation",
@@ -82,6 +86,10 @@ PLAN_ENTITLEMENTS = {
     },
     "GOLD": {
         "max_assets": 20,
+        "max_real_estate_assets": 3,
+        "real_estate_depth": "cashflow",
+        "max_business_assets": 2,
+        "business_depth": "structured",
         "ai_level": "advanced",
         "modules": [
             "foundation",
@@ -125,6 +133,10 @@ PLAN_ENTITLEMENTS = {
     },
     "SILVER": {
         "max_assets": 10,
+        "max_real_estate_assets": 1,
+        "real_estate_depth": "simple",
+        "max_business_assets": 1,
+        "business_depth": "simple",
         "ai_level": "standard",
         "modules": [
             "foundation",
@@ -144,6 +156,10 @@ PLAN_ENTITLEMENTS = {
     },
     "PLATINUM": {
         "max_assets": 30,
+        "max_real_estate_assets": 3,
+        "real_estate_depth": "cashflow",
+        "max_business_assets": 2,
+        "business_depth": "structured",
         "ai_level": "advanced",
         "modules": [
             "foundation",
@@ -172,6 +188,10 @@ PLAN_ENTITLEMENTS = {
     },
     "ELITE": {
         "max_assets": 30,
+        "max_real_estate_assets": 10,
+        "real_estate_depth": "simulation",
+        "max_business_assets": 5,
+        "business_depth": "valuation",
         "ai_level": "premium",
         "modules": [
             "foundation",
@@ -220,6 +240,10 @@ PLAN_ENTITLEMENTS = {
     },
     "LIBERTY": {
         "max_assets": 50,
+        "max_real_estate_assets": None,
+        "real_estate_depth": "family_office",
+        "max_business_assets": None,
+        "business_depth": "family_office",
         "ai_level": "sovereign",
         "modules": [
             "foundation",
@@ -269,6 +293,10 @@ PLAN_ENTITLEMENTS = {
     },
     "LEGACY": {
         "max_assets": None,
+        "max_real_estate_assets": None,
+        "real_estate_depth": "dynasty",
+        "max_business_assets": None,
+        "business_depth": "dynasty",
         "ai_level": "dynasty",
         "modules": [
             "foundation",

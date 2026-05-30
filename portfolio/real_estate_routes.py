@@ -5,6 +5,7 @@ from auth.utils import get_current_user, get_user_id
 from core.cache import redis_client
 from database import engine
 from intelligence.gamification.progress_service import award_xp
+from product.asset_access import build_asset_access, enforce_asset_creation_allowed
 from .real_estate_schemas import RealEstateRequest
 
 
@@ -97,7 +98,7 @@ def build_asset(row):
     }
 
 
-def build_response(rows):
+def build_response(rows, access=None):
     assets = [build_asset(row) for row in rows]
     rental_assets = [asset for asset in assets if asset["property_type"] == "rental"]
     total_purchase = sum(asset["purchase_price"] for asset in assets)
@@ -111,6 +112,7 @@ def build_response(rows):
 
     return {
         "assets": assets,
+        "access": access,
         "totals": {
             "total_purchase": round(total_purchase, 2),
             "total_estimated_value": round(total_target_value, 2),
@@ -156,8 +158,9 @@ def list_real_estate_assets(user):
             raise HTTPException(status_code=404, detail="User not found")
 
         rows = get_real_estate_rows(conn, user_id)
+        access = build_asset_access(conn, user_id, "real_estate", "real_estate_assets")
 
-    return build_response(rows)
+    return build_response(rows, access)
 
 
 @router.get("/")
@@ -178,6 +181,7 @@ def create_real_estate_asset(data: RealEstateRequest, user):
             raise HTTPException(status_code=404, detail="User not found")
 
         ensure_real_estate_table(conn)
+        enforce_asset_creation_allowed(conn, user_id, "real_estate", "real_estate_assets")
 
         conn.execute(text("""
             INSERT INTO real_estate_assets (
