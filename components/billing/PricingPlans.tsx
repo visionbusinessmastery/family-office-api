@@ -91,6 +91,30 @@ const nextLevelPreview: Record<Plan["id"], string> = {
 const isSystemCapacity = (item: string) =>
   /asset|assets|bien|biens|immobilier|business|illimite|illimites/i.test(item);
 
+const flattenCapabilities = (groups: BackendPricingGroup[]) =>
+  groups.flatMap((group) => group.items.filter((item) => !isSystemCapacity(item)));
+
+const visibleCapabilityLimit: Record<Plan["id"], number> = {
+  gold: 5,
+  elite: 6,
+  liberty: 6,
+  legacy: 6,
+};
+
+const coverageLevel: Record<Plan["id"], string> = {
+  gold: "Coverage Standard",
+  elite: "Coverage Advanced",
+  liberty: "Coverage Family Office",
+  legacy: "Coverage Unlimited",
+};
+
+const intelligenceLayer: Record<Plan["id"], string> = {
+  gold: "Wealth Intelligence",
+  elite: "Decision & Simulation Engine",
+  liberty: "Family Office Engine",
+  legacy: "Dynasty Infrastructure",
+};
+
 const planOrder: Record<string, number> = {
   FREE: 0,
   GOLD: 1,
@@ -621,19 +645,14 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             const capacityItems = displayGroups.flatMap((group) =>
               group.items.filter(isSystemCapacity)
             );
-            const capabilityGroups = displayGroups
-              .map((group) => ({
-                ...group,
-                items: group.items.filter((item) => !isSystemCapacity(item)),
-              }))
-              .filter((group) => group.items.length > 0);
+            const visibleCapabilities = flattenCapabilities(displayGroups).slice(
+              0,
+              visibleCapabilityLimit[plan.id]
+            );
+            const discreetCapacity = capacityItems.slice(0, 3).join(" · ");
             const isCurrentPlan = targetPlan === currentPlan && !pendingPlan;
             const isPendingPlan = targetPlan === pendingPlan;
             const isDowngrade = targetRank < currentRank;
-            const capabilityCount = capabilityGroups.reduce(
-              (total, group) => total + group.items.length,
-              0
-            );
             const depth = planDepth[plan.id];
             const actionLabel = isCurrentPlan
               ? "Plan actuel"
@@ -685,49 +704,27 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                     <p className="mt-3 text-sm font-semibold text-gray-200">
                       {displayedPromise}
                     </p>
+                    <p className="mt-3 text-xs leading-relaxed text-gray-400">
+                      {plan.transformation}
+                    </p>
                     <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-gray-500">
                       {plan.includes}
                     </p>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4">
-                    <p className="text-xs uppercase tracking-widest text-emerald-300">
-                      Ce qui change
-                    </p>
-                    <p className="mt-2 text-sm font-black text-white">{plan.transformation}</p>
-                    <p className="mt-2 text-xs leading-relaxed text-emerald-100/80">
-                      {plan.unlock}
-                    </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-gray-400">
+                      {targetRank}/4
+                    </span>
+                    <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-widest ${depth.tone}`}>
+                      {depth.label}
+                    </span>
+                    <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-100">
+                      {intelligenceLayer[plan.id]}
+                    </span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                        Palier
-                      </p>
-                      <p className="mt-1 text-lg font-black text-white">
-                        {targetRank}/4
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                        Capacites
-                      </p>
-                      <p className="mt-1 text-lg font-black text-white">
-                        {capabilityCount}
-                      </p>
-                    </div>
-                    <div className={`rounded-2xl border p-3 ${depth.tone}`}>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-75">
-                        Lecture
-                      </p>
-                      <p className="mt-1 text-xs font-black leading-tight">
-                        {depth.label}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.035] p-3">
                     <div className="flex items-center gap-1">
                       {Array.from({ length: 4 }).map((_, index) => (
                         <span
@@ -746,48 +743,32 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                         />
                       ))}
                     </div>
-                    <p className="mt-2 text-xs font-semibold text-gray-400">
+                    <p className="mt-2 text-xs font-semibold text-gray-500">
                       {depth.detail}
                     </p>
                   </div>
 
-                  <div className="mt-5 space-y-3">
-                    {capabilityGroups.map((group) => (
-                      <div key={group.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                        <p className="text-xs font-black uppercase tracking-widest text-gray-500">
-                          {group.label}
-                        </p>
-                        <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                          {group.items.map((item) => (
-                            <li key={item} className="flex gap-2">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">
+                      Capacites principales
+                    </p>
+                    <ul className="mt-3 space-y-2 text-sm text-gray-300">
+                      {visibleCapabilities.map((item) => (
+                        <li key={item} className="flex gap-2">
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
 
                   {capacityItems.length > 0 && (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <p className="text-xs font-black uppercase tracking-widest text-gray-500">
-                        Capacite systeme
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {capacityItems.map((item) => (
-                          <span
-                            key={item}
-                            className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-gray-300"
-                          >
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    <p className="mt-4 text-[11px] font-semibold leading-relaxed text-gray-500">
+                      {coverageLevel[plan.id]} · {discreetCapacity}
+                    </p>
                   )}
 
-                  <div className="mt-4 rounded-2xl border border-[#3fa9f5]/20 bg-[#3fa9f5]/10 p-4">
+                  <div className="mt-4 border-t border-white/10 pt-4">
                     <p className="text-xs font-black uppercase tracking-widest text-[#8bd0ff]">
                       Niveau suivant
                     </p>
