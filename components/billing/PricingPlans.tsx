@@ -42,6 +42,9 @@ type BackendBillingPlan = {
   id: string;
   name?: string;
   entitlements?: {
+    copy?: {
+      promise?: string;
+    };
     pricing_groups?: BackendPricingGroup[];
   };
 };
@@ -70,6 +73,13 @@ const planOrder: Record<string, number> = {
   ELITE: 2,
   LIBERTY: 3,
   LEGACY: 4,
+};
+
+const previousPlanByRank: Record<number, string> = {
+  1: "free",
+  2: "gold",
+  3: "elite",
+  4: "liberty",
 };
 
 const planDepth: Record<Plan["id"], { label: string; detail: string; tone: string }> = {
@@ -283,6 +293,14 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
   const intervalLabel = interval === "monthly" ? "/ mois" : "/ an";
   const currentPlan = (subscription?.plan || "FREE").toUpperCase();
   const pendingPlan = subscription?.pending_plan?.toUpperCase() || null;
+  const currentRank = planOrder[currentPlan] ?? 0;
+  const previousPlanId = previousPlanByRank[currentRank];
+  const previousPlanLabel =
+    previousPlanId === "free"
+      ? "Free"
+      : previousPlanId
+        ? plans.find((plan) => plan.id === previousPlanId)?.name || previousPlanId
+        : null;
   const formatDate = (value?: string | null) => {
     if (!value) return null;
     try {
@@ -520,13 +538,15 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                 </p>
               </div>
 
-              {planOrder[currentPlan] > 0 && pendingPlan !== "FREE" && (
+              {previousPlanId && pendingPlan !== previousPlanId.toUpperCase() && (
                 <button
-                  onClick={() => scheduleDowngrade("free")}
+                  onClick={() => scheduleDowngrade(previousPlanId)}
                   disabled={loadingPlan !== null}
                   className="rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-sm font-black text-white transition hover:border-[#3fa9f5]/45 hover:bg-white/10 disabled:opacity-60"
                 >
-                  {loadingPlan === "free" ? "Programmation..." : "Revenir a Free a l'echeance"}
+                  {loadingPlan === previousPlanId
+                    ? "Programmation..."
+                    : `Revenir au plan precedent (${previousPlanLabel})`}
                 </button>
               )}
             </div>
@@ -565,8 +585,9 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             const saving = yearlySaving(plan);
             const targetPlan = plan.id.toUpperCase();
             const targetRank = planOrder[targetPlan] ?? 0;
-            const currentRank = planOrder[currentPlan] ?? 0;
             const backendPlan = backendPlans[plan.id];
+            const planPromise =
+              backendPlan?.entitlements?.copy?.promise || plan.transformation;
             const displayGroups =
               backendPlan?.entitlements?.pricing_groups?.length
                 ? backendPlan.entitlements.pricing_groups
@@ -627,7 +648,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                       </p>
                     )}
                     <p className="mt-3 text-sm font-semibold text-gray-200">
-                      {plan.transformation}
+                      {planPromise}
                     </p>
                   </div>
 
@@ -698,7 +719,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                         <ul className="mt-3 space-y-2 text-sm text-gray-300">
                           {group.items.map((item) => (
                             <li key={item} className="flex gap-2">
-                              <span className="text-emerald-300">â€¢</span>
+                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
                               <span>{item}</span>
                             </li>
                           ))}

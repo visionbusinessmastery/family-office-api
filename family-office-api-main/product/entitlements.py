@@ -25,7 +25,7 @@ PLAN_COPY = {
     "GOLD": {
         "name": "Gold",
         "price": "29 EUR/mois",
-        "promise": "Tu debloques Ethan flottant, Future Intelligence et Wealth Narrative.",
+        "promise": "Je comprends mon patrimoine.",
     },
     "SILVER": {
         "name": "Foundation Plus",
@@ -40,17 +40,17 @@ PLAN_COPY = {
     "ELITE": {
         "name": "Wealth OS",
         "price": "79 EUR/mois",
-        "promise": "Tu optimises ta trajectoire avec le cockpit CEO, les simulations et les analyses avancees.",
+        "promise": "J'optimise mon patrimoine.",
     },
     "LIBERTY": {
         "name": "Liberty",
         "price": "149 EUR/mois",
-        "promise": "Tu actives les arbitrages Family Office, les objectifs avances et la transmission.",
+        "promise": "Je pilote mon patrimoine.",
     },
     "LEGACY": {
         "name": "Dynasty",
         "price": "399 EUR/mois",
-        "promise": "Tu construis une architecture patrimoniale qui peut te survivre.",
+        "promise": "Je construis un patrimoine transmissible.",
     },
 }
 
