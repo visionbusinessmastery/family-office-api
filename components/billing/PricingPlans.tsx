@@ -59,12 +59,35 @@ const planOrder: Record<string, number> = {
   LEGACY: 4,
 };
 
+const planDepth: Record<Plan["id"], { label: string; detail: string; tone: string }> = {
+  gold: {
+    label: "Pilotage actif",
+    detail: "Base patrimoniale + decisions",
+    tone: "border-[#3fa9f5]/35 bg-[#3fa9f5]/10 text-[#8bd0ff]",
+  },
+  elite: {
+    label: "Optimisation",
+    detail: "Simulation + lecture CEO",
+    tone: "border-emerald-300/40 bg-emerald-300/10 text-emerald-100",
+  },
+  liberty: {
+    label: "Arbitrages",
+    detail: "Family Office personnel",
+    tone: "border-amber-300/45 bg-amber-300/10 text-amber-100",
+  },
+  legacy: {
+    label: "Dynasty",
+    detail: "Transmission + gouvernance",
+    tone: "border-[#ffe600]/70 bg-[#ffe600]/15 text-[#fff8a6]",
+  },
+};
+
 const ladder = [
   { label: "FREE", role: "Decouverte", tone: "border-white/10 bg-white/[0.03] text-gray-500" },
   { label: "GOLD", role: "Trajectoire", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
   { label: "ELITE", role: "Optimisation", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" },
   { label: "LIBERTY", role: "Arbitrages", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
-  { label: "LEGACY", role: "Dynasty Office", tone: "border-yellow-300/60 bg-yellow-300/[0.16] text-yellow-100" },
+  { label: "LEGACY", role: "Dynasty Office", tone: "border-[#ffe600] bg-[#ffe600]/[0.26] text-[#fff8a6] shadow-lg shadow-[#ffe600]/20" },
 ];
 
 const plans: Plan[] = [
@@ -140,11 +163,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Strategic Intelligence",
-        items: ["30 assets financiers", "10 biens immobiliers avec simulations", "5 business avec valorisation", "Family Office CEO", "Runway", "Lecture operationnelle"],
+        items: ["30 assets financiers", "10 biens immobiliers avec simulations", "5 business avec valorisation", "Family Office CEO", "Runway", "Lecture operationnelle", "Multi-user", "Companies"],
       },
       {
         label: "Family Office Intelligence",
-        items: ["Wealth Narrative enrichi", "Simulations multi-scenarios", "Stress tests avances", "Detecteur de dependances", "Coffre documentaire patrimonial", "Graphiques par rubrique"],
+        items: ["Wealth Narrative enrichi", "Simulations multi-scenarios", "Stress tests avances", "Detecteur de dependances", "Coffre documentaire patrimonial", "Imports assistes", "Graphiques par rubrique", "Allocations avancees"],
       },
     ],
   },
@@ -180,11 +203,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Family Office personnel",
-        items: ["50 assets financiers", "Immobilier illimite", "Business illimites", "Family Office Mode complet", "Comptes enfants", "Scenarios de vie avances"],
+        items: ["50 assets financiers", "Immobilier illimite", "Business illimites", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Scenarios de vie avances", "Probabilites d'atteinte", "Architecture patrimoniale", "Legacy planning"],
       },
       {
         label: "Architecture patrimoniale",
-        items: ["Family Office Board", "CFO View", "Investor View", "Entrepreneur View", "Family View", "Priorites d'allocation"],
+        items: ["Family Office Board", "CFO View", "Investor View", "Entrepreneur View", "Family View", "Priorites d'allocation", "Arbitrages strategiques", "Transmission", "Automation", "Sovereign guidance"],
       },
     ],
   },
@@ -214,17 +237,17 @@ const plans: Plan[] = [
       monthly: "par mois founder",
       yearly: "par an founder",
     },
-    tone: "border-yellow-300/55 bg-yellow-300/14",
-    glow: "from-yellow-300/36 via-amber-300/20 to-orange-300/8",
+    tone: "border-[#ffe600] bg-[#ffe600]/[0.22] shadow-2xl shadow-[#ffe600]/25 ring-1 ring-[#fff8a6]/25",
+    glow: "from-[#ffe600]/65 via-[#facc15]/35 to-[#3fa9f5]/10",
     cta: "Entrer Legacy",
     capabilityGroups: [
       {
         label: "Dynasty Layer",
-        items: ["Assets financiers illimites", "Immobilier et business illimites", "Projection 30 ans", "Transmission familiale", "Family Vault", "Heirs mode", "Protection layer"],
+        items: ["Assets financiers illimites", "Immobilier et business illimites", "Projection 30 ans", "Transmission familiale", "Family Vault", "Heirs mode", "Protection layer", "Asset protection", "Dynasty governance", "Succession planning", "Global strategy", "Legacy timeline"],
       },
       {
         label: "Family Office Infrastructure",
-        items: ["Gouvernance familiale", "Succession planning", "Multi-entites", "Architecture institutionnelle", "Global strategy", "Legacy timeline", "Protection et continuite"],
+        items: ["Gouvernance familiale", "Multi-entites", "Architecture institutionnelle", "Protection et continuite", "Family governance", "Dynasty guidance", "Heirs intelligence", "Global opportunities", "Vault familial", "Scenario successoral", "Continuite familiale", "Patrimoine generationnel"],
       },
     ],
   },
@@ -491,7 +514,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/10 p-4">
               <p className="text-sm font-black">Chaque niveau debloque un univers</p>
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Analytics, Wealth OS, Freedom Engine puis Dynasty Office apparaissent comme des couches.
+                Analytics, Wealth OS, Freedom Engine puis Dynasty Office apparaissent comme des paliers de puissance.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -513,6 +536,11 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             const isCurrentPlan = targetPlan === currentPlan && !pendingPlan;
             const isPendingPlan = targetPlan === pendingPlan;
             const isDowngrade = targetRank < currentRank;
+            const optionCount = plan.capabilityGroups.reduce(
+              (total, group) => total + group.items.length,
+              0
+            );
+            const depth = planDepth[plan.id];
             const actionLabel = isCurrentPlan
               ? "Plan actuel"
               : isPendingPlan
@@ -570,6 +598,57 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                       Ce que vous débloquez
                     </p>
                     <p className="mt-2 text-sm font-black text-white">{plan.unlock}</p>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                        Palier
+                      </p>
+                      <p className="mt-1 text-lg font-black text-white">
+                        {targetRank}/4
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                        Options
+                      </p>
+                      <p className="mt-1 text-lg font-black text-white">
+                        {optionCount}
+                      </p>
+                    </div>
+                    <div className={`rounded-2xl border p-3 ${depth.tone}`}>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-75">
+                        Lecture
+                      </p>
+                      <p className="mt-1 text-xs font-black leading-tight">
+                        {depth.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className={`h-2 flex-1 rounded-full ${
+                            index < targetRank
+                              ? plan.id === "legacy"
+                                ? "bg-[#ffe600] shadow-[0_0_14px_rgba(255,230,0,0.45)]"
+                                : plan.id === "liberty"
+                                  ? "bg-amber-300"
+                                  : plan.id === "elite"
+                                    ? "bg-emerald-300"
+                                    : "bg-[#3fa9f5]"
+                              : "bg-white/10"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-gray-400">
+                      {depth.detail}
+                    </p>
                   </div>
 
                   <div className="mt-5 space-y-3">
