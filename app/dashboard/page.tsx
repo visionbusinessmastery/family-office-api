@@ -2010,13 +2010,40 @@ export default function Dashboard() {
 
               <WealthIntelligencePanel product={product} />
 
-              <FamilyOfficeCeoPanel product={product} />
+              <FutureIntelligencePanel product={product} />
 
               <DecisionIntelligencePanel product={product} />
 
-              <FutureIntelligencePanel product={product} />
-
               <FamilyOfficeIntelligencePanel product={product} />
+
+              {planAllows(currentPlan, "ELITE") ? (
+                <FamilyOfficeCeoPanel product={product} />
+              ) : (
+                <LockedSection
+                  title="Family Office CEO"
+                  description="Debloque en ELITE le burn rate, la marge mensuelle, le runway et la lecture operationnelle de ta trajectoire."
+                  onUpgrade={handleUpgradePlan}
+                  plan="elite"
+                />
+              )}
+
+              {!planAllows(currentPlan, "LIBERTY") && (
+                <LockedSection
+                  title="Arbitrages Family Office"
+                  description="LIBERTY ajoute les priorites d'allocation, le board virtuel, les objectifs avances, les comptes enfants et la transmission."
+                  onUpgrade={handleUpgradePlan}
+                  plan="liberty"
+                />
+              )}
+
+              {!planAllows(currentPlan, "LEGACY") && (
+                <LockedSection
+                  title="Dynasty Office"
+                  description="LEGACY ouvre la projection generationnelle, la gouvernance familiale, la protection et les scenarios successoraux."
+                  onUpgrade={handleUpgradePlan}
+                  plan="legacy"
+                />
+              )}
             </div>
           )}
 

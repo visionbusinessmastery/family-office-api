@@ -368,6 +368,7 @@ def build_data_profile(conn, user_id: int):
 
 def build_modules(plan: str, score: int):
     visible = []
+    locked = []
 
     for module in MODULE_REGISTRY:
         item = {
@@ -379,7 +380,7 @@ def build_modules(plan: str, score: int):
         if can_access_module(plan, score, module):
             visible.append({**item, "state": "active"})
         else:
-            visible.append({
+            locked_item = {
                 **item,
                 "state": "discovery",
                 "reason": (
@@ -387,9 +388,11 @@ def build_modules(plan: str, score: int):
                     if not plan_allows(plan, module["min_plan"])
                     else "Contexte supplementaire requis pour les analyses avancees"
                 ),
-            })
+            }
+            visible.append(locked_item)
+            locked.append(locked_item)
 
-    return {"visible": visible, "locked": []}
+    return {"visible": visible, "locked": locked}
 
 
 def mission_completed(mission: dict, data_profile: dict, plan: str) -> bool:
@@ -1991,6 +1994,87 @@ def build_family_office_intelligence(
     }
 
 
+def apply_plan_experience_gates(
+    plan: str,
+    wealth_intelligence: dict,
+    future_intelligence: dict,
+    strategic_intelligence: dict,
+    decision_intelligence: dict,
+    family_office_intelligence: dict,
+    family_office_ceo: dict,
+):
+    normalized = normalize_plan(plan)
+
+    if not plan_allows(normalized, "GOLD"):
+        future_intelligence = {
+            **future_intelligence,
+            "routes": [],
+            "simulations": [],
+            "film": (future_intelligence.get("film") or [])[:2],
+        }
+        strategic_intelligence = None
+        decision_intelligence = None
+        family_office_intelligence = None
+        family_office_ceo = None
+        return {
+            "wealth_intelligence": wealth_intelligence,
+            "future_intelligence": future_intelligence,
+            "strategic_intelligence": strategic_intelligence,
+            "decision_intelligence": decision_intelligence,
+            "family_office_intelligence": family_office_intelligence,
+            "family_office_ceo": family_office_ceo,
+        }
+
+    if not plan_allows(normalized, "ELITE"):
+        wealth_intelligence = {
+            **wealth_intelligence,
+            "hidden_items": (wealth_intelligence.get("hidden_items") or [])[:2],
+        }
+        future_intelligence = {
+            **future_intelligence,
+            "simulations": (future_intelligence.get("simulations") or [])[:1],
+            "routes": (future_intelligence.get("routes") or [])[:1],
+        }
+        family_office_intelligence = {
+            **family_office_intelligence,
+            "stress_tests": (family_office_intelligence.get("stress_tests") or [])[:2],
+            "dependencies": (family_office_intelligence.get("dependencies") or [])[:2],
+            "weak_signals": [],
+            "life_dimensions": [],
+            "radar": [],
+        }
+        family_office_ceo = None
+
+    if not plan_allows(normalized, "LIBERTY"):
+        strategic_intelligence = {
+            **strategic_intelligence,
+            "decision_matrix": [],
+            "advanced_arbitrages": [],
+            "family_office_board": None,
+        }
+        decision_intelligence = {
+            **decision_intelligence,
+            "decision_matrix": [],
+            "advanced_arbitrages": [],
+            "family_office_board": None,
+        }
+
+    if not plan_allows(normalized, "LEGACY"):
+        family_office_intelligence = {
+            **family_office_intelligence,
+            "dynasty_layer": None,
+        } if family_office_intelligence else None
+
+    return {
+        "wealth_intelligence": wealth_intelligence,
+        "future_intelligence": future_intelligence,
+        "strategic_intelligence": strategic_intelligence,
+        "decision_intelligence": decision_intelligence,
+        "family_office_intelligence": family_office_intelligence,
+        "family_office_ceo": family_office_ceo,
+    }
+
+
 @router.get("/entitlements")
 def product_entitlements(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -2144,6 +2228,21 @@ def product_context(email: str = Depends(get_current_user)):
             strategic_intelligence,
             family_office_ceo,
         )
+        gated_experience = apply_plan_experience_gates(
+            plan,
+            wealth_intelligence,
+            future_intelligence,
+            strategic_intelligence,
+            decision_intelligence,
+            family_office_intelligence,
+            family_office_ceo,
+        )
+        wealth_intelligence = gated_experience["wealth_intelligence"]
+        future_intelligence = gated_experience["future_intelligence"]
+        strategic_intelligence = gated_experience["strategic_intelligence"]
+        decision_intelligence = gated_experience["decision_intelligence"]
+        family_office_intelligence = gated_experience["family_office_intelligence"]
+        family_office_ceo = gated_experience["family_office_ceo"]
 
     return {
         "plan": plan,

@@ -35,9 +35,9 @@ type PricingPlansProps = {
 
 const ladder = [
   { label: "FREE", role: "Decouverte", tone: "border-white/10 bg-white/[0.03] text-gray-500" },
-  { label: "GOLD", role: "Future Intelligence", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
-  { label: "ELITE", role: "Strategic Intelligence", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" },
-  { label: "LIBERTY", role: "Family Office", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
+  { label: "GOLD", role: "Trajectoire", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
+  { label: "ELITE", role: "Optimisation", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" },
+  { label: "LIBERTY", role: "Arbitrages", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
   { label: "LEGACY", role: "Dynasty Office", tone: "border-yellow-300/60 bg-yellow-300/[0.16] text-yellow-100" },
 ];
 
@@ -45,12 +45,12 @@ const plans: Plan[] = [
   {
     id: "gold",
     name: "Gold",
-    subtitle: "Future Intelligence active",
+    subtitle: "Trajectoire patrimoniale active",
     rank: "Niveau 1",
     badge: "Growth Layer",
     altBadge: "Ethan flottant",
-    transformation: "Voir votre trajectoire et agir plus clairement",
-    unlock: "Future Intelligence + Wealth Narrative",
+    transformation: "Comprendre ou vous en etes, ou vous allez et quoi faire maintenant",
+    unlock: "Patrimoine activable + Future Intelligence + Decision Intelligence",
     includes: "Inclut FREE",
     price: {
       monthly: "29 EUR",
@@ -74,11 +74,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Future Intelligence",
-        items: ["20 assets maximum", "Wealth Narrative", "Future Intelligence complete", "Prochain palier patrimonial"],
+        items: ["20 assets maximum", "Patrimoine visible et activable", "Wealth Narrative simple", "Wealth Map", "Projection 10 ans", "Film du futur"],
       },
       {
-        label: "Ethan & Opportunites",
-        items: ["Ethan flottant Gold+", "Reconciliation profil par confirmation", "Opportunites avancees", "Radar d'opportunites", "Emails hebdomadaires Ethan"],
+        label: "Decision & solidite",
+        items: ["Ethan flottant Gold+", "Reconciliation profil par confirmation", "Action utile", "Risque principal", "Opportunite principale", "Scorecard et stress tests simples"],
       },
     ],
   },
@@ -89,8 +89,8 @@ const plans: Plan[] = [
     rank: "Niveau 2",
     badge: "Strategic OS",
     altBadge: "Wealth OS",
-    transformation: "Passer du suivi patrimonial au pilotage decisionnel",
-    unlock: "Strategic Intelligence + Family Office Intelligence",
+    transformation: "Optimiser votre trajectoire au lieu de seulement la suivre",
+    unlock: "Family Office CEO + simulations avancees",
     includes: "Tout GOLD inclus",
     price: {
       monthly: "79 EUR",
@@ -114,11 +114,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Strategic Intelligence",
-        items: ["30 assets maximum", "Decision du moment", "Risque principal", "Levier prioritaire", "Stress tests"],
+        items: ["30 assets maximum", "Family Office CEO", "Burn rate", "Marge mensuelle", "Runway", "Lecture operationnelle"],
       },
       {
         label: "Family Office Intelligence",
-        items: ["Scorecard multidimensionnelle", "Coffre documentaire patrimonial", "Patrimoine cache", "Detecteur de dependances", "Graphiques par rubrique", "Espace familial Family Office"],
+        items: ["Wealth Narrative enrichi", "Simulations multi-scenarios", "Stress tests avances", "Detecteur de dependances", "Coffre documentaire patrimonial", "Graphiques par rubrique"],
       },
     ],
   },
@@ -129,8 +129,8 @@ const plans: Plan[] = [
     rank: "Niveau 3",
     badge: "Family Office",
     altBadge: "Private Access",
-    transformation: "Structurer votre richesse comme un Family Office personnel",
-    unlock: "Family Office Mode + transmission",
+    transformation: "Prendre de meilleures decisions patrimoniales avec une logique Family Office",
+    unlock: "Arbitrages Family Office + objectifs avances",
     includes: "Tout ELITE inclus",
     price: {
       monthly: "149 EUR",
@@ -154,11 +154,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Family Office personnel",
-        items: ["50 assets maximum", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Scenarios de vie avances"],
+        items: ["50 assets maximum", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Probabilites d'atteinte", "Scenarios de vie avances"],
       },
       {
         label: "Architecture patrimoniale",
-        items: ["Wealth Narrative enrichi", "Transmission", "Legacy planning", "Automation", "Business Command Center"],
+        items: ["Family Office Board", "CFO View", "Investor View", "Entrepreneur View", "Family View", "Priorites d'allocation"],
       },
     ],
   },
@@ -194,11 +194,11 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Dynasty Layer",
-        items: ["Assets illimites", "Transmission familiale", "Vision generationnelle", "Family Vault", "Heirs mode", "Protection layer"],
+        items: ["Assets illimites", "Projection 30 ans", "Transmission familiale", "Vision generationnelle", "Family Vault", "Heirs mode", "Protection layer"],
       },
       {
         label: "Family Office Infrastructure",
-        items: ["Gouvernance familiale", "Succession planning", "Architecture institutionnelle", "Global strategy", "Legacy timeline", "Protection et continuite"],
+        items: ["Gouvernance familiale", "Succession planning", "Multi-entites", "Architecture institutionnelle", "Global strategy", "Legacy timeline", "Protection et continuite"],
       },
     ],
   },

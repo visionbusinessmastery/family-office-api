@@ -546,7 +546,7 @@ export type ProductContext = {
       score?: number;
     }>;
     decision_matrix?: NonNullable<ProductContext["decision_engine"]>["decisions"];
-  };
+  } | null;
   decision_intelligence?: {
     title?: string;
     question?: string;
@@ -592,7 +592,7 @@ export type ProductContext = {
       action?: string;
       score?: number;
     }>;
-  };
+  } | null;
   family_office_intelligence?: {
     title?: string;
     question?: string;
@@ -602,7 +602,7 @@ export type ProductContext = {
     weak_signals?: ProductDependencySignal[];
     life_dimensions?: NonNullable<ProductContext["life_wealth"]>["dimensions"];
     radar?: NonNullable<ProductContext["family_office_radar"]>["items"];
-  };
+  } | null;
   family_office_ceo?: {
     title?: string;
     question?: string;
@@ -638,7 +638,7 @@ export type ProductContext = {
       score?: number;
     } | null;
     mission?: ProductMission | null;
-  };
+  } | null;
 };
 
 export type LegacyOverview = {

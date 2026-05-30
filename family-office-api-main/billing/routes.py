@@ -32,17 +32,17 @@ PLANS = {
     "gold": {
         "name": "Gold - Growth",
         "price_env": "STRIPE_PRICE_GOLD",
-        "description": "Pilotage actif: Ethan flottant, Future Intelligence, Wealth Narrative et opportunites avancees.",
+        "description": "Trajectoire active: Ethan flottant, patrimoine activable, Future Intelligence, Decision Intelligence et scorecard simple.",
     },
     "elite": {
         "name": "Elite - Wealth OS",
         "price_env": "STRIPE_PRICE_ELITE",
-        "description": "Wealth OS: Strategic Intelligence, scorecard, stress tests, dependances et simulations.",
+        "description": "Optimisation: Family Office CEO, recit enrichi, stress tests avances, dependances et simulations multi-scenarios.",
     },
     "liberty": {
         "name": "Liberty - Financial Freedom",
         "price_env": "STRIPE_PRICE_LIBERTY",
-        "description": "Family Office personnel: comptes enfants, transmission, scenarios avances et mode Family Office.",
+        "description": "Arbitrages Family Office: comptes enfants, objectifs avances, board virtuel, transmission et priorites d'allocation.",
     },
     "legacy": {
         "name": "Legacy - Dynasty Office",
