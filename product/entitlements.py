@@ -1,4 +1,4 @@
-from product.tiers import (
+﻿from product.tiers import (
     ACTIVE_SUBSCRIPTION_STATUSES,
     DISCOVERABLE_MODULES,
     FEATURE_MIN_PLAN,
@@ -48,7 +48,7 @@ PLAN_COPY = {
         "promise": "Tu actives les arbitrages Family Office, les objectifs avances et la transmission.",
     },
     "LEGACY": {
-        "name": "Dynasty Office",
+        "name": "Dynasty",
         "price": "399 EUR/mois",
         "promise": "Tu construis une architecture patrimoniale qui peut te survivre.",
     },
@@ -90,6 +90,30 @@ PLAN_ENTITLEMENTS = {
         "real_estate_depth": "cashflow",
         "max_business_assets": 2,
         "business_depth": "structured",
+        "pricing_groups": [
+            {
+                "label": "Comprendre",
+                "items": [
+                    "20 assets financiers",
+                    "3 biens immobiliers avec lecture cashflow",
+                    "2 business structures",
+                    "Patrimoine visible et activable",
+                    "Wealth Map",
+                    "Projection 10 ans",
+                ],
+            },
+            {
+                "label": "Decider",
+                "items": [
+                    "Ethan flottant Gold+",
+                    "Reconciliation profil par confirmation",
+                    "Action utile",
+                    "Risque principal",
+                    "Opportunite principale",
+                    "Scorecard et stress tests simples",
+                ],
+            },
+        ],
         "ai_level": "advanced",
         "modules": [
             "foundation",
@@ -192,6 +216,34 @@ PLAN_ENTITLEMENTS = {
         "real_estate_depth": "simulation",
         "max_business_assets": 5,
         "business_depth": "valuation",
+        "pricing_groups": [
+            {
+                "label": "Optimiser",
+                "items": [
+                    "30 assets financiers",
+                    "10 biens immobiliers avec simulations",
+                    "5 business avec valorisation",
+                    "Family Office CEO",
+                    "Runway",
+                    "Lecture operationnelle",
+                    "Multi-user",
+                    "Companies",
+                ],
+            },
+            {
+                "label": "Simuler",
+                "items": [
+                    "Wealth Narrative enrichi",
+                    "Simulations multi-scenarios",
+                    "Stress tests avances",
+                    "Detecteur de dependances",
+                    "Coffre documentaire patrimonial",
+                    "Imports assistes",
+                    "Graphiques par rubrique",
+                    "Allocations avancees",
+                ],
+            },
+        ],
         "ai_level": "premium",
         "modules": [
             "foundation",
@@ -244,6 +296,38 @@ PLAN_ENTITLEMENTS = {
         "real_estate_depth": "family_office",
         "max_business_assets": None,
         "business_depth": "family_office",
+        "pricing_groups": [
+            {
+                "label": "Structurer",
+                "items": [
+                    "50 assets financiers",
+                    "Immobilier illimite",
+                    "Business illimites",
+                    "Family Office Mode complet",
+                    "Comptes enfants",
+                    "Multi-objectifs",
+                    "Scenarios de vie avances",
+                    "Probabilites d'atteinte",
+                    "Architecture patrimoniale",
+                    "Dynasty planning",
+                ],
+            },
+            {
+                "label": "Arbitrer",
+                "items": [
+                    "Family Office Board",
+                    "CFO View",
+                    "Investor View",
+                    "Entrepreneur View",
+                    "Family View",
+                    "Priorites d'allocation",
+                    "Arbitrages strategiques",
+                    "Transmission",
+                    "Automation",
+                    "Sovereign guidance",
+                ],
+            },
+        ],
         "ai_level": "sovereign",
         "modules": [
             "foundation",
@@ -297,6 +381,42 @@ PLAN_ENTITLEMENTS = {
         "real_estate_depth": "dynasty",
         "max_business_assets": None,
         "business_depth": "dynasty",
+        "pricing_groups": [
+            {
+                "label": "Transmettre",
+                "items": [
+                    "Assets financiers illimites",
+                    "Immobilier et business illimites",
+                    "Projection 30 ans",
+                    "Transmission familiale",
+                    "Family Vault",
+                    "Heirs mode",
+                    "Protection layer",
+                    "Asset protection",
+                    "Dynasty governance",
+                    "Succession planning",
+                    "Global strategy",
+                    "Dynasty timeline",
+                ],
+            },
+            {
+                "label": "Gouverner",
+                "items": [
+                    "Gouvernance familiale",
+                    "Multi-entites",
+                    "Architecture institutionnelle",
+                    "Protection et continuite",
+                    "Family governance",
+                    "Dynasty guidance",
+                    "Heirs intelligence",
+                    "Global opportunities",
+                    "Vault familial",
+                    "Scenario successoral",
+                    "Continuite familiale",
+                    "Patrimoine generationnel",
+                ],
+            },
+        ],
         "ai_level": "dynasty",
         "modules": [
             "foundation",
@@ -520,7 +640,7 @@ MODULE_REGISTRY = [
     },
     {
         "key": "legacy_planning",
-        "label": "Legacy Planning",
+        "label": "Dynasty planning",
         "stage": 8,
         "min_plan": "LIBERTY",
         "min_score": 85,
@@ -568,7 +688,7 @@ MODULE_REGISTRY = [
     },
     {
         "key": "legacy_timeline",
-        "label": "Legacy Timeline",
+        "label": "Dynasty timeline",
         "stage": 9,
         "min_plan": "LEGACY",
         "min_score": 0,
@@ -622,3 +742,4 @@ def is_feature_enabled(user_plan: str, feature_key: str) -> bool:
         enabled,
     )
     return enabled
+

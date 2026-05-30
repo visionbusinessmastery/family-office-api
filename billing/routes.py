@@ -46,7 +46,7 @@ PLANS = {
         "description": "Arbitrages Family Office: comptes enfants, objectifs avances, board virtuel, transmission et priorites d'allocation.",
     },
     "legacy": {
-        "name": "Legacy - Dynasty Office",
+        "name": "Dynasty - Family Office",
         "price_env": "STRIPE_PRICE_LEGACY",
         "description": "Dynasty Office: gouvernance familiale, protection, vault, heritiers et strategie generationnelle.",
     },
