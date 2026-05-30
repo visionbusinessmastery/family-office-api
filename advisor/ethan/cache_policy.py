@@ -1,1 +1,1 @@
-ETHAN_GLOBAL_CACHE_VERSION = "v23-openai-resilience"
+ETHAN_GLOBAL_CACHE_VERSION = "v24-empty-output-retry"

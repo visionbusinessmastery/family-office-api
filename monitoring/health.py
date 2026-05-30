@@ -73,11 +73,18 @@ def _check_openai_live():
                     **{token_param: 8},
                 )
                 text = str(response.choices[0].message.content or "").strip()
-                return {
-                    "live_status": "ok" if text else "empty_output",
+                if text:
+                    return {
+                        "live_status": "ok",
+                        "tested_model": model,
+                        "token_param": token_param,
+                        "has_text": True,
+                    }
+                last_error = {
+                    "live_status": "empty_output",
                     "tested_model": model,
                     "token_param": token_param,
-                    "has_text": bool(text),
+                    "has_text": False,
                 }
             except Exception as exc:
                 last_error = {

@@ -157,10 +157,10 @@ def get_llm_response(
         }
         return chat_completion_fn(**kwargs)
 
-    response = None
     selected_model = model
     attempted = set()
     attempts = []
+    last_empty = None
 
     for candidate in [model, fallback_model, *SAFE_MODEL_FALLBACKS]:
         if not candidate or candidate in attempted:
@@ -173,7 +173,22 @@ def get_llm_response(
         try:
             response = _call(candidate, token_param)
             selected_model = candidate
-            break
+            llm_text = extract_llm_text(response)
+            usage = getattr(response, "usage", None)
+            input_tokens = getattr(usage, "prompt_tokens", None) or estimate_tokens_fn(json.dumps(messages))
+            output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens_fn(llm_text)
+
+            if not llm_text:
+                last_empty = (input_tokens, output_tokens, selected_model)
+                logger.warning(
+                    "Ethan OpenAI returned empty content; trying next model",
+                    extra={"model": candidate, "token_param": token_param},
+                )
+                continue
+
+            if not is_legacy_ethan_response(llm_text):
+                set_cache_fn(llm_cache_key, llm_text, ttl=1800)
+            return llm_text, False, input_tokens, output_tokens, selected_model, "ready"
         except Exception:
             logger.warning(
                 "Ethan OpenAI attempt failed",
@@ -181,26 +196,11 @@ def get_llm_response(
                 exc_info=True,
             )
 
-    if response is None:
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, selected_model, "openai_call_failed"
+    if last_empty:
+        input_tokens, output_tokens, selected_model = last_empty
+        return None, False, input_tokens, output_tokens, selected_model, "openai_empty_output"
 
-    try:
-        llm_text = extract_llm_text(response)
-        usage = getattr(response, "usage", None)
-        input_tokens = getattr(usage, "prompt_tokens", None) or estimate_tokens_fn(json.dumps(messages))
-        output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens_fn(llm_text)
-        if not llm_text:
-            logger.warning(
-                "Ethan OpenAI returned empty content",
-                extra={"model": selected_model},
-            )
-            return None, False, input_tokens, output_tokens, selected_model, "openai_empty_output"
-        if not is_legacy_ethan_response(llm_text):
-            set_cache_fn(llm_cache_key, llm_text, ttl=1800)
-        return llm_text, False, input_tokens, output_tokens, selected_model, "ready"
-    except Exception:
-        logger.warning("Ethan OpenAI response parsing failed", exc_info=True)
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, selected_model, "openai_parse_failed"
+    return None, False, estimate_tokens_fn(json.dumps(messages)), 0, selected_model, "openai_call_failed"
 
 
 def build_fallback_response(
