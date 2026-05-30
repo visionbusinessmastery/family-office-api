@@ -180,179 +180,6 @@ function SectionHeader({
   );
 }
 
-function MissionControlPanel({
-  product,
-  onOpenMission,
-}: {
-  product?: ProductContext | null;
-  onOpenMission: () => void;
-}) {
-  const control = product?.mission_control;
-  const items = [
-    control?.risk,
-    control?.opportunity,
-    control?.decision,
-    control?.mission,
-  ].filter(Boolean);
-
-  if (!items.length) return null;
-
-  return (
-    <section className="rounded-2xl border border-[#3fa9f5]/25 bg-zinc-950 p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Mission Control
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Une lecture. Une direction.
-          </h2>
-        </div>
-        <button
-          onClick={onOpenMission}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-200 transition hover:border-[#3fa9f5]/50"
-        >
-          Voir progression
-        </button>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-        {items.map((item, index) => (
-          <div key={`${item?.title}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-widest text-gray-500">
-              {index === 0 ? "Risque" : index === 1 ? "Opportunite" : index === 2 ? "Decision" : "Mission"}
-            </p>
-            <h3 className="mt-2 text-sm font-bold text-white">{item?.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-400">
-              {item?.description}
-            </p>
-            {item?.action && (
-              <p className="mt-3 text-xs font-semibold text-[#3fa9f5]">
-                {item.action}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function FutureViewPanel({ product }: { product?: ProductContext | null }) {
-  const future = product?.future_view;
-  const scenarios = future?.scenarios || [];
-
-  if (!future || scenarios.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Future View
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Ton futur patrimonial visible
-          </h2>
-        </div>
-        <div className="text-sm text-gray-400">
-          Capacite mensuelle backend:{" "}
-          <span className="font-bold text-white">
-            {money.format(Number(future.monthly_capacity || 0))} EUR
-          </span>
-        </div>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        {scenarios.map((scenario) => (
-          <div key={scenario.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-widest text-gray-500">
-              {scenario.label}
-            </p>
-            <p className="mt-2 text-3xl font-black text-white">
-              {money.format(Number(scenario.value || 0))} EUR
-            </p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-sm leading-relaxed text-gray-400">
-        {future.assumption}
-      </p>
-    </section>
-  );
-}
-
-function WealthTimelinePanel({ product }: { product?: ProductContext | null }) {
-  const timeline = product?.wealth_timeline;
-  const stages = timeline?.stages || [];
-
-  if (!timeline || stages.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-[#3fa9f5]/25 bg-gradient-to-br from-[#071521] via-zinc-950 to-black p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Ton futur patrimonial
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Une trajectoire, pas seulement des chiffres
-          </h2>
-        </div>
-        {timeline.next_milestone?.label && (
-          <p className="text-sm text-gray-400">
-            Prochain palier:{" "}
-            <span className="font-bold text-white">{timeline.next_milestone.label}</span>
-            {timeline.next_milestone.estimated_label ? (
-              <span className="text-[#3fa9f5]"> · {timeline.next_milestone.estimated_label}</span>
-            ) : null}
-          </p>
-        )}
-      </div>
-      <div className="mt-6 space-y-3">
-        {stages.map((stage) => {
-          const active = stage.status === "achieved" || stage.status === "current";
-          return (
-            <div
-              key={stage.label}
-              className={`grid grid-cols-1 gap-3 rounded-xl border p-4 md:grid-cols-[150px_1fr_170px] md:items-center ${
-                active
-                  ? "border-[#3fa9f5]/50 bg-[#3fa9f5]/10"
-                  : "border-white/10 bg-white/[0.03]"
-              }`}
-            >
-              <div>
-                <p className="text-sm font-bold text-white">{stage.label}</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {stage.target ? `${money.format(Number(stage.target || 0))} EUR` : "Position actuelle"}
-                </p>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[#3fa9f5]"
-                  style={{ width: `${Math.min(100, Number(stage.progress_percent || 0))}%` }}
-                />
-              </div>
-              <div className="text-left md:text-right">
-                <p className="text-sm font-bold text-white">
-                  {stage.estimated_label}
-                </p>
-                {stage.months_to_target ? (
-                  <p className="mt-1 text-xs text-gray-500">
-                    dans {stage.months_to_target} mois · reste {money.format(Number(stage.distance_remaining || 0))} EUR
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {active ? "palier actuel ou franchi" : "date a confirmer"}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 function FamilyOfficeModePanel({ product }: { product?: ProductContext | null }) {
   const view = product?.family_office_view;
   const allocation = view?.allocation || [];
@@ -397,342 +224,55 @@ function FamilyOfficeModePanel({ product }: { product?: ProductContext | null })
   );
 }
 
-function WealthGpsPanel({ product }: { product?: ProductContext | null }) {
-  const gps = product?.wealth_gps;
-  const routes = gps?.routes || [];
+function WealthNarrativePanel({ product }: { product?: ProductContext | null }) {
+  const narrative = product?.wealth_narrative;
+  const hidden = product?.hidden_wealth;
 
-  if (!gps || routes.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-[#3fa9f5]/20 bg-zinc-950 p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            GPS patrimonial
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Plusieurs chemins vers le prochain palier
-          </h2>
-        </div>
-        <div className="text-right text-sm text-gray-400">
-          Destination:{" "}
-          <span className="font-bold text-white">
-            {money.format(Number(gps.next_destination || 0))} EUR
-          </span>
-        </div>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
-        {routes.map((route) => (
-          <div key={route.key || route.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-bold text-white">{route.label}</h3>
-              <span className="rounded-full bg-[#3fa9f5]/15 px-2 py-1 text-xs text-[#3fa9f5]">
-                {route.annual_return}%/an
-              </span>
-            </div>
-            <p className="mt-3 text-2xl font-black text-white">
-              {money.format(Number(route.value_10y || 0))} EUR
-            </p>
-            <p className="mt-1 text-xs text-gray-500">projection 10 ans</p>
-            <p className="mt-3 text-sm leading-relaxed text-gray-400">
-              {route.description}
-            </p>
-            <p className="mt-3 text-xs font-semibold text-[#3fa9f5]">
-              {route.years_to_next_milestone
-                ? `Palier atteignable en ${route.years_to_next_milestone} an(s)`
-                : "Palier non atteint dans la projection prudente"}
-            </p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-sm leading-relaxed text-gray-500">{gps.assumption}</p>
-    </section>
-  );
-}
-
-function DigitalTwinPanel({ product }: { product?: ProductContext | null }) {
-  const twin = product?.digital_twin;
-  const scenarios = twin?.scenarios || [];
-
-  if (!twin || scenarios.length === 0) return null;
+  if (!narrative) return null;
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-          Double patrimonial
-        </p>
-        <h2 className="mt-1 text-2xl font-black text-white">
-          Explorer plusieurs futurs possibles
-        </h2>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        {scenarios.map((scenario) => (
-          <div key={scenario.key || scenario.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <h3 className="text-sm font-bold text-white">{scenario.label}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-400">
-              {scenario.description}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-gray-500">5 ans</p>
-                <p className="text-lg font-black text-white">
-                  {money.format(Number(scenario.value_5y || 0))} EUR
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">10 ans</p>
-                <p className="text-lg font-black text-white">
-                  {money.format(Number(scenario.value_10y || 0))} EUR
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-sm leading-relaxed text-gray-500">{twin.basis}</p>
-    </section>
-  );
-}
-
-function WeakSignalsPanel({ product }: { product?: ProductContext | null }) {
-  const signals = product?.weak_signals?.signals || [];
-
-  if (signals.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-          Signaux faibles
-        </p>
-        <h2 className="mt-1 text-2xl font-black text-white">
-          Ce que White Rock surveille avant toi
-        </h2>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        {signals.map((signal) => (
-          <div key={`${signal.type}-${signal.title}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold text-white">{signal.title}</h3>
-              <span className={`rounded-full px-2 py-1 text-xs ${
-                signal.severity === "high"
-                  ? "bg-red-500/15 text-red-300"
-                  : signal.severity === "medium"
-                    ? "bg-amber-500/15 text-amber-200"
-                    : "bg-[#3fa9f5]/15 text-[#3fa9f5]"
-              }`}>
-                {signal.severity || "signal"}
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-gray-400">
-              {signal.description}
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SelfBenchmarkPanel({ product }: { product?: ProductContext | null }) {
-  const benchmark = product?.self_benchmark;
-  const deltas = [
-    { label: "6 mois", value: benchmark?.six_months },
-    { label: "12 mois", value: benchmark?.twelve_months },
-  ];
-
-  if (!benchmark) return null;
-
-  return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Contre toi-meme
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Ta progression, pas celle des autres
-          </h2>
-        </div>
-        <p className="text-2xl font-black text-white">
-          {money.format(Number(benchmark.current_wealth || 0))} EUR
-        </p>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        {deltas.map((item) => (
-          <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-widest text-gray-500">
-              Depuis {item.label}
-            </p>
-            {item.value ? (
-              <>
-                <p className={`mt-2 text-2xl font-black ${
-                  Number(item.value.delta_value || 0) >= 0 ? "text-[#3fa9f5]" : "text-red-300"
-                }`}>
-                  {Number(item.value.delta_value || 0) >= 0 ? "+" : ""}
-                  {money.format(Number(item.value.delta_value || 0))} EUR
-                </p>
-                <p className="mt-1 text-sm text-gray-400">
-                  {Number(item.value.delta_percent || 0) >= 0 ? "+" : ""}
-                  {item.value.delta_percent}% vs {money.format(Number(item.value.previous_value || 0))} EUR
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Historique encore insuffisant pour comparer ce palier.
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-sm leading-relaxed text-gray-500">{benchmark.basis}</p>
-    </section>
-  );
-}
-
-function WealthStoryPanel({ product }: { product?: ProductContext | null }) {
-  const story = product?.wealth_story;
-  const events = story?.events || [];
-
-  if (events.length === 0) return null;
-
-  return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-          Histoire de richesse
-        </p>
-        <h2 className="mt-1 text-2xl font-black text-white">
-          Ta biographie patrimoniale commence ici
-        </h2>
-      </div>
-      <div className="mt-5 space-y-3">
-        {events.map((event, index) => (
-          <div key={`${event.label}-${index}`} className="grid grid-cols-[90px_1fr] gap-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-              {event.label}
-            </p>
-            <div>
-              <h3 className="text-sm font-bold text-white">{event.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-gray-400">
-                {event.description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function WealthMapHeroPanel({ product }: { product?: ProductContext | null }) {
-  const map = product?.wealth_map;
-  const invisible = product?.invisible_wealth;
-  const radarItems = product?.family_office_radar?.items || [];
-
-  if (!map && !invisible && radarItems.length === 0) return null;
-
-  return (
-    <section className="overflow-hidden rounded-2xl border border-[#d6b35a]/30 bg-[radial-gradient(circle_at_top_left,_rgba(63,169,245,0.22),_transparent_34%),linear-gradient(135deg,#080b10,#111006_58%,#020202)] p-5">
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+    <section className="rounded-2xl border border-[#d6b35a]/30 bg-[radial-gradient(circle_at_top_left,_rgba(214,179,90,0.2),_transparent_35%),linear-gradient(135deg,#080808,#141006_60%,#020202)] p-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div>
           <p className="text-xs uppercase tracking-widest text-[#d6b35a]">
-            Wealth Map
+            Wealth Narrative
           </p>
           <h2 className="mt-2 text-3xl font-black text-white md:text-4xl">
-            Tu es ici. Ton prochain palier est visible.
+            {narrative.headline || "Ce que raconte ta trajectoire"}
           </h2>
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-black/35 p-4">
-              <p className="text-xs text-gray-500">Position actuelle</p>
-              <p className="mt-2 text-2xl font-black text-white">
-                {money.format(Number(map?.current_position || 0))} EUR
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-black/35 p-4">
-              <p className="text-xs text-gray-500">Destination</p>
-              <p className="mt-2 text-2xl font-black text-white">
-                {money.format(Number(map?.destination?.target || 0))} EUR
-              </p>
-              <p className="mt-1 text-xs text-[#3fa9f5]">{map?.destination?.label}</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-black/35 p-4">
-              <p className="text-xs text-gray-500">Date estimee</p>
-              <p className="mt-2 text-2xl font-black text-white">
-                {map?.estimated_label || "A confirmer"}
-              </p>
-            </div>
-          </div>
-          <div className="mt-5">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Progression vers {map?.destination?.label || "destination"}</span>
-              <span>{map?.progress_percent || 0}%</span>
-            </div>
-            <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#3fa9f5] to-[#d6b35a]"
-                style={{ width: `${Math.min(100, Number(map?.progress_percent || 0))}%` }}
-              />
-            </div>
-            <p className="mt-3 text-sm text-gray-400">
-              Distance restante:{" "}
-              <span className="font-bold text-white">
-                {money.format(Number(map?.distance_remaining || 0))} EUR
-              </span>
-              {" "}· vitesse actuelle backend:{" "}
-              <span className="font-bold text-white">
-                {money.format(Number(map?.monthly_velocity || 0))} EUR/mois
-              </span>
-            </p>
-          </div>
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-gray-300">
+            {narrative.narrative}
+          </p>
+          <p className="mt-4 text-sm leading-relaxed text-gray-500">
+            {narrative.gravity_reading}
+          </p>
         </div>
-
-        <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
-          <p className="text-xs uppercase tracking-widest text-[#d6b35a]">
-            Richesse invisible
-          </p>
-          <p className="mt-3 text-sm text-gray-400">
-            Ce que White Rock projette au-dela de la photo actuelle.
-          </p>
-          <div className="mt-5 space-y-4">
-            <div>
-              <p className="text-xs text-gray-500">Potentiel patrimonial projete</p>
-              <p className="mt-1 text-3xl font-black text-white">
-                {money.format(Number(invisible?.projected_wealth || 0))} EUR
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          {[
+            ["Patrimoine visible", narrative.visible_wealth],
+            ["Patrimoine activable", narrative.activable_wealth],
+            ["Potentiel total", narrative.total_potential],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="rounded-xl border border-white/10 bg-black/35 p-4">
+              <p className="text-xs text-gray-500">{label}</p>
+              <p className="mt-2 text-2xl font-black text-white">
+                {money.format(Number(value || 0))} EUR
               </p>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Capital non exploite</p>
-              <p className="mt-1 text-3xl font-black text-[#d6b35a]">
-                {money.format(Number(invisible?.untapped_capital || 0))} EUR
-              </p>
-            </div>
-            <p className="text-sm leading-relaxed text-gray-400">
-              Meilleur chemin simule:{" "}
-              <span className="font-bold text-white">
-                {invisible?.best_path?.label || "a confirmer"}
-              </span>
-            </p>
-          </div>
+          ))}
         </div>
       </div>
-
-      {radarItems.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-6">
-          {radarItems.map((item) => (
-            <div key={item.key || item.label} className="rounded-xl border border-white/10 bg-black/35 p-3">
-              <div className={`mb-3 h-2 rounded-full ${
-                item.status === "green"
-                  ? "bg-emerald-400"
-                  : item.status === "amber"
-                    ? "bg-amber-300"
-                    : "bg-red-400"
-              }`} />
-              <p className="text-xs uppercase tracking-widest text-gray-500">
-                {item.label}
+      {(hidden?.items || []).length > 0 && (
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+          {(hidden?.items || []).slice(0, 4).map((item) => (
+            <div key={item.key || item.label} className="rounded-xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm font-bold text-white">{item.label}</p>
+              <p className="mt-2 text-xl font-black text-[#d6b35a]">
+                {money.format(Number(item.potential_value || 0))} EUR
               </p>
-              <p className="mt-1 text-xl font-black text-white">{item.score}/100</p>
+              <p className="mt-2 text-xs leading-relaxed text-gray-400">
+                {item.description}
+              </p>
             </div>
           ))}
         </div>
@@ -741,350 +281,195 @@ function WealthMapHeroPanel({ product }: { product?: ProductContext | null }) {
   );
 }
 
-function FamilyOfficeNarrativePanel({ product }: { product?: ProductContext | null }) {
-  const hidden = product?.hidden_wealth;
-  const gravity = product?.gravity_center;
-  const stress = product?.stress_tests;
-  const leverage = product?.leverage_engine;
-  const life = product?.life_wealth;
-  const film = product?.future_film;
-  const scorecard = product?.family_office_scorecard;
-  const board = product?.board_briefing;
+function FutureIntelligencePanel({ product }: { product?: ProductContext | null }) {
+  const future = product?.future_intelligence;
+  const position = future?.position;
+  const timeline = future?.timeline || [];
+  const simulations = future?.simulations || [];
+  const film = future?.film || [];
 
-  if (!hidden && !gravity && !film) return null;
+  if (!future) return null;
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-2xl border border-[#d6b35a]/25 bg-gradient-to-br from-[#171104] to-black p-5">
-          <p className="text-xs uppercase tracking-widest text-[#d6b35a]">
-            Patrimoine cache
+    <section className="rounded-2xl border border-[#3fa9f5]/20 bg-zinc-950 p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+            Future Intelligence
           </p>
-          <h2 className="mt-2 text-2xl font-black text-white">
-            Ce que White Rock voit au dela du patrimoine visible
+          <h2 className="mt-1 text-2xl font-black text-white">
+            {future.question || "Ou vais-je ?"}
           </h2>
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <p className="text-xs text-gray-500">Visible</p>
-              <p className="text-2xl font-black text-white">
-                {money.format(Number(hidden?.visible_wealth || 0))} EUR
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Activable</p>
-              <p className="text-2xl font-black text-[#d6b35a]">
-                {money.format(Number(hidden?.activable_wealth || 0))} EUR
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Potentiel total</p>
-              <p className="text-2xl font-black text-white">
-                {money.format(Number(hidden?.total_potential || 0))} EUR
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 space-y-2">
-            {(hidden?.items || []).slice(0, 4).map((item) => (
-              <div key={item.key || item.label} className="rounded-xl border border-white/10 bg-black/35 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-white">{item.label}</p>
-                  <p className="text-sm font-black text-[#d6b35a]">
-                    {money.format(Number(item.potential_value || 0))} EUR
-                  </p>
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
         </div>
-
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-              Conseil personnel
-            </p>
-            <h3 className="mt-2 text-xl font-black text-white">
-              {board?.title || "Conseil Family Office"}
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-gray-400">
-              {board?.what_changed || gravity?.reading}
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-                <p className="text-xs text-gray-500">Risque</p>
-                <p className="mt-1 text-sm font-bold text-white">{board?.main_risk || "A confirmer"}</p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-                <p className="text-xs text-gray-500">Opportunite</p>
-                <p className="mt-1 text-sm font-bold text-white">{board?.main_opportunity || "A confirmer"}</p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-                <p className="text-xs text-gray-500">Prochaine decision</p>
-                <p className="mt-1 text-sm font-bold text-[#3fa9f5]">{board?.next_step || "Attendre un signal backend"}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <h3 className="font-bold text-white">Centre de gravite</h3>
-              <p className="mt-2 text-sm text-gray-400">{gravity?.reading}</p>
-              <div className="mt-4 space-y-2">
-                {(gravity?.future || []).map((item) => (
-                  <div key={item.key || item.label}>
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span>{item.label}</span>
-                      <span>{item.weight}%</span>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-[#3fa9f5]"
-                        style={{ width: `${Math.min(100, Number(item.weight || 0))}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <h3 className="font-bold text-white">Moteur de leviers</h3>
-              <p className="mt-2 text-sm text-gray-400">
-                Levier principal:{" "}
-                <span className="font-bold text-white">{leverage?.main_lever?.label || "a confirmer"}</span>
-              </p>
-              <div className="mt-4 space-y-2">
-                {(leverage?.levers || []).slice(0, 4).map((lever) => (
-                  <div key={lever.key || lever.label} className="rounded-xl border border-white/10 bg-black/30 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-white">{lever.label}</p>
-                      <p className="text-sm font-black text-[#d6b35a]">{lever.impact_score}/100</p>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">{lever.reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="text-sm text-gray-400">
+          Prochain palier:{" "}
+          <span className="font-bold text-white">
+            {position?.destination?.label || "a confirmer"}
+          </span>
+          {position?.estimated_label ? (
+            <span className="text-[#3fa9f5]"> · {position.estimated_label}</span>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h3 className="font-bold text-white">Film du futur</h3>
-          <div className="mt-4 space-y-3">
-            {(film?.chapters || []).map((chapter) => (
-              <div key={`${chapter.year}-${chapter.title}`} className="grid grid-cols-[70px_1fr_120px] gap-3 rounded-xl border border-white/10 bg-black/30 p-3">
+      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Wealth Map</p>
+          <p className="mt-2 text-3xl font-black text-white">
+            {money.format(Number(position?.current || 0))} EUR
+          </p>
+          <p className="mt-1 text-sm text-gray-400">
+            vers {money.format(Number(position?.destination?.target || 0))} EUR
+          </p>
+          <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#3fa9f5] to-[#d6b35a]"
+              style={{ width: `${Math.min(100, Number(position?.progress_percent || 0))}%` }}
+            />
+          </div>
+          <p className="mt-3 text-sm text-gray-400">
+            Reste {money.format(Number(position?.distance_remaining || 0))} EUR · vitesse{" "}
+            {money.format(Number(position?.monthly_velocity || 0))} EUR/mois
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {simulations.slice(0, 3).map((scenario) => (
+            <div key={scenario.key || scenario.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-bold text-white">{scenario.label}</p>
+              <p className="mt-2 text-2xl font-black text-white">
+                {money.format(Number(scenario.value_10y || 0))} EUR
+              </p>
+              <p className="mt-1 text-xs text-gray-500">projection 10 ans</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="space-y-2">
+          {timeline.slice(0, 5).map((stage) => (
+            <div key={stage.label} className="grid grid-cols-[90px_1fr_120px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-sm font-bold text-white">{stage.label}</p>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#3fa9f5]"
+                  style={{ width: `${Math.min(100, Number(stage.progress_percent || 0))}%` }}
+                />
+              </div>
+              <p className="text-right text-xs text-gray-400">{stage.estimated_label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-2">
+          {film.slice(0, 4).map((chapter) => (
+            <div key={`${chapter.year}-${chapter.title}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-black text-[#3fa9f5]">{chapter.year}</p>
-                <div>
-                  <p className="text-sm font-bold text-white">{chapter.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-400">{chapter.narrative}</p>
-                </div>
-                <p className="text-right text-sm font-black text-white">
+                <p className="text-sm font-black text-white">
                   {money.format(Number(chapter.wealth || 0))} EUR
                 </p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h3 className="font-bold text-white">Patrimoine de vie</h3>
-            <div className="mt-4 grid grid-cols-1 gap-2">
-              {(life?.dimensions || []).map((dimension) => (
-                <div key={dimension.key || dimension.label}>
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>{dimension.label}</span>
-                    <span>{dimension.score}%</span>
-                  </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-[#d6b35a]"
-                      style={{ width: `${Math.min(100, Number(dimension.score || 0))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+              <p className="mt-1 text-sm font-bold text-white">{chapter.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-400">{chapter.narrative}</p>
             </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h3 className="font-bold text-white">Scorecard Family Office</h3>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {(scorecard?.dimensions || []).map((dimension) => (
-                <div key={dimension.key || dimension.label} className="rounded-xl border border-white/10 bg-black/30 p-3">
-                  <p className="text-xs text-gray-500">{dimension.label}</p>
-                  <p className="mt-1 text-xl font-black text-white">{dimension.score}/100</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h3 className="font-bold text-white">Stress tests</h3>
-            <div className="mt-4 space-y-2">
-              {(stress?.tests || []).slice(0, 3).map((test) => (
-                <div key={test.key || test.label} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 p-3">
-                  <p className="text-sm font-bold text-white">{test.label}</p>
-                  <p className={`text-sm font-black ${Number(test.delta || 0) >= 0 ? "text-[#3fa9f5]" : "text-red-300"}`}>
-                    {Number(test.delta || 0) >= 0 ? "+" : ""}
-                    {money.format(Number(test.delta || 0))} EUR
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function PersonalCommandCenterPanel({ product }: { product?: ProductContext | null }) {
-  const center = product?.personal_command_center;
-  const radarItems = product?.opportunity_radar?.items || [];
-  const decisions = product?.decision_engine?.decisions || [];
-  const blocks = product?.wealth_blocks?.blocks || [];
-  const dependencies = product?.dependency_detector?.signals || [];
-  const timeValue = product?.time_value;
-  const commandOpportunity = center?.opportunity;
-  const commandOpportunityText =
-    commandOpportunity && "why_fit" in commandOpportunity
-      ? commandOpportunity.why_fit
-      : commandOpportunity && "description" in commandOpportunity
-        ? commandOpportunity.description
-        : undefined;
+function StrategicIntelligencePanel({ product }: { product?: ProductContext | null }) {
+  const strategy = product?.strategic_intelligence;
+  const cards = strategy?.cards || [];
 
-  if (!center) return null;
+  if (!strategy || cards.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-[#3fa9f5]/30 bg-gradient-to-br from-[#061827] via-zinc-950 to-black p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Centre de commandement personnel
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Une seule vue pour décider
-          </h2>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-right">
-          <p className="text-xs text-gray-500">Valeur estimee d&apos;une heure</p>
-          <p className="text-2xl font-black text-white">
-            {money.format(Number(timeValue?.hourly_value || 0))} EUR
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
-          <p className="text-xs uppercase tracking-widest text-gray-500">Situation</p>
-          <p className="mt-2 text-sm leading-relaxed text-gray-300">
-            {center.situation || "Situation en cours de consolidation backend."}
-          </p>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
-          <p className="text-xs uppercase tracking-widest text-gray-500">Menace</p>
-          <h3 className="mt-2 text-sm font-bold text-white">{center.threat?.title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-gray-400">
-            {center.threat?.description}
-          </p>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
-          <p className="text-xs uppercase tracking-widest text-gray-500">Opportunite</p>
-          <h3 className="mt-2 text-sm font-bold text-white">{center.opportunity?.title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-gray-400">
-            {commandOpportunityText}
-          </p>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
-          <p className="text-xs uppercase tracking-widest text-gray-500">Prochaine etape</p>
-          <p className="mt-2 text-sm font-bold leading-relaxed text-[#3fa9f5]">
-            {center.next_step || "Attendre un signal backend plus precis."}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[1.1fr_1fr]">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="font-bold text-white">Radar d&apos;opportunites</h3>
-            <span className="text-xs text-gray-500">filtre profil backend</span>
+    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+      <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+        Strategic Intelligence
+      </p>
+      <h2 className="mt-1 text-2xl font-black text-white">
+        {strategy.question || "Que dois-je faire ?"}
+      </h2>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        {cards.slice(0, 4).map((card) => (
+          <div key={card.key || card.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs uppercase tracking-widest text-gray-500">{card.label}</p>
+            <h3 className="mt-2 text-sm font-bold text-white">{card.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-400">{card.description}</p>
+            {card.action ? (
+              <p className="mt-3 text-xs font-semibold text-[#3fa9f5]">{card.action}</p>
+            ) : null}
+            {card.score ? (
+              <p className="mt-3 text-xs font-semibold text-[#d6b35a]">impact {card.score}/100</p>
+            ) : null}
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            {radarItems.map((item) => (
-              <div key={item.key || item.title} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                <p className="text-sm font-bold text-white">{item.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                  {item.impact}
-                </p>
-                <p className="mt-2 text-xs font-semibold text-[#3fa9f5]">
-                  {item.next_action}
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FamilyOfficeIntelligencePanel({ product }: { product?: ProductContext | null }) {
+  const intelligence = product?.family_office_intelligence;
+  const scorecard = intelligence?.scorecard || [];
+  const stressTests = intelligence?.stress_tests || [];
+  const dependencies = intelligence?.dependencies || [];
+
+  if (!intelligence) return null;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+      <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+        Family Office Intelligence
+      </p>
+      <h2 className="mt-1 text-2xl font-black text-white">
+        {intelligence.question || "Quelle est la solidite globale ?"}
+      </h2>
+      <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr_1fr]">
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <h3 className="font-bold text-white">Scorecard</h3>
+          <div className="mt-3 space-y-2">
+            {scorecard.slice(0, 6).map((item) => (
+              <div key={item.key || item.label}>
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>{item.label}</span>
+                  <span>{item.score}/100</span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-[#d6b35a]" style={{ width: `${Math.min(100, Number(item.score || 0))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <h3 className="font-bold text-white">Stress tests</h3>
+          <div className="mt-3 space-y-2">
+            {stressTests.slice(0, 4).map((test) => (
+              <div key={test.key || test.label} className="flex items-center justify-between gap-3 rounded-lg bg-black/30 p-3">
+                <p className="text-sm font-bold text-white">{test.label}</p>
+                <p className={`text-sm font-black ${Number(test.delta || 0) >= 0 ? "text-[#3fa9f5]" : "text-red-300"}`}>
+                  {Number(test.delta || 0) >= 0 ? "+" : ""}
+                  {money.format(Number(test.delta || 0))} EUR
                 </p>
               </div>
             ))}
           </div>
         </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <h3 className="font-bold text-white">Detecteur de dependances</h3>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <h3 className="font-bold text-white">Dependances</h3>
           <div className="mt-3 space-y-2">
-            {dependencies.map((signal) => (
-              <div key={`${signal.type}-${signal.title}`} className="rounded-lg border border-white/10 bg-black/30 p-3">
+            {dependencies.slice(0, 3).map((signal) => (
+              <div key={`${signal.type}-${signal.title}`} className="rounded-lg bg-black/30 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-bold text-white">{signal.title}</p>
                   <span className="text-xs uppercase text-gray-500">{signal.severity}</span>
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                  {signal.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <h3 className="font-bold text-white">Moteur de decisions</h3>
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {decisions.slice(0, 4).map((decision) => (
-              <div key={decision.key || decision.label} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-white">{decision.label}</p>
-                  <span className="rounded-full bg-[#3fa9f5]/15 px-2 py-1 text-xs text-[#3fa9f5]">
-                    fit {decision.fit}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-400">
-                  <span>cashflow {decision.cashflow}</span>
-                  <span>liquidite {decision.liquidity}</span>
-                  <span>risque {decision.risk}</span>
-                  <span>liberte {decision.freedom_impact}</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                  {decision.comment}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <h3 className="font-bold text-white">Blocs de richesse</h3>
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
-            {blocks.slice(0, 6).map((block) => (
-              <div key={block.key || block.label} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                <p className="text-xs uppercase tracking-widest text-gray-500">
-                  {block.label}
-                </p>
-                <p className="mt-2 text-lg font-black text-white">
-                  {money.format(Number(block.value || 0))} EUR
-                </p>
-                <p className="mt-1 text-xs text-[#3fa9f5]">{block.status}</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-400">{signal.description}</p>
               </div>
             ))}
           </div>
@@ -2351,30 +1736,13 @@ export default function Dashboard() {
                 onOpenOpportunities={() => goToSection("opportunities")}
               />
 
-              <WealthMapHeroPanel product={product} />
+              <WealthNarrativePanel product={product} />
 
-              <FamilyOfficeNarrativePanel product={product} />
+              <FutureIntelligencePanel product={product} />
 
-              <MissionControlPanel
-                product={product}
-                onOpenMission={() => goToSection("progression")}
-              />
+              <StrategicIntelligencePanel product={product} />
 
-              <PersonalCommandCenterPanel product={product} />
-
-              <FutureViewPanel product={product} />
-
-              <WealthGpsPanel product={product} />
-
-              <DigitalTwinPanel product={product} />
-
-              <WealthTimelinePanel product={product} />
-
-              <WeakSignalsPanel product={product} />
-
-              <SelfBenchmarkPanel product={product} />
-
-              <WealthStoryPanel product={product} />
+              <FamilyOfficeIntelligencePanel product={product} />
 
               <FamilyOfficeModePanel product={product} />
 

@@ -1703,6 +1703,137 @@ def build_board_briefing(personal_command_center: dict, gravity_center: dict, st
     }
 
 
+def build_wealth_narrative(
+    data_profile: dict,
+    hidden_wealth: dict,
+    gravity_center: dict,
+    wealth_map: dict,
+    leverage_engine: dict,
+):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    activable = float(hidden_wealth.get("activable_wealth") or 0)
+    destination = wealth_map.get("destination") or {}
+    main_lever = leverage_engine.get("main_lever") or {}
+    estimated_label = wealth_map.get("estimated_label") or destination.get("estimated_label")
+
+    if activable > current_wealth and main_lever.get("label"):
+        narrative = (
+            f"Ton patrimoine visible est deja mesurable, mais la partie la plus interessante semble etre le potentiel activable. "
+            f"Le centre de gravite peut progressivement se deplacer vers {str(gravity_center.get('dominant_future') or 'un levier futur').lower()}, "
+            f"avec {str(main_lever.get('label')).lower()} comme accelerateur principal."
+        )
+    elif estimated_label:
+        narrative = (
+            f"Ta trajectoire est maintenant lisible: le prochain palier patrimonial est estime autour de {estimated_label}. "
+            "La valeur de White Rock ici n'est pas seulement de montrer le patrimoine, mais de rendre la distance et le rythme visibles."
+        )
+    else:
+        narrative = (
+            "White Rock commence a transformer les donnees patrimoniales en trajectoire. "
+            "Plus les revenus, actifs et objectifs seront renseignes, plus le recit deviendra precis."
+        )
+
+    return {
+        "title": "Wealth Narrative",
+        "headline": "Ce que raconte ta trajectoire",
+        "narrative": narrative,
+        "visible_wealth": round(current_wealth, 2),
+        "activable_wealth": round(activable, 2),
+        "total_potential": hidden_wealth.get("total_potential"),
+        "next_milestone": destination,
+        "main_lever": main_lever,
+        "gravity_reading": gravity_center.get("reading"),
+    }
+
+
+def build_future_intelligence(
+    wealth_map: dict,
+    wealth_timeline: dict,
+    digital_twin: dict,
+    wealth_gps: dict,
+    future_film: dict,
+):
+    return {
+        "title": "Future Intelligence",
+        "question": "Ou vais-je ?",
+        "position": {
+            "current": wealth_map.get("current_position"),
+            "destination": wealth_map.get("destination"),
+            "progress_percent": wealth_map.get("progress_percent"),
+            "distance_remaining": wealth_map.get("distance_remaining"),
+            "monthly_velocity": wealth_map.get("monthly_velocity"),
+            "estimated_label": wealth_map.get("estimated_label"),
+        },
+        "timeline": wealth_timeline.get("stages") or [],
+        "routes": wealth_gps.get("routes") or [],
+        "simulations": digital_twin.get("scenarios") or [],
+        "film": future_film.get("chapters") or [],
+    }
+
+
+def build_strategic_intelligence(
+    mission_control: dict,
+    opportunity_radar: dict,
+    decision_engine: dict,
+    leverage_engine: dict,
+    board_briefing: dict,
+):
+    return {
+        "title": "Strategic Intelligence",
+        "question": "Que dois-je faire ?",
+        "cards": [
+            {
+                "key": "risk",
+                "label": "Risque principal",
+                "title": (mission_control.get("risk") or {}).get("title"),
+                "description": (mission_control.get("risk") or {}).get("description"),
+            },
+            {
+                "key": "opportunity",
+                "label": "Opportunite principale",
+                "title": ((opportunity_radar.get("items") or [{}])[0]).get("title"),
+                "description": ((opportunity_radar.get("items") or [{}])[0]).get("impact"),
+                "action": ((opportunity_radar.get("items") or [{}])[0]).get("next_action"),
+            },
+            {
+                "key": "decision",
+                "label": "Decision du moment",
+                "title": (mission_control.get("decision") or {}).get("title"),
+                "description": (mission_control.get("decision") or {}).get("description"),
+                "action": board_briefing.get("next_step"),
+            },
+            {
+                "key": "leverage",
+                "label": "Levier principal",
+                "title": (leverage_engine.get("main_lever") or {}).get("label"),
+                "description": (leverage_engine.get("main_lever") or {}).get("reason"),
+                "score": (leverage_engine.get("main_lever") or {}).get("impact_score"),
+            },
+        ],
+        "decision_matrix": decision_engine.get("decisions") or [],
+    }
+
+
+def build_family_office_intelligence(
+    family_office_scorecard: dict,
+    stress_tests: dict,
+    dependency_detector: dict,
+    weak_signals: dict,
+    life_wealth: dict,
+    family_office_radar: dict,
+):
+    return {
+        "title": "Family Office Intelligence",
+        "question": "Quelle est la solidite globale ?",
+        "scorecard": family_office_scorecard.get("dimensions") or [],
+        "stress_tests": stress_tests.get("tests") or [],
+        "dependencies": dependency_detector.get("signals") or [],
+        "weak_signals": weak_signals.get("signals") or [],
+        "life_dimensions": life_wealth.get("dimensions") or [],
+        "radar": family_office_radar.get("items") or [],
+    }
+
+
 @router.get("/entitlements")
 def product_entitlements(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -1810,6 +1941,35 @@ def product_context(email: str = Depends(get_current_user)):
         future_film = build_future_film(data_profile, digital_twin, leverage_engine)
         family_office_scorecard = build_family_office_scorecard(data_profile, life_profile, life_wealth)
         board_briefing = build_board_briefing(personal_command_center, gravity_center, stress_tests)
+        wealth_narrative = build_wealth_narrative(
+            data_profile,
+            hidden_wealth,
+            gravity_center,
+            wealth_map,
+            leverage_engine,
+        )
+        future_intelligence = build_future_intelligence(
+            wealth_map,
+            wealth_timeline,
+            digital_twin,
+            wealth_gps,
+            future_film,
+        )
+        strategic_intelligence = build_strategic_intelligence(
+            mission_control,
+            opportunity_radar,
+            decision_engine,
+            leverage_engine,
+            board_briefing,
+        )
+        family_office_intelligence = build_family_office_intelligence(
+            family_office_scorecard,
+            stress_tests,
+            dependency_detector,
+            weak_signals,
+            life_wealth,
+            family_office_radar,
+        )
 
     return {
         "plan": plan,
@@ -1848,6 +2008,10 @@ def product_context(email: str = Depends(get_current_user)):
         "future_film": future_film,
         "family_office_scorecard": family_office_scorecard,
         "board_briefing": board_briefing,
+        "wealth_narrative": wealth_narrative,
+        "future_intelligence": future_intelligence,
+        "strategic_intelligence": strategic_intelligence,
+        "family_office_intelligence": family_office_intelligence,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,

@@ -476,6 +476,69 @@ export type ProductContext = {
       reading?: string;
     } | null;
   };
+  wealth_narrative?: {
+    title?: string;
+    headline?: string;
+    narrative?: string;
+    visible_wealth?: number;
+    activable_wealth?: number;
+    total_potential?: number;
+    next_milestone?: {
+      label?: string;
+      target?: number;
+      estimated_label?: string | null;
+      months_to_target?: number | null;
+    } | null;
+    main_lever?: {
+      label?: string;
+      impact_score?: number;
+      reason?: string;
+    } | null;
+    gravity_reading?: string;
+  };
+  future_intelligence?: {
+    title?: string;
+    question?: string;
+    position?: {
+      current?: number;
+      destination?: {
+        label?: string;
+        target?: number;
+        estimated_label?: string | null;
+      } | null;
+      progress_percent?: number;
+      distance_remaining?: number;
+      monthly_velocity?: number;
+      estimated_label?: string | null;
+    };
+    timeline?: NonNullable<ProductContext["wealth_timeline"]>["stages"];
+    routes?: NonNullable<ProductContext["wealth_gps"]>["routes"];
+    simulations?: NonNullable<ProductContext["digital_twin"]>["scenarios"];
+    film?: NonNullable<ProductContext["future_film"]>["chapters"];
+  };
+  strategic_intelligence?: {
+    title?: string;
+    question?: string;
+    cards?: Array<{
+      key?: string;
+      label?: string;
+      title?: string;
+      description?: string;
+      action?: string;
+      score?: number;
+    }>;
+    decision_matrix?: NonNullable<ProductContext["decision_engine"]>["decisions"];
+  };
+  family_office_intelligence?: {
+    title?: string;
+    question?: string;
+    scorecard?: NonNullable<ProductContext["family_office_scorecard"]>["dimensions"];
+    stress_tests?: NonNullable<ProductContext["stress_tests"]>["tests"];
+    dependencies?: ProductDependencySignal[];
+    weak_signals?: ProductDependencySignal[];
+    life_dimensions?: NonNullable<ProductContext["life_wealth"]>["dimensions"];
+    radar?: NonNullable<ProductContext["family_office_radar"]>["items"];
+  };
 };
 
 export type LegacyOverview = {
