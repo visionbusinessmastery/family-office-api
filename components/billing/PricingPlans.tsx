@@ -34,23 +34,23 @@ type PricingPlansProps = {
 };
 
 const ladder = [
-  { label: "FREE", role: "Découverte", tone: "border-white/10 bg-white/[0.03] text-gray-500" },
-  { label: "GOLD", role: "Structuration", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
-  { label: "ELITE", role: "Pilotage", tone: "border-amber-200/35 bg-amber-200/[0.08] text-amber-100" },
-  { label: "LIBERTY", role: "Liberté", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
-  { label: "LEGACY", role: "Dynastie", tone: "border-yellow-300/60 bg-yellow-300/[0.16] text-yellow-100" },
+  { label: "FREE", role: "Decouverte", tone: "border-white/10 bg-white/[0.03] text-gray-500" },
+  { label: "GOLD", role: "Future Intelligence", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
+  { label: "ELITE", role: "Strategic Intelligence", tone: "border-amber-200/35 bg-amber-200/[0.08] text-amber-100" },
+  { label: "LIBERTY", role: "Family Office", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
+  { label: "LEGACY", role: "Dynasty Office", tone: "border-yellow-300/60 bg-yellow-300/[0.16] text-yellow-100" },
 ];
 
 const plans: Plan[] = [
   {
     id: "gold",
     name: "Gold",
-    subtitle: "Fondations financières intelligentes",
+    subtitle: "Future Intelligence active",
     rank: "Niveau 1",
-    badge: "Investor Favorite",
-    altBadge: "Most Popular",
-    transformation: "Structurer votre croissance patrimoniale",
-    unlock: "Unlock advanced analytics",
+    badge: "Growth Layer",
+    altBadge: "Ethan flottant",
+    transformation: "Voir votre trajectoire et agir plus clairement",
+    unlock: "Future Intelligence + Wealth Narrative",
     includes: "Inclut FREE",
     price: {
       monthly: "29 EUR",
@@ -70,15 +70,15 @@ const plans: Plan[] = [
     },
     tone: "border-[#3fa9f5]/45 bg-[#3fa9f5]/10",
     glow: "from-[#3fa9f5]/18 via-transparent to-transparent",
-    cta: "Débloquer Gold",
+    cta: "Debloquer Gold",
     capabilityGroups: [
       {
-        label: "Wealth Intelligence",
-        items: ["Score patrimonial lisible", "20 assets maximum", "Signaux d'amelioration"],
+        label: "Future Intelligence",
+        items: ["20 assets maximum", "Wealth Narrative", "Future Intelligence complete", "Prochain palier patrimonial"],
       },
       {
-        label: "Opportunity Engine",
-        items: ["Opportunites guidees", "Allocation de depart", "Lecture immobilier/investissements"],
+        label: "Ethan & Opportunites",
+        items: ["Ethan flottant Gold+", "Opportunites avancees", "Radar d'opportunites", "Emails hebdomadaires Ethan"],
       },
     ],
   },
@@ -87,10 +87,10 @@ const plans: Plan[] = [
     name: "Elite",
     subtitle: "Wealth Operating System",
     rank: "Niveau 2",
-    badge: "Wealth OS",
+    badge: "Strategic OS",
     altBadge: "Wealth OS",
-    transformation: "Piloter votre Wealth OS",
-    unlock: "Unlock Wealth Intelligence",
+    transformation: "Passer du suivi patrimonial au pilotage decisionnel",
+    unlock: "Strategic Intelligence + Family Office Intelligence",
     includes: "Tout GOLD inclus",
     price: {
       monthly: "79 EUR",
@@ -113,12 +113,12 @@ const plans: Plan[] = [
     cta: "Passer Elite",
     capabilityGroups: [
       {
-        label: "Investment Operating System",
-        items: ["Cockpit Family Office", "30 assets maximum", "Priorites patrimoniales", "Graphiques par rubrique"],
+        label: "Strategic Intelligence",
+        items: ["30 assets maximum", "Decision du moment", "Risque principal", "Levier prioritaire", "Stress tests"],
       },
       {
-        label: "AI Strategic Guidance",
-        items: ["Copilote avance", "Guidance contextuelle", "Syntheses executives", "Multi-user Family Office"],
+        label: "Family Office Intelligence",
+        items: ["Scorecard multidimensionnelle", "Patrimoine cache", "Detecteur de dependances", "Graphiques par rubrique", "Multi-user Family Office"],
       },
     ],
   },
@@ -127,10 +127,10 @@ const plans: Plan[] = [
     name: "Liberty",
     subtitle: "Freedom Engine",
     rank: "Niveau 3",
-    badge: "Freedom Tier",
-    altBadge: "Sovereign Access",
-    transformation: "Construire votre liberté financière",
-    unlock: "Unlock Freedom Systems",
+    badge: "Family Office",
+    altBadge: "Private Access",
+    transformation: "Structurer votre richesse comme un Family Office personnel",
+    unlock: "Family Office Mode + transmission",
     includes: "Tout ELITE inclus",
     price: {
       monthly: "149 EUR",
@@ -153,12 +153,12 @@ const plans: Plan[] = [
     cta: "Activer Liberty",
     capabilityGroups: [
       {
-        label: "Freedom Systems",
-        items: ["Pilotage liberte financiere", "50 assets maximum", "Trajectoire d'independance", "Comptes enfants", "Architecture patrimoniale"],
+        label: "Family Office personnel",
+        items: ["50 assets maximum", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Scenarios de vie avances"],
       },
       {
-        label: "Business Command Center",
-        items: ["Opportunites premium", "Business assets", "Strategie de croissance", "Automation", "Legacy planning"],
+        label: "Architecture patrimoniale",
+        items: ["Wealth Narrative enrichi", "Transmission", "Legacy planning", "Automation", "Business Command Center"],
       },
     ],
   },
@@ -168,8 +168,8 @@ const plans: Plan[] = [
     subtitle: "Dynasty Office",
     rank: "Niveau 4",
     badge: "Dynasty Grade",
-    altBadge: "Private Office",
-    transformation: "Créer une dynastie familiale",
+    altBadge: "Dynasty Office",
+    transformation: "Organiser la protection, la transmission et la gouvernance familiale",
     unlock: "Unlock Dynasty Infrastructure",
     includes: "Tout LIBERTY inclus",
     price: {
@@ -194,16 +194,15 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Dynasty Layer",
-        items: ["Transmission familiale", "Assets illimites", "Vision generationnelle", "Family Vault", "Heirs mode", "Protection layer"],
+        items: ["Assets illimites", "Transmission familiale", "Vision generationnelle", "Family Vault", "Heirs mode", "Protection layer"],
       },
       {
         label: "Family Office Infrastructure",
-        items: ["Dynasty Office", "Protection et continuite", "Architecture institutionnelle", "Global strategy", "Legacy timeline", "Governance familiale"],
+        items: ["Gouvernance familiale", "Succession planning", "Architecture institutionnelle", "Global strategy", "Legacy timeline", "Protection et continuite"],
       },
     ],
   },
 ];
-
 export default function PricingPlans({ mode }: PricingPlansProps) {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
