@@ -1,1 +1,1 @@
-ETHAN_GLOBAL_CACHE_VERSION = "v24-empty-output-retry"
+ETHAN_GLOBAL_CACHE_VERSION = "v25-advisor-arbitrage"
