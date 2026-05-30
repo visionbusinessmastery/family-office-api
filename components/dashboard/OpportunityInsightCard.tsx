@@ -4,12 +4,28 @@ import type { CategoryOpportunity } from "@/lib/types";
 
 type OpportunityInsightCardProps = {
   opportunity?: CategoryOpportunity;
+  variant?: "card" | "compact";
 };
 
 export default function OpportunityInsightCard({
   opportunity,
+  variant = "card",
 }: OpportunityInsightCardProps) {
   if (!opportunity) return null;
+  const signalText =
+    opportunity.quick_action ||
+    opportunity.detected_opportunity?.title ||
+    opportunity.market_signal?.headline ||
+    opportunity.analysis;
+
+  if (variant === "compact") {
+    return (
+      <div className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">
+        <span className="font-bold text-emerald-200">Signal</span>
+        {signalText ? <span className="ml-2 text-emerald-50">{signalText}</span> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-[#3fa9f5]/20 bg-[#3fa9f5]/10 p-4">

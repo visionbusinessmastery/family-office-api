@@ -823,6 +823,7 @@ export default function Dashboard() {
     realEstate,
     yieldAssets,
     ventureAssets,
+    businessIntelligence,
     categoryOpportunities,
     legacyOverview,
     onboarding,
@@ -969,6 +970,9 @@ export default function Dashboard() {
       value: Number(asset.final_value || asset.computed_value || asset.valuation || 0),
     })),
   ];
+  const businessMetrics = businessIntelligence?.metrics || {};
+  const businessDecision = businessIntelligence?.decision;
+  const businessNarrative = businessIntelligence?.narrative;
   const categoryOpportunityItems = categoryOpportunities?.categories || [];
   const findOpportunity = (key: string) =>
     categoryOpportunityItems.find((item) => item.key === key);
@@ -2323,16 +2327,83 @@ export default function Dashboard() {
               <SectionHeader
                 eyebrow="Business & Ventures"
                 title="Entreprises, startups et rendement prive"
-                description="Business, startup, activites digitales, franchise, crowdfunding et private equity dans une vue dediee."
+                description="Une lecture investisseur: intelligence business, actifs suivis, puis opportunites a explorer."
               />
 
-              <OpportunityDiscoveryPanel
-                universe="business"
-                title="Business Opportunity Engine"
-                description="Donnees business digital, startup, franchise, reprise, crowdfunding et private equity selon ton budget, ton risque et ton ambition."
-                plan={currentPlan}
-                token={token}
-              />
+              <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-xs font-bold uppercase tracking-widest text-emerald-300">
+                      Business Intelligence
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black text-white">
+                      {compactText(businessNarrative?.title, "Lecture business")}
+                    </h2>
+                    <p className="mt-3 text-sm leading-relaxed text-gray-300">
+                      {compactText(
+                        businessNarrative?.text,
+                        "La rubrique Business se construit a partir des actifs et investissements prives deja renseignes."
+                      )}
+                    </p>
+                    {businessNarrative?.emphasis && (
+                      <p className="mt-3 rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+                        {businessNarrative.emphasis}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 lg:w-80">
+                    <p className="text-xs font-bold uppercase tracking-widest text-amber-200">
+                      Decision du moment
+                    </p>
+                    <h3 className="mt-2 text-lg font-black text-white">
+                      {compactText(businessDecision?.title, "Structurer la prochaine action")}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-gray-300">
+                      {compactText(
+                        businessDecision?.description,
+                        "Ajoute ou precise un actif business pour obtenir une lecture priorisee."
+                      )}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                        <p className="uppercase tracking-widest text-gray-500">Horizon</p>
+                        <p className="mt-1 font-bold text-white">
+                          {compactText(businessDecision?.timeframe, "A definir")}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                        <p className="uppercase tracking-widest text-gray-500">Impact</p>
+                        <p className="mt-1 font-bold text-white">
+                          {compactText(businessDecision?.impact, "Pilotage")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  {[
+                    ["CA", businessMetrics.revenue],
+                    ["Resultat", businessMetrics.result],
+                    ["Dette", businessMetrics.debts],
+                    ["Actifs prives", businessMetrics.private_capital],
+                    ["Valeur business", businessMetrics.total_business_value],
+                  ].map(([label, value]) => (
+                    <div
+                      key={String(label)}
+                      className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                    >
+                      <p className="text-xs uppercase tracking-widest text-gray-500">
+                        {label}
+                      </p>
+                      <p className="mt-2 text-xl font-black text-white">
+                        {money.format(Number(value || 0))} EUR
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
               {eliteChartsEnabled ? (
                 <RubricBreakdownChart
@@ -2349,16 +2420,6 @@ export default function Dashboard() {
                 />
               )}
 
-              <YieldInvestmentsModule
-                data={yieldAssets}
-                onAdd={handleAddYieldAsset}
-                onUpdate={handleUpdateYieldAsset}
-                onDelete={handleDeleteYieldAsset}
-                opportunities={categoryOpportunityItems.filter((item) =>
-                  ["crowdfunding", "private_equity"].includes(item.key || "")
-                )}
-              />
-
               <VentureAssetsModule
                 data={ventureAssets}
                 onAdd={handleAddVentureAsset}
@@ -2369,6 +2430,24 @@ export default function Dashboard() {
                     item.key || ""
                   )
                 )}
+              />
+
+              <YieldInvestmentsModule
+                data={yieldAssets}
+                onAdd={handleAddYieldAsset}
+                onUpdate={handleUpdateYieldAsset}
+                onDelete={handleDeleteYieldAsset}
+                opportunities={categoryOpportunityItems.filter((item) =>
+                  ["crowdfunding", "private_equity"].includes(item.key || "")
+                )}
+              />
+
+              <OpportunityDiscoveryPanel
+                universe="business"
+                title="Opportunity Engine"
+                description="Exploration separee du portefeuille: business digital, startup, franchise, reprise, crowdfunding et private equity selon ton contexte White Rock."
+                plan={currentPlan}
+                token={token}
               />
             </div>
           )}
@@ -2468,7 +2547,7 @@ export default function Dashboard() {
 
                   {progressionTimelineItems.length === 0 && (
                     <p className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">
-                      Aucun historique detaille n'est encore disponible. Les prochains jalons valides par le backend apparaitront ici.
+                      Aucun historique detaille n'est encore disponible. Les prochains jalons valides par White Rock apparaitront ici.
                     </p>
                   )}
                 </div>

@@ -790,6 +790,33 @@ export type VentureAssetData = {
   };
 };
 
+export type BusinessIntelligenceData = {
+  version?: string;
+  access?: AssetAccess | null;
+  metrics?: {
+    revenue?: number | string;
+    charges?: number | string;
+    result?: number | string;
+    debts?: number | string;
+    valuation?: number | string;
+    private_capital?: number | string;
+    projected_gain?: number | string;
+    total_business_value?: number | string;
+    assets_count?: number | string;
+  };
+  narrative?: {
+    title?: string;
+    text?: string;
+    emphasis?: string;
+  };
+  decision?: {
+    title?: string;
+    description?: string;
+    timeframe?: string;
+    impact?: string;
+  };
+};
+
 export type Opportunity = {
   type?: string;
   title?: string;

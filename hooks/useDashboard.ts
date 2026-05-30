@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, clearAuthSession, isJwtExpired } from "@/lib/api";
 import type {
-  CommandCenter,
+  BusinessIntelligenceData,
   CategoryOpportunityData,
+  CommandCenter,
   DashboardSummary,
   FinanceData,
   GamificationData,
@@ -84,6 +85,7 @@ type DashboardSessionSnapshot = {
   realEstate: RealEstateData | null;
   yieldAssets: YieldAssetData | null;
   ventureAssets: VentureAssetData | null;
+  businessIntelligence: BusinessIntelligenceData | null;
   onboarding: OnboardingData | null;
   intelligence: UserIntelligence | null;
   categoryOpportunities: CategoryOpportunityData | null;
@@ -215,6 +217,8 @@ export function useDashboard() {
   const [realEstate, setRealEstate] = useState<RealEstateData | null>(null);
   const [yieldAssets, setYieldAssets] = useState<YieldAssetData | null>(null);
   const [ventureAssets, setVentureAssets] = useState<VentureAssetData | null>(null);
+  const [businessIntelligence, setBusinessIntelligence] =
+    useState<BusinessIntelligenceData | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
   const [intelligence, setIntelligence] = useState<UserIntelligence | null>(null);
   const [categoryOpportunities, setCategoryOpportunities] =
@@ -280,6 +284,7 @@ export function useDashboard() {
     setRealEstate(snapshot.realEstate);
     setYieldAssets(snapshot.yieldAssets);
     setVentureAssets(snapshot.ventureAssets);
+    setBusinessIntelligence(snapshot.businessIntelligence || null);
     setOnboarding(snapshot.onboarding);
     setIntelligence(snapshot.intelligence);
     setCategoryOpportunities(snapshot.categoryOpportunities);
@@ -409,6 +414,14 @@ export function useDashboard() {
     setVentureAssets(data || { assets: [], totals: {} });
   }, [safeFetch]);
 
+  const loadBusinessIntelligence = useCallback(async () => {
+    const data = await safeFetch<BusinessIntelligenceData>(
+      "/business-intelligence/"
+    );
+    setBusinessIntelligence(data || null);
+    return data;
+  }, [safeFetch]);
+
   const loadIntelligence = useCallback(async () => {
     const intel = await safeFetch<UserIntelligence & { onboarding?: OnboardingData }>(
       "/intelligence/user-intelligence"
@@ -481,6 +494,7 @@ export function useDashboard() {
       loadRealEstate(),
       loadYieldAssets(),
       loadVentureAssets(),
+      loadBusinessIntelligence(),
       loadFinance(),
       loadCategoryOpportunities(),
       loadOnboarding(userData),
@@ -499,6 +513,7 @@ export function useDashboard() {
     loadRealEstate,
     loadYieldAssets,
     loadVentureAssets,
+    loadBusinessIntelligence,
     loadOnboarding,
     loadPortfolio,
     loadBillingSubscription,
@@ -513,6 +528,7 @@ export function useDashboard() {
       loadProductContext(),
       loadCommandCenter(),
       loadCategoryOpportunities(),
+      loadBusinessIntelligence(),
       loadGamification(),
       loadProgressionTimeline(),
     ]);
@@ -520,6 +536,7 @@ export function useDashboard() {
     loadBillingSubscription,
     loadCategoryOpportunities,
     loadCommandCenter,
+    loadBusinessIntelligence,
     loadGamification,
     loadProgressionTimeline,
     loadProductContext,
@@ -590,6 +607,7 @@ export function useDashboard() {
       realEstate,
       yieldAssets,
       ventureAssets,
+      businessIntelligence,
       onboarding,
       intelligence,
       categoryOpportunities,
@@ -602,6 +620,7 @@ export function useDashboard() {
     });
   }, [
     billingSubscription,
+    businessIntelligence,
     categoryOpportunities,
     commandCenter,
     dashboard,
@@ -636,6 +655,7 @@ export function useDashboard() {
     realEstate,
     yieldAssets,
     ventureAssets,
+    businessIntelligence,
     onboarding,
     intelligence,
     categoryOpportunities,
@@ -655,6 +675,7 @@ export function useDashboard() {
     loadRealEstate,
     loadYieldAssets,
     loadVentureAssets,
+    loadBusinessIntelligence,
     loadOnboarding,
     loadIntelligence,
     loadCategoryOpportunities,

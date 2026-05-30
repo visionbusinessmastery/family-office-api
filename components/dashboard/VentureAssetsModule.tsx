@@ -40,16 +40,17 @@ export default function VentureAssetsModule({
   const canAddAsset = !access || access.is_unlimited || n(access.remaining) > 0;
   const accessLine = access
     ? access.is_unlimited
-      ? `${access.depth_label || "Lecture avancee"} · business illimites`
-      : `${access.depth_label || "Lecture"} · ${access.count || 0}/${access.limit} business`
+      ? `${access.depth_label || "Lecture avancee"} - business illimites`
+      : `${access.depth_label || "Lecture"} - ${access.count || 0}/${access.limit} business`
     : null;
 
   return (
-    <section className="bg-zinc-950 border border-white/10 rounded-2xl p-5">
+    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
       <div className="mb-5">
-        <h2 className="text-2xl font-bold">Business & Ventures</h2>
+        <h2 className="text-2xl font-bold">Portfolio Business</h2>
         <p className="text-sm text-gray-400">
-          CA, charges, resultat, dettes, levees et valorisation.
+          Les actifs que tu possedes ou structures: activites, startups,
+          franchises et reprises.
         </p>
         {accessLine && (
           <p className="mt-2 text-xs font-bold uppercase tracking-widest text-emerald-300">
@@ -58,29 +59,39 @@ export default function VentureAssetsModule({
         )}
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard label="Chiffre d'affaires" value={`${money.format(n(totals.total_revenue))} EUR`} />
-        <MetricCard label="Charges" value={`${money.format(n(totals.total_charges))} EUR`} />
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="Resultat"
+          label="Chiffre d'affaires"
+          value={`${money.format(n(totals.total_revenue))} EUR`}
+        />
+        <MetricCard
+          label="Charges"
+          value={`${money.format(n(totals.total_charges))} EUR`}
+        />
+        <MetricCard
+          label="Performance"
           value={`${n(totals.total_result) >= 0 ? "+" : ""}${money.format(n(totals.total_result))} EUR`}
           tone={n(totals.total_result) >= 0 ? "success" : "danger"}
         />
-        <MetricCard label="Levees - dettes" value={`${money.format(n(totals.total_fundraising) - n(totals.total_debts))} EUR`} />
-        <MetricCard label="Valorisation / final" value={`${money.format(n(totals.total_final_value))} EUR`} tone="primary" />
+        <MetricCard
+          label="Valeur suivie"
+          value={`${money.format(n(totals.total_final_value))} EUR`}
+          tone="primary"
+        />
       </div>
 
       <div className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-widest text-amber-200">
-              Rachat d&apos;entreprise
+              Reprise d'entreprise
             </p>
             <h3 className="mt-1 text-lg font-bold text-white">
-              Reprise et fonds de commerce
+              Rachat et fonds de commerce
             </h3>
             <p className="mt-1 text-sm text-gray-400">
-              Ces volets restent rattaches a la rubrique Business pour conserver une lecture simple.
+              Ces volets restent rattaches au portefeuille Business pour
+              conserver une lecture investisseur simple.
             </p>
           </div>
           {onAdd && canAddAsset && (
@@ -96,16 +107,17 @@ export default function VentureAssetsModule({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {types.map((type) => {
           const rows = assets.filter((asset) => asset.asset_type === type.key);
-          const opportunity = opportunities.find(
-            (item) => item.key === type.key
-          );
+          const opportunity = opportunities.find((item) => item.key === type.key);
 
           return (
-            <div key={type.key} className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-3 mb-4">
+            <div
+              key={type.key}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="font-bold">{type.label}</h3>
                 {onAdd && canAddAsset && (
                   <ActionButton onClick={() => onAdd(type.key)} icon="+">
@@ -115,15 +127,19 @@ export default function VentureAssetsModule({
               </div>
 
               <div className="space-y-3">
-                <OpportunityInsightCard opportunity={opportunity} />
+                <OpportunityInsightCard opportunity={opportunity} variant="compact" />
 
                 {rows.length === 0 ? (
                   <EmptyState
-                    title="Aucun business"
+                    title={
+                      canAddAsset
+                        ? "Aucun actif suivi"
+                        : `${type.label} en apercu limite`
+                    }
                     description={
                       canAddAsset
-                        ? "Ajoute une ligne pour suivre CA, charges, resultat et valorisation."
-                        : "La limite du plan actuel est atteinte pour les actifs business."
+                        ? "Ajoute une ligne pour suivre revenus, performance, dette et valeur."
+                        : "Disponible avec un niveau de lecture superieur. Le portefeuille reste visible sans creer de fausse donnee."
                     }
                     action={
                       onAdd && canAddAsset ? (
@@ -135,41 +151,69 @@ export default function VentureAssetsModule({
                   />
                 ) : (
                   rows.map((asset) => {
-                    const assetResultClass = n(asset.result) >= 0 ? "text-emerald-400" : "text-red-400";
+                    const assetResultClass =
+                      n(asset.result) >= 0 ? "text-emerald-400" : "text-red-400";
 
                     return (
-                      <article key={asset.id} className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <article
+                        key={asset.id}
+                        className="rounded-xl border border-white/10 bg-black/30 p-4"
+                      >
                         <div className="flex justify-between gap-3">
                           <div>
                             <h4 className="font-bold">{asset.name}</h4>
                             <p className="text-xs text-gray-400">
-                              CA {money.format(n(asset.revenue))} EUR - charges {money.format(n(asset.charges))} EUR
+                              {type.label} - revenus{" "}
+                              {money.format(n(asset.revenue))} EUR
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-gray-400">Final</p>
+                            <p className="text-xs text-gray-400">Valeur</p>
                             <p className="font-black text-[#3fa9f5]">
                               {money.format(n(asset.final_value))} EUR
                             </p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mt-3 text-sm">
-                          <p className={assetResultClass}>
-                            Resultat {n(asset.result) >= 0 ? "+" : ""}
-                            {money.format(n(asset.result))} EUR
-                          </p>
-                          <p>Levee {money.format(n(asset.fundraising))} EUR</p>
-                          <p>Dettes {money.format(n(asset.debts))} EUR</p>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                          <div>
+                            <p className="text-xs text-gray-500">Resultat</p>
+                            <p className={assetResultClass}>
+                              {n(asset.result) >= 0 ? "+" : ""}
+                              {money.format(n(asset.result))} EUR
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Charges</p>
+                            <p>{money.format(n(asset.charges))} EUR</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Dette</p>
+                            <p>{money.format(n(asset.debts))} EUR</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Financement</p>
+                            <p>{money.format(n(asset.fundraising))} EUR</p>
+                          </div>
                         </div>
+
                         {(onUpdate || onDelete) && (
-                          <div className="flex justify-end gap-2 mt-4">
+                          <div className="mt-4 flex justify-end gap-2">
                             {onUpdate && (
-                              <ActionButton onClick={() => onUpdate(asset)} variant="secondary" className="px-3 py-1.5 text-xs">
+                              <ActionButton
+                                onClick={() => onUpdate(asset)}
+                                variant="secondary"
+                                className="px-3 py-1.5 text-xs"
+                              >
                                 Modifier
                               </ActionButton>
                             )}
                             {onDelete && (
-                              <ActionButton onClick={() => onDelete(asset.id)} variant="danger" className="px-3 py-1.5 text-xs">
+                              <ActionButton
+                                onClick={() => onDelete(asset.id)}
+                                variant="danger"
+                                className="px-3 py-1.5 text-xs"
+                              >
                                 Supprimer
                               </ActionButton>
                             )}
