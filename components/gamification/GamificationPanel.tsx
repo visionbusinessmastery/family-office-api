@@ -314,15 +314,15 @@ export default function GamificationPanel({
 
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
         <h3 className="text-lg font-semibold text-white">Badges obtenus</h3>
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {earnedBadges.length > 0 ? (
             earnedBadges.map((badge) => (
-              <div key={badge.key} className="min-w-[240px]">
+              <div key={badge.key}>
                 <BadgeMedal badge={badge} unlocked />
               </div>
             ))
           ) : (
-            <p className="min-w-[240px] rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">
+            <p className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">
               Aucun badge obtenu pour le moment.
             </p>
           )}
@@ -331,9 +331,9 @@ export default function GamificationPanel({
 
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
         <h3 className="text-lg font-semibold text-white">Badges a debloquer</h3>
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {lockedBadges.map((badge) => (
-            <div key={badge.key} className="min-w-[240px]">
+            <div key={badge.key}>
               <BadgeMedal badge={badge} unlocked={false} />
             </div>
           ))}

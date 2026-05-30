@@ -7,13 +7,14 @@ import { ActionButton, EmptyState, TextField, WealthModal } from "@/components/u
 
 type ChildAccountsPanelProps = {
   enabled?: boolean;
+  onUpgrade?: (plan: string) => void;
 };
 
 const money = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 0,
 });
 
-export default function ChildAccountsPanel({ enabled }: ChildAccountsPanelProps) {
+export default function ChildAccountsPanel({ enabled, onUpgrade }: ChildAccountsPanelProps) {
   const [data, setData] = useState<ChildAccountsData | null>(null);
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState({
@@ -48,11 +49,20 @@ export default function ChildAccountsPanel({ enabled }: ChildAccountsPanelProps)
   if (!enabled) {
     return (
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-        <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">Liberty+</p>
-        <h3 className="mt-2 text-xl font-black text-white">Comptes enfants</h3>
-        <p className="mt-2 text-sm text-gray-400">
-          Portefeuille enfant, objectifs education et transmission deviennent disponibles a partir de Liberty.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">Liberty+</p>
+            <h3 className="mt-2 text-xl font-black text-white">Comptes enfants</h3>
+            <p className="mt-2 text-sm text-gray-400">
+              Portefeuille enfant, objectifs education et transmission deviennent disponibles a partir de Liberty.
+            </p>
+          </div>
+          {onUpgrade && (
+            <ActionButton onClick={() => onUpgrade("liberty")}>
+              Passer a Liberty
+            </ActionButton>
+          )}
+        </div>
       </section>
     );
   }

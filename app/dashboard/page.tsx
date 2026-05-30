@@ -508,6 +508,8 @@ export default function Dashboard() {
   );
   const currentPlan = product?.plan || dashboard?.plan;
   const eliteChartsEnabled = planAllows(currentPlan, "ELITE");
+  const legacyNavigationEnabled = planAllows(currentPlan, "LIBERTY");
+  const progressionMissions = product?.missions || [];
   const hasModule = (key: string) =>
     visibleModules.has(key);
   const maxAssets = product?.entitlements?.max_assets;
@@ -558,11 +560,15 @@ export default function Dashboard() {
       label: "Business",
       description: "Ventures",
     },
-    {
-      key: "legacy",
-      label: "Legacy",
-      description: "Transmission",
-    },
+    ...(legacyNavigationEnabled
+      ? [
+          {
+            key: "legacy" as const,
+            label: "Legacy",
+            description: "Transmission",
+          },
+        ]
+      : []),
     {
       key: "progression",
       label: "Progression",
@@ -1651,7 +1657,10 @@ export default function Dashboard() {
                 <FinanceBlock title="Dettes" type="dettes" data={finance.dettes} onCreate={handleAddFinance} onDelete={handleDeleteFinance} onUpdate={handleUpdateFinance} />
               </section>
 
-              <ChildAccountsPanel enabled={hasModule("child_accounts")} />
+              <ChildAccountsPanel
+                enabled={hasModule("child_accounts")}
+                onUpgrade={handleUpgradePlan}
+              />
             </div>
           )}
 
@@ -1815,78 +1824,6 @@ export default function Dashboard() {
               />
 
               <OpportunitiesModule commandCenter={commandCenter} />
-
-              <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-                <div className="mb-4">
-                  <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-                    Signaux supplementaires
-                  </p>
-                  <h2 className="mt-1 text-2xl font-bold">Lecture par rubrique</h2>
-                  <p className="mt-2 text-sm text-gray-400">
-                    Ces signaux reprennent les champs fournis par le backend:
-                    analyse, opportunite detectee, signal marche et action rapide.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {categoryOpportunityItems.length > 0 ? (
-                    categoryOpportunityItems.map((item) => (
-                      <article
-                        key={item.key || item.title}
-                        className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
-                      >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-widest text-gray-500">
-                              {item.key || "signal"}
-                            </p>
-                            <h3 className="mt-1 text-lg font-bold text-white">
-                              {item.title || item.detected_opportunity?.title || "Signal disponible"}
-                            </h3>
-                            <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                              {item.analysis ||
-                                item.market_signal?.headline ||
-                                "Signal backend disponible, sans analyse detaillee pour le moment."}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-[#3fa9f5]/20 bg-[#3fa9f5]/10 px-3 py-2 text-sm text-[#bfe8ff] lg:max-w-xs">
-                            {item.quick_action ||
-                              item.detected_opportunity?.potential ||
-                              "Consulter la rubrique associee pour l'action suivante."}
-                          </div>
-                        </div>
-
-                        {(item.detected_opportunity || item.market_signal) && (
-                          <div className="mt-4 grid grid-cols-1 gap-2 text-xs md:grid-cols-3">
-                            {item.detected_opportunity?.type && (
-                              <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-                                <p className="text-gray-500">Type</p>
-                                <p className="mt-1 font-bold text-white">{item.detected_opportunity.type}</p>
-                              </div>
-                            )}
-                            {item.detected_opportunity?.risk && (
-                              <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-                                <p className="text-gray-500">Risque</p>
-                                <p className="mt-1 font-bold text-white">{item.detected_opportunity.risk}</p>
-                              </div>
-                            )}
-                            {item.market_signal?.sentiment && (
-                              <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-                                <p className="text-gray-500">Marche</p>
-                                <p className="mt-1 font-bold text-white">{item.market_signal.sentiment}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </article>
-                    ))
-                  ) : (
-                    <p className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">
-                      Aucun signal supplementaire renvoye par le backend pour le moment.
-                    </p>
-                  )}
-                </div>
-              </section>
             </div>
           )}
 
@@ -1924,41 +1861,72 @@ export default function Dashboard() {
                 </p>
                 <h2 className="mt-2 text-2xl font-bold">Defis, badges et recompenses</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Suivi direct dans l&apos;onglet Progression. Les validations restent gerees par le backend.
+                  Comprends pourquoi chaque mission compte, ce qu&apos;elle debloque et comment elle ameliore ton cockpit.
                 </p>
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                  {(product?.missions || []).map((mission) => (
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-xs text-gray-500">XP</p>
+                    <p className="mt-1 text-xl font-black text-white">
+                      {product?.progression?.xp || gamification?.xp || 0}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-xs text-gray-500">Niveau</p>
+                    <p className="mt-1 text-xl font-black text-white">
+                      {product?.progression?.level || "Builder"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-xs text-gray-500">Progression</p>
+                    <p className="mt-1 text-xl font-black text-[#3fa9f5]">
+                      {product?.progression?.progress_percent || gamification?.progress_percent || 0}%
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-xs text-gray-500">Missions</p>
+                    <p className="mt-1 text-xl font-black text-white">
+                      {progressionMissions.length}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  {progressionMissions.map((mission) => (
                     <article
                       key={mission.key}
-                      className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
+                      className="rounded-2xl border border-white/10 bg-black/45 p-5 shadow-2xl transition hover:-translate-y-0.5 hover:border-[#3fa9f5]/40"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-bold text-white">{mission.title}</h3>
-                        <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase text-gray-400">
-                          {mission.status || (mission.completed ? "completed" : "pending")}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                      <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+                        {mission.module || "WHITE ROCK"}
+                      </p>
+                      <h3 className="mt-2 text-xl font-black text-white">{mission.title}</h3>
+                      <p className="mt-3 text-sm leading-relaxed text-gray-300">
                         {mission.description}
                       </p>
                       {mission.context_reason && (
-                        <p className="mt-3 text-xs leading-relaxed text-[#8bd0ff]">
-                          {mission.context_reason}
+                        <p className="mt-3 rounded-xl border border-[#3fa9f5]/20 bg-[#3fa9f5]/10 p-3 text-xs leading-relaxed text-[#bfe8ff]">
+                          Pourquoi maintenant: {mission.context_reason}
                         </p>
                       )}
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-emerald-300">
-                          {mission.xp ? `+${mission.xp} XP` : "Progression"}
-                        </span>
-                        {mission.recommended_plan && (
-                          <span className="text-xs text-[#3fa9f5]">
-                            {mission.recommended_plan}
-                          </span>
-                        )}
+                      <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                        <p className="text-xs uppercase tracking-widest text-emerald-200">
+                          Recompense
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-white">
+                          +{mission.xp || 80} XP - meilleur contexte backend
+                        </p>
                       </div>
+                      <p className="mt-4 text-xs leading-relaxed text-gray-500">
+                        Impact: modules mieux priorises, contexte plus fiable et opportunites plus adaptees.
+                      </p>
+                      {mission.status && (
+                        <span className="mt-4 inline-flex rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase text-gray-400">
+                          {mission.status}
+                        </span>
+                      )}
                     </article>
                   ))}
-                  {(product?.missions || []).length === 0 && (
+                  {progressionMissions.length === 0 && (
                     <p className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">
                       Aucune mission supplementaire renvoyee par le backend pour le moment.
                     </p>
@@ -1968,7 +1936,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeSection === "legacy" && (
+          {activeSection === "legacy" && legacyNavigationEnabled && (
             <div className="space-y-6">
               <SectionHeader
                 eyebrow="Legacy"

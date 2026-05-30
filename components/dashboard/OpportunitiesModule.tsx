@@ -36,7 +36,6 @@ export default function OpportunitiesModule({
 }: OpportunitiesModuleProps) {
   const [selectedOpportunity, setSelectedOpportunity] =
     useState<Opportunity | null>(null);
-  const [showRest, setShowRest] = useState(false);
   const opportunities = normalizeOpportunities(commandCenter?.opportunities);
   const detectedCount =
     typeof commandCenter?.opportunities_count === "number"
@@ -153,28 +152,17 @@ export default function OpportunitiesModule({
 
           {restOpportunities.length > 0 && (
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                    Signaux supplementaires
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRest((value) => !value)}
-                  className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white hover:border-[#3fa9f5]/40"
-                >
-                  {showRest ? "Masquer" : "Afficher"}
-                </button>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                  Signaux supplementaires
+                </p>
               </div>
 
-              {showRest && (
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {restOpportunities.map((opportunity, index) =>
-                    renderOpportunityCard(opportunity, index + 3)
-                  )}
-                </div>
-              )}
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {restOpportunities.map((opportunity, index) =>
+                  renderOpportunityCard(opportunity, index + 3)
+                )}
+              </div>
             </div>
           )}
         </div>

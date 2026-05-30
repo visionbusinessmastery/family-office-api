@@ -20,7 +20,7 @@ const initialMessages: ChatMessage[] = [];
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED_MESSAGES = 40;
-const CONVERSATION_CACHE_VERSION = "v18-freeze-pipeline";
+const CONVERSATION_CACHE_VERSION = "v19-contextual-renderer";
 const LEGACY_RESPONSE_PATTERNS = [
   "ton score est",
   "score 39/100",

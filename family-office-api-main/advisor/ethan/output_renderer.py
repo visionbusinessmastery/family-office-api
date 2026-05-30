@@ -20,6 +20,14 @@ LEGACY_CONTENT_PATTERNS = [
     "capacite mensuelle disponible",
 ]
 
+BANNED_RENDERER_TAILS = [
+    "Garde ce filtre simple.",
+    "La suite doit rester legere.",
+    "Ferme une option avant d'en ouvrir une autre.",
+    "Moins d'options, plus de nettete.",
+    "La discipline ici est de ne pas surconstruire.",
+]
+
 ETHAN_TEXT_ORIGIN = "ethan_output_renderer"
 
 
@@ -50,10 +58,7 @@ def _looks_legacy_or_structured(text) -> bool:
     normalized = _normalize(text)
     if any(_normalize(pattern) in normalized for pattern in LEGACY_CONTENT_PATTERNS):
         return True
-    return any(
-        re.search(pattern, normalized, flags=re.IGNORECASE | re.MULTILINE)
-        for pattern in VISIBLE_STRUCTURE_PATTERNS
-    )
+    return False
 
 
 def _strip_visible_labels(text):
@@ -87,13 +92,50 @@ def _context_phrase(context):
     return "avec le contexte disponible"
 
 
+def _message_has(message, words):
+    normalized = _normalize(message)
+    return any(_normalize(word) in normalized for word in words)
+
+
+def _profile(context, message):
+    life_context = context.get("life_context") if isinstance(context, dict) else {}
+    life_context = life_context if isinstance(life_context, dict) else {}
+    businesses = life_context.get("businesses") or []
+
+    return {
+        "time_limited": bool(life_context.get("time_constraint")) or _message_has(
+            message, ["peu de temps", "pas le temps", "temps limite", "charge mentale"]
+        ),
+        "has_children": bool(life_context.get("has_children") or life_context.get("family_constraint"))
+        or _message_has(message, ["enfant", "enfants", "famille"]),
+        "marketing": bool(life_context.get("expertise")) or _message_has(
+            message, ["marketing", "communication", "commerce", "acquisition", "contenu"]
+        ),
+        "employee": _message_has(message, ["salarie", "cdi", "emploi", "2000"]),
+        "business": bool(life_context.get("business_context") or businesses) or _message_has(
+            message, ["entreprise", "business", "activite", "freelance", "individuelle"]
+        ),
+    }
+
+
+def _clean_human_text(text):
+    cleaned = _strip_visible_labels(text)
+    for tail in BANNED_RENDERER_TAILS:
+        cleaned = cleaned.replace(tail, "").strip()
+
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > 950:
+        cleaned = cleaned[:947].rstrip() + "..."
+    return cleaned
+
+
 def _raw_signal(response_data):
     if not isinstance(response_data, dict):
         return ""
     raw = response_data.get("raw_llm_output") or response_data.get("raw_signal") or ""
     if _looks_legacy_or_structured(raw):
         return ""
-    return _strip_visible_labels(raw)
+    return _clean_human_text(raw)
 
 
 def _sentence_from_signal(signal):
@@ -103,6 +145,81 @@ def _sentence_from_signal(signal):
     if len(sentence) > 260:
         sentence = sentence[:257].rstrip() + "..."
     return sentence
+
+
+def _fallback_from_context(message, context, response_strategy):
+    profile = _profile(context or {}, message)
+    intent = (response_strategy or {}).get("primary_intent") or ""
+    normalized_message = _normalize(message)
+
+    if profile["marketing"] and profile["time_limited"] and profile["has_children"]:
+        if "utiliser" in normalized_message or "entreprise" in normalized_message:
+            return (
+                "Ton entreprise marketing peut devenir un levier si tu la rends plus productisee. "
+                "Je ne chercherais pas a vendre plus de prestations sur mesure: je construirais une offre standardisee, livrable vite, "
+                "comme un diagnostic acquisition + plan d'action IA pour dirigeants de petites entreprises. "
+                "La prochaine etape utile est de choisir une seule cible et d'ecrire une promesse assez precise pour etre envoyee en message direct."
+            )
+        if "revenu" in normalized_message or intent == "increase_income":
+            return (
+                "Vu ton temps limite et ton activite marketing, le meilleur levier n'est pas d'ajouter plus de travail: "
+                "c'est de packager une offre courte, vendable et recurrente. Je partirais sur un audit marketing/IA simple, "
+                "avec une promesse claire, un prix fixe et une option d'accompagnement mensuel leger. Cette semaine, ne cherche pas dix idees: "
+                "ecris l'offre en une page et propose-la a trois contacts deja accessibles."
+            )
+        if "semaine" in normalized_message or "meilleure action" in normalized_message:
+            return (
+                "Cette semaine, je ferais une action commerciale minuscule mais concrete: reprendre ton expertise marketing et la transformer en une offre test. "
+                "Pas de tunnel, pas de site, pas de nouveau projet. Juste une phrase de promesse, un prix indicatif et trois personnes a qui l'envoyer. "
+                "Le but est de valider si ton savoir-faire peut generer du revenu sans consommer tes soirees."
+            )
+        if "investir" in normalized_message or "developper" in normalized_message:
+            return (
+                "Je privilegierais ton activite avant un nouvel investissement. Avec peu de temps et deux jeunes enfants, "
+                "le capital le plus sous-exploite est ton expertise marketing, pas une allocation plus complexe. "
+                "La bonne decision maintenant: creer une petite source de revenu recurrente a faible charge mentale, puis investir seulement l'excedent stable."
+            )
+        if "opportunite" in normalized_message or "profil" in normalized_message:
+            return (
+                "L'opportunite la plus coherente avec ton profil est une offre B2B courte autour de ton savoir-faire marketing, pas un projet digital lourd. "
+                "Tu as besoin d'un format qui se vend cher, se livre vite et peut devenir recurrent. "
+                "Je viserais une offre d'audit ou de pilotage mensuel leger pour PME locales qui veulent clarifier leur acquisition."
+            )
+        if "enfants" in normalized_message or "temps" in normalized_message:
+            return (
+                "Avec deux enfants en bas age, la strategie doit proteger ton energie. "
+                "Je chercherais une action qui cree du revenu sans ouvrir un chantier permanent: une offre courte, un rendez-vous qualifie, une proposition simple. "
+                "Ton indicateur n'est pas le nombre d'idees, c'est le nombre d'actions que tu peux vraiment terminer dans une semaine normale."
+            )
+        if "risque" in normalized_message:
+            return (
+                "Ton risque principal semble etre la dispersion: vouloir augmenter les revenus, investir et structurer le patrimoine en meme temps. "
+                "Avec une charge familiale forte, la priorite est de choisir un seul levier de revenu simple et mesurable. "
+                "Le bon test cette semaine: une offre, une cible, une action commerciale."
+            )
+        return (
+            "Ta priorite n'est pas de tout optimiser: c'est de trouver un levier de revenu compatible avec ta vraie vie. "
+            "Avec ton profil marketing et peu de temps disponible, je commencerais par transformer ton expertise en offre premium courte, "
+            "plutot qu'en nouveau projet lourd. Une action utile: definir une offre precise que tu peux vendre sans y passer tes soirees."
+        )
+
+    if intent == "increase_income" or "revenu" in normalized_message:
+        return (
+            "Le levier le plus propre est de partir de ce que tu sais deja vendre ou produire, puis de le rendre plus recurrent. "
+            "Cherche une offre simple, avec un resultat clair et un temps de livraison limite. L'objectif n'est pas plus d'activite, "
+            "mais plus de valeur par heure."
+        )
+
+    if "risque" in normalized_message:
+        return (
+            "Le risque a surveiller est la dispersion: trop de pistes ouvertes reduisent la qualite des decisions. "
+            "Garde une seule priorite visible cette semaine et mesure si elle ameliore vraiment ta marge de manoeuvre."
+        )
+
+    return (
+        "La prochaine decision doit reduire la complexite tout en creant un resultat visible. "
+        "Choisis l'action qui peut etre terminee cette semaine et qui rapproche le plus ton revenu, ton temps et ton patrimoine."
+    )
 
 
 def render_ethan_output(response_data, context=None, message=None, response_strategy=None, tier=None):
@@ -119,7 +236,7 @@ def render_ethan_output(response_data, context=None, message=None, response_stra
     counter = strategy.get("diversity_counter") or 0
     status = response_data.get("status") if isinstance(response_data, dict) else "empty"
     phrase = _context_phrase(context)
-    signal = _sentence_from_signal(_raw_signal(response_data))
+    signal = _raw_signal(response_data)
     premium = tier not in ["ESSENTIALS", "FREE", "BASIC", None]
     entry_mode = {
         "human_context": "observation_first",
@@ -133,60 +250,15 @@ def render_ethan_output(response_data, context=None, message=None, response_stra
     transition = "direct"
 
     if signal and status != "empty":
-        variants = {
-            "insight_first": [
-                f"{signal} Ce qui compte ici, {phrase}, c'est de ne garder qu'une avancee vraiment executable.",
-                f"{phrase.capitalize()}, je retiendrais surtout ceci: {signal} Le reste peut attendre.",
-            ],
-            "action_first": [
-                f"Garde une seule avancee concrete cette semaine. {signal}",
-                f"Commence par le geste le plus simple a terminer, puis utilise ce signal: {signal}",
-            ],
-            "risk_first": [
-                f"Le risque serait de transformer ca en plan trop lourd. {signal}",
-                f"Attention a la surcharge de decision: {signal}",
-            ],
-            "question_first": [
-                f"La bonne question est: qu'est-ce qui devient plus simple apres cette decision ? {signal}",
-                f"Avant d'ajouter une option, demande-toi ce que ce signal allege vraiment: {signal}",
-            ],
-            "observation_first": [
-                f"{phrase.capitalize()}, ce signal merite surtout d'etre simplifie: {signal}",
-                f"Ce que j'observe ici est assez net: {signal}",
-            ],
-        }
-        if premium and density == "dense":
-            variants.setdefault(entry_mode, []).append(
-                f"{signal} Je le lirais comme un arbitrage de charge mentale: avance sur ce qui cree de la clarte sans consommer plus d'energie."
-            )
-    else:
-        variants = {
-            "insight_first": [
-                f"Le point utile ici, {phrase}, c'est de ne pas transformer la question en plan trop lourd.",
-                f"Je prefere rester sobre: {phrase}, la bonne suite n'est pas d'ajouter plus d'analyse.",
-            ],
-            "action_first": [
-                f"Choisis une avancee tres simple et executable cette semaine, {phrase}.",
-                f"Avance sur une action que tu peux terminer vite, puis reviens au reste apres.",
-            ],
-            "risk_first": [
-                f"Le piege serait d'ouvrir trop de fronts en meme temps. {phrase.capitalize()}, reduis d'abord la charge de decision.",
-                f"Ce qui merite attention, c'est la complexite ajoutee. Garde la prochaine etape courte et verifiable.",
-            ],
-            "question_first": [
-                f"Quelle decision rend la suite plus legere ? {phrase.capitalize()}, c'est le bon filtre maintenant.",
-                f"Demande-toi ce qui peut etre termine avant la fin de semaine, sans ouvrir un nouveau chantier.",
-            ],
-            "observation_first": [
-                f"{phrase.capitalize()}, le mouvement le plus propre est une avancee courte, visible et facile a verifier.",
-                f"Ce que j'observe ici: il vaut mieux reduire la charge de decision que chercher une analyse parfaite.",
-            ],
-        }
-        if premium and density == "dense":
-            variants.setdefault(entry_mode, []).append(
-                f"Il y a probablement un arbitrage a garder simple: {phrase}, la meilleure decision est celle qui cree de la clarte sans consommer plus d'energie."
-            )
+        return signal
 
+    variants = {
+        "insight_first": [_fallback_from_context(message, context, strategy)],
+        "action_first": [_fallback_from_context(message, context, strategy)],
+        "risk_first": [_fallback_from_context(message, context, strategy)],
+        "question_first": [_fallback_from_context(message, context, strategy)],
+        "observation_first": [_fallback_from_context(message, context, strategy)],
+    }
     selected_variants = variants.get(entry_mode) or variants["observation_first"]
     index = _stable_index(
         {
@@ -202,16 +274,4 @@ def render_ethan_output(response_data, context=None, message=None, response_stra
         len(selected_variants),
     )
     rendered = selected_variants[index]
-
-    transition_tail = {
-        "direct": "Garde ce filtre simple.",
-        "soft_pivot": "La suite doit rester legere.",
-        "contrast": "Ferme une option avant d'en ouvrir une autre.",
-        "compression": "Moins d'options, plus de nettete.",
-        "quiet_challenge": "La discipline ici est de ne pas surconstruire.",
-    }.get(transition)
-
-    if transition_tail and density == "medium":
-        return f"{rendered} {transition_tail}"
-
-    return rendered
+    return _clean_human_text(rendered)
