@@ -8,7 +8,7 @@ from sqlalchemy import text
 from auth.utils import get_current_user
 from core.cache import delete_cache_keys, delete_cache_patterns
 from database import engine
-from product.entitlements import normalize_plan, resolve_effective_plan
+from product.entitlements import build_entitlements, normalize_plan, resolve_effective_plan
 from security.audit import ensure_security_tables, log_security_event
 from analytics.analytics_events import SUBSCRIPTION_UPGRADED, FOUNDER_UPGRADE
 from analytics.posthog_service import capture_event
@@ -27,27 +27,27 @@ PLANS = {
     "free": {
         "name": "Free - Foundation",
         "price_env": None,
-        "description": "Fondations financieres, progression et guidance simple.",
+        "description": "Decouverte: Wealth Snapshot, prochain palier, Future Intelligence reduite et Ethan limite.",
     },
     "gold": {
         "name": "Gold - Growth",
         "price_env": "STRIPE_PRICE_GOLD",
-        "description": "Croissance patrimoniale, analytics, immobilier, opportunites et guidance avancee.",
+        "description": "Pilotage actif: Ethan flottant, Future Intelligence, Wealth Narrative et opportunites avancees.",
     },
     "elite": {
         "name": "Elite - Wealth OS",
         "price_env": "STRIPE_PRICE_ELITE",
-        "description": "Family Office OS, multi-user, gouvernance, guidance premium et consolidation.",
+        "description": "Wealth OS: Strategic Intelligence, scorecard, stress tests, dependances et simulations.",
     },
     "liberty": {
         "name": "Liberty - Financial Freedom",
         "price_env": "STRIPE_PRICE_LIBERTY",
-        "description": "Liberte financiere, ecosysteme Wealth OS complet, guidance premium et pilotage avance.",
+        "description": "Family Office personnel: comptes enfants, transmission, scenarios avances et mode Family Office.",
     },
     "legacy": {
         "name": "Legacy - Dynasty Office",
         "price_env": "STRIPE_PRICE_LEGACY",
-        "description": "Transmission, gouvernance familiale, protection patrimoniale et strategie multi-generationnelle.",
+        "description": "Dynasty Office: gouvernance familiale, protection, vault, heritiers et strategie generationnelle.",
     },
 }
 
@@ -304,6 +304,7 @@ def get_plans():
                 "id": plan_id,
                 "name": plan["name"],
                 "description": plan["description"],
+                "entitlements": build_entitlements(plan_id.upper()),
                 "configured": is_plan_configured(plan_id, plan),
                 "prices": {
                     interval: {
@@ -348,6 +349,7 @@ def billing_config():
             plan_id: {
                 "configured": is_plan_configured(plan_id, plan),
                 "price_env": plan["price_env"],
+                "entitlements": build_entitlements(plan_id.upper()),
                 "prices": {
                     interval: {
                         "configured": bool(
