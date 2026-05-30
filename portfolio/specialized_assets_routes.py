@@ -22,6 +22,7 @@ def invalidate_asset_caches(email: str, user_id: int):
         redis_client.delete(
             f"yield_assets:{user_id}",
             f"venture_assets:{user_id}",
+            f"business_intelligence:{user_id}",
             f"cmd_center:{user_id}",
             f"intel:{email}",
             f"context:{email}",
@@ -187,6 +188,93 @@ def build_venture_response(rows, access=None):
     }
 
 
+def build_business_intelligence(yield_rows, venture_rows, access=None):
+    yield_payload = build_yield_response(yield_rows)
+    venture_payload = build_venture_response(venture_rows, access)
+
+    yield_totals = yield_payload["totals"]
+    venture_totals = venture_payload["totals"]
+    venture_assets = venture_payload["assets"]
+    yield_assets = yield_payload["assets"]
+
+    revenue = float(venture_totals.get("total_revenue") or 0)
+    charges = float(venture_totals.get("total_charges") or 0)
+    result = float(venture_totals.get("total_result") or 0)
+    debts = float(venture_totals.get("total_debts") or 0)
+    valuation = float(venture_totals.get("total_final_value") or 0)
+    private_capital = float(yield_totals.get("total_principal") or 0)
+    projected_gain = float(yield_totals.get("total_projected_gain") or 0)
+    total_business_value = valuation + float(yield_totals.get("total_final_value") or 0)
+    total_assets = len(venture_assets) + len(yield_assets)
+
+    if total_assets == 0:
+        narrative = {
+            "title": "Business a structurer",
+            "text": "Aucun actif business n'est encore suivi. La priorite est de creer une premiere ligne claire avant d'analyser des opportunites.",
+            "emphasis": "Commencer simple: une activite, une valeur, une prochaine action.",
+        }
+        decision = {
+            "title": "Ajouter le premier actif business",
+            "description": "Renseigne une activite, une startup ou un investissement prive pour donner une base fiable au pilotage.",
+            "timeframe": "Cette semaine",
+            "impact": "Donne a White Rock une lecture business exploitable.",
+        }
+    elif result <= 0 and revenue > 0:
+        narrative = {
+            "title": "Marge a clarifier",
+            "text": "Le portefeuille business genere du revenu, mais les charges absorbent encore la creation de valeur.",
+            "emphasis": "Le prochain levier est la performance operationnelle, pas l'ajout de complexite.",
+        }
+        decision = {
+            "title": "Identifier l'actif a meilleure marge",
+            "description": "Isole le business ou la ligne la plus rentable et concentre l'effort sur son amelioration.",
+            "timeframe": "7 jours",
+            "impact": "Ameliore la qualite du pilotage et la lecture investisseur.",
+        }
+    elif debts > max(result * 12, 1) and debts > 0:
+        narrative = {
+            "title": "Dette a surveiller",
+            "text": "La valeur business existe, mais la dette pese dans la lecture globale du portefeuille.",
+            "emphasis": "La solidite doit passer avant l'expansion.",
+        }
+        decision = {
+            "title": "Stabiliser la dette business",
+            "description": "Verifie quelle dette est prioritaire et quel actif la justifie reellement.",
+            "timeframe": "30 jours",
+            "impact": "Reduit le risque et clarifie la valeur nette business.",
+        }
+    else:
+        narrative = {
+            "title": "Capital business actif",
+            "text": "Ton portefeuille business commence a fonctionner comme un moteur patrimonial distinct des actifs financiers classiques.",
+            "emphasis": "Le sujet principal devient la priorisation: renforcer ce qui cree le plus de valeur.",
+        }
+        decision = {
+            "title": "Renforcer l'actif business prioritaire",
+            "description": "Choisis l'actif avec le meilleur rapport resultat, temps et potentiel, puis definis une action mesurable.",
+            "timeframe": "30 jours",
+            "impact": "Transforme la rubrique Business en vrai levier de creation patrimoniale.",
+        }
+
+    return {
+        "version": "business-intelligence-v1",
+        "access": access,
+        "metrics": {
+            "revenue": round(revenue, 2),
+            "charges": round(charges, 2),
+            "result": round(result, 2),
+            "debts": round(debts, 2),
+            "valuation": round(valuation, 2),
+            "private_capital": round(private_capital, 2),
+            "projected_gain": round(projected_gain, 2),
+            "total_business_value": round(total_business_value, 2),
+            "assets_count": total_assets,
+        },
+        "narrative": narrative,
+        "decision": decision,
+    }
+
+
 @router.get("/yield-assets/")
 @router.get("/yield-assets")
 def get_yield_assets(user=Depends(get_current_user)):
@@ -201,6 +289,30 @@ def get_yield_assets(user=Depends(get_current_user)):
         """), {"user_id": user_id}).fetchall()
 
     return build_yield_response(rows)
+
+
+@router.get("/business-intelligence/")
+@router.get("/business-intelligence")
+def get_business_intelligence(user=Depends(get_current_user)):
+    with engine.begin() as conn:
+        user_id = require_user_id(conn, user)
+        ensure_yield_table(conn)
+        ensure_venture_table(conn)
+        yield_rows = conn.execute(text("""
+            SELECT *
+            FROM yield_assets
+            WHERE user_id = :user_id
+            ORDER BY created_at DESC, id DESC
+        """), {"user_id": user_id}).fetchall()
+        venture_rows = conn.execute(text("""
+            SELECT *
+            FROM venture_assets
+            WHERE user_id = :user_id
+            ORDER BY created_at DESC, id DESC
+        """), {"user_id": user_id}).fetchall()
+        access = build_asset_access(conn, user_id, "business", "venture_assets")
+
+    return build_business_intelligence(yield_rows, venture_rows, access)
 
 
 @router.post("/yield-assets/")
