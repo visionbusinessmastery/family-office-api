@@ -48,6 +48,7 @@ import type {
 
 import Header from "@/components/dashboard/Header";
 import AdvisorChat from "@/components/dashboard/AdvisorChat";
+import BalanceSheetModule from "@/components/dashboard/BalanceSheetModule";
 import FinanceModule from "@/components/dashboard/FinanceModule";
 import LegacyOfficePanel from "@/components/dashboard/LegacyOfficePanel";
 import OpportunityDiscoveryPanel from "@/components/dashboard/OpportunityDiscoveryPanel";
@@ -127,6 +128,7 @@ type DashboardSection =
   | "home"
   | "opportunities"
   | "finances"
+  | "balance_sheet"
   | "investments"
   | "real_estate"
   | "ventures"
@@ -1100,8 +1102,13 @@ export default function Dashboard() {
     },
     {
       key: "finances",
-      label: "Finances",
+      label: "Cashflow",
       description: "Cashflow",
+    },
+    {
+      key: "balance_sheet",
+      label: "Bilan",
+      description: "Long terme",
     },
     {
       key: "investments",
@@ -2189,9 +2196,9 @@ export default function Dashboard() {
           {activeSection === "finances" && (
             <div className="space-y-6">
               <SectionHeader
-                eyebrow="Finances"
-                title="Donnees financieres"
-                description="Revenus, charges, epargne et dettes. Cette page sert a tenir les donnees financieres a jour."
+                eyebrow="Cashflow"
+                title="Finances court terme"
+                description="Revenus, charges, reste a vivre et marge mensuelle. Cette page suit uniquement les flux du mois."
               />
 
               <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
@@ -2215,6 +2222,23 @@ export default function Dashboard() {
               <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <FinanceBlock title="Revenus" type="revenus" data={finance.revenus} onCreate={handleAddFinance} onDelete={handleDeleteFinance} onUpdate={handleUpdateFinance} />
                 <FinanceBlock title="Charges" type="charges" data={finance.charges} onCreate={handleAddFinance} onDelete={handleDeleteFinance} onUpdate={handleUpdateFinance} />
+              </section>
+            </div>
+          )}
+
+          {activeSection === "balance_sheet" && (
+            <div className="space-y-6">
+              <SectionHeader
+                eyebrow="Bilan"
+                title="Bilan Patrimonial"
+                description="Epargne, dettes, liquidite et engagements. Cette page suit les stocks financiers de long terme."
+              />
+
+              <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+                <BalanceSheetModule overview={financeOverview} />
+              </section>
+
+              <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <FinanceBlock title="Epargne" type="epargne" data={finance.epargne} onCreate={handleAddFinance} onDelete={handleDeleteFinance} onUpdate={handleUpdateFinance} />
                 <FinanceBlock title="Dettes" type="dettes" data={finance.dettes} onCreate={handleAddFinance} onDelete={handleDeleteFinance} onUpdate={handleUpdateFinance} />
               </section>

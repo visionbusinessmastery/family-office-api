@@ -36,7 +36,7 @@ export default function FinanceModule({ overview }: FinanceModuleProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-[#3fa9f5]/20 bg-[#3fa9f5]/10 p-5">
           <p className="mb-2 text-sm text-gray-400">Revenus suivis</p>
           <h3 className="text-2xl font-black text-[#3fa9f5]">
@@ -49,26 +49,6 @@ export default function FinanceModule({ overview }: FinanceModuleProps) {
           <h3 className="text-2xl font-black text-red-300">
             {money.format(n(totals.expenses))} EUR
           </h3>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5">
-          <p className="mb-2 text-sm text-gray-400">Patrimoine liquide</p>
-          <h3 className="text-2xl font-black text-emerald-300">
-            {money.format(n(totals.savings))} EUR
-          </h3>
-          <p className="mt-2 text-xs text-gray-400">
-            {n(ratios.liquid_months).toFixed(1)} mois de charges
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-5">
-          <p className="mb-2 text-sm text-gray-400">Dette totale</p>
-          <h3 className="text-2xl font-black text-amber-200">
-            {money.format(n(totals.debt))} EUR
-          </h3>
-          <p className="mt-2 text-xs text-gray-400">
-            Ratio dette / revenu {n(ratios.debt_to_income).toFixed(2)}x
-          </p>
         </div>
       </div>
 
