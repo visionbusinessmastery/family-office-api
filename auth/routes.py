@@ -203,6 +203,8 @@ def get_me(email: str = Depends(get_current_user)):
                 users.email,
                 users.plan AS user_plan,
                 users.profile_completed,
+                users.age,
+                users.situation_pro,
                 users.revenus_mensuels,
                 users.charges_mensuelles,
                 users.is_founder,
@@ -231,6 +233,8 @@ def get_me(email: str = Depends(get_current_user)):
                 user.subscription_status,
             ),
             "profile_completed": profile_completed,
+            "age": user.age,
+            "situation_pro": user.situation_pro,
             "revenus_mensuels": user.revenus_mensuels or 0,
             "charges_mensuelles": user.charges_mensuelles or 0,
             "is_founder": bool(user.is_founder),
@@ -378,11 +382,15 @@ def update_onboarding(data: dict, email: str = Depends(get_current_user)):
 
         conn.execute(text("""
             UPDATE users
-            SET revenus_mensuels = :revenus_mensuels,
-                charges_mensuelles = :charges_mensuelles
+            SET age = COALESCE(:age, age),
+                situation_pro = COALESCE(:situation_pro, situation_pro),
+                revenus_mensuels = COALESCE(:revenus_mensuels, revenus_mensuels),
+                charges_mensuelles = COALESCE(:charges_mensuelles, charges_mensuelles)
             WHERE email = :email
         """), {
             "email": email,
+            "age": data.get("age"),
+            "situation_pro": data.get("situation_pro"),
             "revenus_mensuels": data.get("revenus_mensuels"),
             "charges_mensuelles": data.get("charges_mensuelles")
         })

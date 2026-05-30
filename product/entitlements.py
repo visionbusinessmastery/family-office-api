@@ -40,12 +40,12 @@ PLAN_COPY = {
     "ELITE": {
         "name": "Wealth OS",
         "price": "79 EUR/mois",
-        "promise": "Tu pilotes decisions, stress tests et scorecard Family Office.",
+        "promise": "Tu optimises ta trajectoire avec le cockpit CEO, les simulations et les analyses avancees.",
     },
     "LIBERTY": {
         "name": "Liberty",
         "price": "149 EUR/mois",
-        "promise": "Tu actives la couche Family Office, enfants et transmission.",
+        "promise": "Tu actives les arbitrages Family Office, les objectifs avances et la transmission.",
     },
     "LEGACY": {
         "name": "Dynasty Office",
@@ -97,6 +97,8 @@ PLAN_ENTITLEMENTS = {
             "advanced_guidance",
             "future_intelligence",
             "wealth_narrative",
+            "strategic_intelligence",
+            "family_office_intelligence",
             "gamification",
         ],
         "features": [
@@ -111,8 +113,13 @@ PLAN_ENTITLEMENTS = {
             "category_opportunities",
             "future_intelligence_full",
             "wealth_narrative",
+            "hidden_wealth",
             "opportunity_radar",
             "projections",
+            "strategic_intelligence",
+            "family_office_scorecard",
+            "stress_tests",
+            "dependency_detector",
             "forex_full",
         ],
     },
@@ -182,6 +189,7 @@ PLAN_ENTITLEMENTS = {
             "bank_sync",
             "governance",
             "imports",
+            "family_office_ceo",
             "strategic_intelligence",
             "family_office_intelligence",
             "gamification",
@@ -201,6 +209,8 @@ PLAN_ENTITLEMENTS = {
             "wealth_blocks",
             "multi_scenario_simulations",
             "family_office_intelligence",
+            "family_office_ceo",
+            "advanced_wealth_narrative",
             "advanced_allocations",
             "governance",
             "automatic_imports",
@@ -231,6 +241,7 @@ PLAN_ENTITLEMENTS = {
             "legacy_planning",
             "child_accounts",
             "family_office_mode",
+            "family_office_board",
             "gamification",
         ],
         "features": [
@@ -247,8 +258,10 @@ PLAN_ENTITLEMENTS = {
             "legacy_planning",
             "child_accounts",
             "family_office_mode",
-            "advanced_wealth_narrative",
             "advanced_simulations",
+            "advanced_strategic_arbitrage",
+            "family_office_board",
+            "allocation_priorities",
             "multi_goals",
             "transmission",
             "forex_advanced_analytics",
@@ -433,17 +446,33 @@ MODULE_REGISTRY = [
         "key": "strategic_intelligence",
         "label": "Strategic Intelligence",
         "stage": 6,
-        "min_plan": "ELITE",
+        "min_plan": "GOLD",
         "min_score": 0,
-        "description": "Regrouper risque, opportunite, decision et levier principal.",
+        "description": "Regrouper risque, opportunite, decision et levier principal dans une lecture simple.",
     },
     {
         "key": "family_office_intelligence",
         "label": "Family Office Intelligence",
         "stage": 6,
+        "min_plan": "GOLD",
+        "min_score": 0,
+        "description": "Scorecard, stress tests simples et dependances consolidees.",
+    },
+    {
+        "key": "family_office_ceo",
+        "label": "Family Office CEO",
+        "stage": 6,
         "min_plan": "ELITE",
         "min_score": 0,
-        "description": "Scorecard, stress tests, dependances et signaux faibles consolides.",
+        "description": "Burn rate, marge mensuelle, runway et lecture operationnelle du patrimoine.",
+    },
+    {
+        "key": "family_office_board",
+        "label": "Family Office Board",
+        "stage": 8,
+        "min_plan": "LIBERTY",
+        "min_score": 0,
+        "description": "Analyser la trajectoire sous les angles CFO, investisseur, entrepreneur et famille.",
     },
     {
         "key": "multi_user",
@@ -552,9 +581,6 @@ def build_entitlements(plan: str):
 def can_access_module(plan: str, score: int, module: dict) -> bool:
     normalized = normalize_plan(plan)
     required = normalize_plan(module["min_plan"])
-
-    if plan_allows(normalized, "LIBERTY"):
-        return True
 
     return plan_allows(normalized, required) and score >= int(module.get("min_score", 0))
 

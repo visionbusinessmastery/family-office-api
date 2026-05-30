@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
 from auth.utils import get_current_user, get_user_id
+from core.cache import delete_cache_patterns
 from database import engine
 
 
@@ -177,5 +178,12 @@ def update_profile(data: dict, email: str = Depends(get_current_user)):
             "confidentiality_need": data.get("confidentiality_need"),
             "family_strategy": data.get("family_strategy"),
         })
+
+    delete_cache_patterns(
+        f"intel:{email}*",
+        f"context:{email}*",
+        f"product:{email}*",
+        f"advisor:{email}*",
+    )
 
     return {"status": "ok"}
