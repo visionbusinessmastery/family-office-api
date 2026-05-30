@@ -78,7 +78,7 @@ const plans: Plan[] = [
       },
       {
         label: "Ethan & Opportunites",
-        items: ["Ethan flottant Gold+", "Opportunites avancees", "Radar d'opportunites", "Emails hebdomadaires Ethan"],
+        items: ["Ethan flottant Gold+", "Reconciliation profil par confirmation", "Opportunites avancees", "Radar d'opportunites", "Emails hebdomadaires Ethan"],
       },
     ],
   },
@@ -118,7 +118,7 @@ const plans: Plan[] = [
       },
       {
         label: "Family Office Intelligence",
-        items: ["Scorecard multidimensionnelle", "Patrimoine cache", "Detecteur de dependances", "Graphiques par rubrique", "Multi-user Family Office"],
+        items: ["Scorecard multidimensionnelle", "Inbox patrimonial documents", "Patrimoine cache", "Detecteur de dependances", "Graphiques par rubrique", "Multi-user Family Office"],
       },
     ],
   },

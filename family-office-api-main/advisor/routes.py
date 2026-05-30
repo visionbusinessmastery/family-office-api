@@ -31,8 +31,124 @@ from .ethan.persistence_engine import (
 from .ethan_core import run_ethan_chat
 from analytics.analytics_events import AUTOPILOT_SIMULATION_USED, ETHAN_USED
 from analytics.posthog_service import capture_event
+from advisor.ethan.memory_engine import extract_context_signals
+from product.entitlements import plan_allows
+from profile.routes import ensure_profile_tables
 
 router = APIRouter()
+
+
+ALLOWED_PROFILE_UPDATE_FIELDS = {
+    "investor_profile",
+    "has_children",
+    "goals",
+    "horizon",
+    "risk_level",
+    "motivation",
+    "transmission_goal",
+    "family_strategy",
+}
+
+
+def ensure_ethan_action_tables(conn):
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS ethan_profile_update_proposals (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            field TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT NOT NULL,
+            source TEXT DEFAULT 'conversation',
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT NOW(),
+            resolved_at TIMESTAMP
+        )
+    """))
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS ethan_document_inbox (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            filename TEXT,
+            document_type TEXT,
+            extracted_data JSONB DEFAULT '{}'::jsonb,
+            proposed_updates JSONB DEFAULT '[]'::jsonb,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT NOW(),
+            resolved_at TIMESTAMP
+        )
+    """))
+
+
+def require_plan(plan: str, minimum: str, feature: str):
+    if not plan_allows(plan, minimum):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "feature_locked", "feature": feature, "required_plan": minimum},
+        )
+
+
+def _profile_value(row, field):
+    if not row:
+        return None
+    return getattr(row, field, None)
+
+
+def _normalize_profile_value(value):
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
+def _insert_profile_proposal(conn, user_id, field, old_value, new_value, source):
+    if field not in ALLOWED_PROFILE_UPDATE_FIELDS:
+        raise HTTPException(status_code=400, detail="Profile field not allowed")
+    if _normalize_profile_value(old_value) == _normalize_profile_value(new_value):
+        return None
+
+    existing = conn.execute(text("""
+        SELECT id, field, old_value, new_value, status, created_at
+        FROM ethan_profile_update_proposals
+        WHERE user_id = :user_id
+          AND field = :field
+          AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 1
+    """), {"user_id": user_id, "field": field}).fetchone()
+
+    if existing:
+        return {
+            "id": existing.id,
+            "field": existing.field,
+            "old_value": existing.old_value,
+            "new_value": existing.new_value,
+            "status": existing.status,
+            "created_at": str(existing.created_at),
+        }
+
+    row = conn.execute(text("""
+        INSERT INTO ethan_profile_update_proposals (
+            user_id, field, old_value, new_value, source
+        )
+        VALUES (
+            :user_id, :field, :old_value, :new_value, :source
+        )
+        RETURNING id, field, old_value, new_value, status, created_at
+    """), {
+        "user_id": user_id,
+        "field": field,
+        "old_value": None if old_value is None else str(old_value),
+        "new_value": str(new_value),
+        "source": source,
+    }).fetchone()
+
+    return {
+        "id": row.id,
+        "field": row.field,
+        "old_value": row.old_value,
+        "new_value": row.new_value,
+        "status": row.status,
+        "created_at": str(row.created_at),
+    }
 
 
 @router.post("/core")
@@ -129,6 +245,258 @@ def advisor_autopilot(request: Request, data: AdvisorRequest):
         }
 
     return safe_execute(_run, module_name="AUTOPILOT_ENGINE")
+
+
+@router.post("/profile-reconciliation/detect")
+@limiter.limit("20/minute")
+def detect_profile_reconciliation(request: Request, data: dict):
+    def _run():
+        user_email = request.state.user_email
+        source_text = inspect_advisor_prompt(str(data.get("source_text") or data.get("message") or ""))
+        proposals = []
+
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            ensure_profile_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "GOLD", "ethan_profile_reconciliation")
+
+            profile = conn.execute(text("""
+                SELECT investor_profile, has_children, goals, horizon, risk_level,
+                       motivation, transmission_goal, family_strategy
+                FROM user_wealth_profiles
+                WHERE user_id = :user_id
+            """), {"user_id": user_id}).fetchone()
+
+            signals = extract_context_signals(source_text)
+            if signals.get("professional_context"):
+                proposal = _insert_profile_proposal(
+                    conn,
+                    user_id,
+                    "investor_profile",
+                    _profile_value(profile, "investor_profile"),
+                    signals["professional_context"],
+                    "conversation",
+                )
+                if proposal:
+                    proposals.append(proposal)
+
+            if signals.get("family_constraint") and not bool(_profile_value(profile, "has_children")):
+                proposal = _insert_profile_proposal(
+                    conn,
+                    user_id,
+                    "has_children",
+                    _profile_value(profile, "has_children"),
+                    "true",
+                    "conversation",
+                )
+                if proposal:
+                    proposals.append(proposal)
+
+        return {"status": "ok", "proposals": proposals}
+
+    return safe_execute(_run, module_name="ETHAN_PROFILE_RECONCILIATION")
+
+
+@router.get("/profile-reconciliation")
+def list_profile_reconciliation(request: Request):
+    def _run():
+        user_email = request.state.user_email
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "GOLD", "ethan_profile_reconciliation")
+            rows = conn.execute(text("""
+                SELECT id, field, old_value, new_value, source, status, created_at
+                FROM ethan_profile_update_proposals
+                WHERE user_id = :user_id
+                  AND status = 'pending'
+                ORDER BY created_at DESC
+            """), {"user_id": user_id}).fetchall()
+
+        return {
+            "status": "ok",
+            "proposals": [
+                {
+                    "id": row.id,
+                    "field": row.field,
+                    "old_value": row.old_value,
+                    "new_value": row.new_value,
+                    "source": row.source,
+                    "status": row.status,
+                    "created_at": str(row.created_at),
+                }
+                for row in rows
+            ],
+        }
+
+    return safe_execute(_run, module_name="ETHAN_PROFILE_RECONCILIATION")
+
+
+@router.post("/profile-reconciliation/{proposal_id}/accept")
+def accept_profile_reconciliation(proposal_id: int, request: Request):
+    def _run():
+        user_email = request.state.user_email
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            ensure_profile_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "GOLD", "ethan_profile_reconciliation")
+
+            proposal = conn.execute(text("""
+                SELECT id, field, old_value, new_value, status
+                FROM ethan_profile_update_proposals
+                WHERE id = :proposal_id
+                  AND user_id = :user_id
+                  AND status = 'pending'
+            """), {"proposal_id": proposal_id, "user_id": user_id}).fetchone()
+
+            if not proposal:
+                raise HTTPException(status_code=404, detail="Proposal not found")
+            if proposal.field not in ALLOWED_PROFILE_UPDATE_FIELDS:
+                raise HTTPException(status_code=400, detail="Profile field not allowed")
+
+            if proposal.field == "has_children":
+                conn.execute(text("""
+                    INSERT INTO user_wealth_profiles (user_id, has_children, updated_at)
+                    VALUES (:user_id, :value, NOW())
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET has_children = EXCLUDED.has_children, updated_at = NOW()
+                """), {"user_id": user_id, "value": str(proposal.new_value).lower() in ["true", "1", "yes", "oui"]})
+            else:
+                conn.execute(text(f"""
+                    INSERT INTO user_wealth_profiles (user_id, {proposal.field}, updated_at)
+                    VALUES (:user_id, :value, NOW())
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET {proposal.field} = EXCLUDED.{proposal.field}, updated_at = NOW()
+                """), {"user_id": user_id, "value": proposal.new_value})
+
+            conn.execute(text("""
+                UPDATE ethan_profile_update_proposals
+                SET status = 'accepted', resolved_at = NOW()
+                WHERE id = :proposal_id AND user_id = :user_id
+            """), {"proposal_id": proposal_id, "user_id": user_id})
+
+        return {"status": "accepted", "proposal_id": proposal_id}
+
+    return safe_execute(_run, module_name="ETHAN_PROFILE_RECONCILIATION")
+
+
+@router.post("/profile-reconciliation/{proposal_id}/reject")
+def reject_profile_reconciliation(proposal_id: int, request: Request):
+    def _run():
+        user_email = request.state.user_email
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "GOLD", "ethan_profile_reconciliation")
+            conn.execute(text("""
+                UPDATE ethan_profile_update_proposals
+                SET status = 'rejected', resolved_at = NOW()
+                WHERE id = :proposal_id
+                  AND user_id = :user_id
+                  AND status = 'pending'
+            """), {"proposal_id": proposal_id, "user_id": user_id})
+        return {"status": "rejected", "proposal_id": proposal_id}
+
+    return safe_execute(_run, module_name="ETHAN_PROFILE_RECONCILIATION")
+
+
+@router.get("/document-inbox")
+def list_document_inbox(request: Request):
+    def _run():
+        user_email = request.state.user_email
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "ELITE", "patrimonial_document_inbox")
+            rows = conn.execute(text("""
+                SELECT id, filename, document_type, extracted_data, proposed_updates, status, created_at
+                FROM ethan_document_inbox
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 50
+            """), {"user_id": user_id}).fetchall()
+        return {
+            "status": "ok",
+            "documents": [
+                {
+                    "id": row.id,
+                    "filename": row.filename,
+                    "document_type": row.document_type,
+                    "extracted_data": row.extracted_data or {},
+                    "proposed_updates": row.proposed_updates or [],
+                    "status": row.status,
+                    "created_at": str(row.created_at),
+                }
+                for row in rows
+            ],
+        }
+
+    return safe_execute(_run, module_name="ETHAN_DOCUMENT_INBOX")
+
+
+@router.post("/document-inbox")
+@limiter.limit("10/minute")
+def create_document_inbox_item(request: Request, data: dict):
+    def _run():
+        user_email = request.state.user_email
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "ELITE", "patrimonial_document_inbox")
+            row = conn.execute(text("""
+                INSERT INTO ethan_document_inbox (
+                    user_id, filename, document_type, extracted_data, proposed_updates
+                )
+                VALUES (
+                    :user_id, :filename, :document_type,
+                    CAST(:extracted_data AS JSONB), CAST(:proposed_updates AS JSONB)
+                )
+                RETURNING id, filename, document_type, extracted_data, proposed_updates, status, created_at
+            """), {
+                "user_id": user_id,
+                "filename": str(data.get("filename") or "Document"),
+                "document_type": str(data.get("document_type") or "unknown"),
+                "extracted_data": __import__("json").dumps(data.get("extracted_data") or {}),
+                "proposed_updates": __import__("json").dumps(data.get("proposed_updates") or []),
+            }).fetchone()
+
+        return {
+            "status": "pending",
+            "document": {
+                "id": row.id,
+                "filename": row.filename,
+                "document_type": row.document_type,
+                "extracted_data": row.extracted_data or {},
+                "proposed_updates": row.proposed_updates or [],
+                "status": row.status,
+                "created_at": str(row.created_at),
+            },
+        }
+
+    return safe_execute(_run, module_name="ETHAN_DOCUMENT_INBOX")
+
+
+@router.post("/document-inbox/{document_id}/resolve")
+def resolve_document_inbox_item(document_id: int, request: Request, data: dict):
+    def _run():
+        user_email = request.state.user_email
+        next_status = "accepted" if bool(data.get("accept")) else "rejected"
+        with engine.begin() as conn:
+            ensure_ethan_action_tables(conn)
+            user_id, plan = get_user_plan(conn, user_email)
+            require_plan(plan, "ELITE", "patrimonial_document_inbox")
+            conn.execute(text("""
+                UPDATE ethan_document_inbox
+                SET status = :status, resolved_at = NOW()
+                WHERE id = :document_id
+                  AND user_id = :user_id
+                  AND status = 'pending'
+            """), {"status": next_status, "document_id": document_id, "user_id": user_id})
+        return {"status": next_status, "document_id": document_id}
+
+    return safe_execute(_run, module_name="ETHAN_DOCUMENT_INBOX")
 
 
 @router.get("/usage")

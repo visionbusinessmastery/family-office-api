@@ -18,6 +18,14 @@ type AdvisorResponse = {
   };
 };
 
+type ProfileProposal = {
+  id: number;
+  field: string;
+  old_value?: string | null;
+  new_value: string;
+  status: string;
+};
+
 const initialMessages: ChatMessage[] = [];
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -177,12 +185,42 @@ async function requestAdvisorResponse(
   });
 }
 
+async function detectProfileProposals(token: string | null, sourceText: string) {
+  if (!token) return [];
+  try {
+    const payload = await apiRequest<{ proposals?: ProfileProposal[] }>(
+      "/advisor/profile-reconciliation/detect",
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({ source_text: sourceText }),
+      }
+    );
+    return payload.proposals || [];
+  } catch {
+    return [];
+  }
+}
+
+async function resolveProfileProposal(
+  token: string | null,
+  proposalId: number,
+  action: "accept" | "reject"
+) {
+  if (!token) return false;
+  await apiRequest(`/advisor/profile-reconciliation/${proposalId}/${action}`, token, {
+    method: "POST",
+  });
+  return true;
+}
+
 export default function AdvisorChat({ compact = false }: { compact?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [cacheReady, setCacheReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [profileProposals, setProfileProposals] = useState<ProfileProposal[]>([]);
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -242,11 +280,27 @@ export default function AdvisorChat({ compact = false }: { compact?: boolean }) 
         ...current,
         { role: "assistant", content: analysis },
       ]);
+      const proposals = await detectProfileProposals(token, question);
+      if (proposals.length > 0) {
+        setProfileProposals(proposals);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       setErrorMessage(message || "Connexion au moteur indisponible pour le moment.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProposal = async (proposalId: number, action: "accept" | "reject") => {
+    try {
+      await resolveProfileProposal(token, proposalId, action);
+      setProfileProposals((current) =>
+        current.filter((proposal) => proposal.id !== proposalId)
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setErrorMessage(message || "Impossible de traiter la proposition de profil.");
     }
   };
 
@@ -272,6 +326,39 @@ export default function AdvisorChat({ compact = false }: { compact?: boolean }) 
           Un regard calme pour transformer ton contexte en decisions simples.
         </p>
       </div>
+
+      {profileProposals.length > 0 && (
+        <div className="mb-4 space-y-3 rounded-2xl border border-[#3fa9f5]/25 bg-[#3fa9f5]/10 p-4">
+          <p className="text-xs font-black uppercase tracking-widest text-[#8bd0ff]">
+            Mise a jour profil detectee
+          </p>
+          {profileProposals.map((proposal) => (
+            <div key={proposal.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+              <p className="text-sm text-gray-200">
+                Remplacer <span className="font-bold text-white">{proposal.old_value || "non renseigne"}</span>{" "}
+                par <span className="font-bold text-white">{proposal.new_value}</span>{" "}
+                pour <span className="font-bold text-white">{proposal.field}</span> ?
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleProposal(proposal.id, "accept")}
+                  className="rounded-full bg-[#3fa9f5] px-3 py-1 text-xs font-black text-white"
+                >
+                  Mettre a jour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProposal(proposal.id, "reject")}
+                  className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-gray-300"
+                >
+                  Ignorer
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         className={`overflow-y-auto rounded-2xl border border-white/10 bg-black/40 p-3 space-y-3 sm:p-4 ${
