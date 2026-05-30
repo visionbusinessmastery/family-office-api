@@ -47,6 +47,7 @@ def invalidate_finance_caches(email: str, user_id: Optional[int] = None):
 
         if user_id is not None:
             keys.append(f"financial:{user_id}")
+            keys.append(f"financial_overview:{user_id}")
 
         redis_client.delete(*keys)
     except Exception:
@@ -152,6 +153,87 @@ def get_finance(user=Depends(get_current_user)):
         "charges": charges,
         "dettes": debts,
         "epargne": savings
+    }
+
+
+@router.get("/overview")
+def get_finance_overview(user=Depends(get_current_user)):
+
+    email = user
+
+    with engine.connect() as conn:
+
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            return {"error": "User not found"}
+
+        rows = conn.execute(
+            text("""
+                SELECT type, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+                FROM finance_items
+                WHERE user_id = :user_id
+                GROUP BY type
+            """),
+            {"user_id": user_id}
+        ).fetchall()
+
+    totals = {
+        "revenus": 0.0,
+        "charges": 0.0,
+        "epargne": 0.0,
+        "dettes": 0.0,
+    }
+    counts = {
+        "revenus": 0,
+        "charges": 0,
+        "epargne": 0,
+        "dettes": 0,
+    }
+
+    for row in rows:
+        if row.type in totals:
+            totals[row.type] = float(row.total or 0)
+            counts[row.type] = int(row.count or 0)
+
+    income = totals["revenus"]
+    expenses = totals["charges"]
+    savings = totals["epargne"]
+    debt = totals["dettes"]
+    cashflow = income - expenses
+    savings_rate = (cashflow / income * 100) if income > 0 else 0
+    debt_to_income = (debt / income) if income > 0 else 0
+    liquid_months = (savings / expenses) if expenses > 0 else 0
+
+    if income <= 0:
+        reading = "Ajoute tes revenus suivis pour obtenir une lecture fiable de ta marge de liberte mensuelle."
+        priority = "Renseigner les revenus recurrents"
+    elif cashflow > 0:
+        reading = "Ta base financiere montre une marge mensuelle positive a partir des lignes deja renseignees."
+        priority = "Transformer cette marge en coussin de securite et trajectoire d'epargne."
+    else:
+        reading = "Les charges suivies absorbent les revenus renseignes. La priorite est de retrouver une marge positive."
+        priority = "Identifier une charge ajustable ou un revenu complementaire."
+
+    return {
+        "version": "finance-overview-v1",
+        "source": "finance_items",
+        "totals": {
+            "income": round(income, 2),
+            "expenses": round(expenses, 2),
+            "cashflow": round(cashflow, 2),
+            "living_margin": round(cashflow, 2),
+            "savings": round(savings, 2),
+            "debt": round(debt, 2),
+        },
+        "ratios": {
+            "savings_rate": round(savings_rate, 2),
+            "debt_to_income": round(debt_to_income, 2),
+            "liquid_months": round(liquid_months, 2),
+        },
+        "counts": counts,
+        "reading": reading,
+        "priority": priority,
     }
 
 
