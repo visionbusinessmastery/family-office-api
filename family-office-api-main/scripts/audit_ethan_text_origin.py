@@ -28,10 +28,10 @@ def main():
     runtime_engine = read("family-office-api-main/advisor/ethan/runtime_engine.py")
     advisor_chat = read("components/dashboard/AdvisorChat.tsx")
 
-    if 'ETHAN_GLOBAL_CACHE_VERSION = "v25-advisor-arbitrage"' in read("family-office-api-main/advisor/ethan/cache_policy.py"):
-        ok(passes, "global cache version is v25-advisor-arbitrage")
+    if 'ETHAN_GLOBAL_CACHE_VERSION = "v26-memory-priority"' in read("family-office-api-main/advisor/ethan/cache_policy.py"):
+        ok(passes, "global cache version is v26-memory-priority")
     else:
-        fail(issues, "cache", "ETHAN_GLOBAL_CACHE_VERSION must be v25-advisor-arbitrage")
+        fail(issues, "cache", "ETHAN_GLOBAL_CACHE_VERSION must be v26-memory-priority")
 
     advisor_core_block = routes.split("def advisor_core", 1)[1].split("def advisor_legacy_route", 1)[0]
     if (
@@ -73,10 +73,10 @@ def main():
     else:
         fail(issues, "advisor_cache", "ADVISOR_CACHE_VERSION must point to ETHAN_GLOBAL_CACHE_VERSION")
 
-    if 'const CONVERSATION_CACHE_VERSION = "v25-advisor-arbitrage"' in advisor_chat:
+    if 'const CONVERSATION_CACHE_VERSION = "v26-memory-priority"' in advisor_chat:
         ok(passes, "frontend conversation cache follows global cache version")
     else:
-        fail(issues, "frontend_cache", "AdvisorChat cache version must be v25-advisor-arbitrage")
+        fail(issues, "frontend_cache", "AdvisorChat cache version must be v26-memory-priority")
 
     if "data.result" not in advisor_chat and "result?:" not in advisor_chat:
         ok(passes, "frontend consumes direct Ethan contract only")

@@ -14,25 +14,6 @@ const AdvisorChat = dynamic(() => import("@/components/dashboard/AdvisorChat"), 
   ),
 });
 
-const PLAN_ORDER: Record<string, number> = {
-  FREE: 0,
-  GOLD: 1,
-  ELITE: 2,
-  LIBERTY: 3,
-  LEGACY: 4,
-};
-
-const normalizePlan = (plan?: string | null) => {
-  const value = String(plan || "FREE").trim().toUpperCase();
-  if (value === "GROWTH") return "GOLD";
-  if (value === "PLATINUM" || value === "WEALTH_OS") return "ELITE";
-  if (value === "DYNASTY" || value === "DYNASTY_OFFICE") return "LEGACY";
-  return PLAN_ORDER[value] === undefined ? "FREE" : value;
-};
-
-const planAllows = (plan: string | undefined | null, required: string) =>
-  PLAN_ORDER[normalizePlan(plan)] >= PLAN_ORDER[normalizePlan(required)];
-
 export default function EthanFloatingAdvisor() {
   const [open, setOpen] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -45,17 +26,14 @@ export default function EthanFloatingAdvisor() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    apiRequest<Pick<ProductContext, "plan" | "entitlements">>(
+    apiRequest<Pick<ProductContext, "entitlements">>(
       "/product/entitlements",
       token
     )
       .then((product) => {
         if (cancelled) return;
         const features = product?.entitlements?.features || [];
-        setEnabled(
-          planAllows(product?.plan, "GOLD") &&
-            features.includes("ethan_floating_chat")
-        );
+        setEnabled(features.includes("ethan_floating_chat"));
       })
       .catch(() => {
         if (!cancelled) setEnabled(false);

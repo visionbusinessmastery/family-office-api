@@ -1,4 +1,5 @@
 import json
+import unicodedata
 
 from sqlalchemy import text
 
@@ -21,12 +22,35 @@ def _versioned_context_profile(profile):
         "professional_context",
         "business_context",
         "businesses",
+        "profile_correction",
     ]
     return {
         key: profile[key]
         for key in preserved_keys
         if profile.get(key)
     }
+
+
+def _normalize(value) -> str:
+    normalized = unicodedata.normalize("NFD", str(value or "").lower())
+    cleaned = "".join(
+        char for char in normalized if unicodedata.category(char) != "Mn"
+    )
+    return (
+        cleaned
+        .replace("Ã©", "e")
+        .replace("Ã¨", "e")
+        .replace("Ãª", "e")
+        .replace("Ã ", "a")
+        .replace("Ã¢", "a")
+        .replace("Ã®", "i")
+        .replace("Ã´", "o")
+        .replace("Ã»", "u")
+        .replace("ã©", "e")
+        .replace("ã¨", "e")
+        .replace("ãª", "e")
+        .replace("ã ", "a")
+    )
 
 
 def get_memory(conn, user_id):
@@ -101,14 +125,26 @@ def build_life_context(conn, user_id, memory=None):
     remembered = memory.get("context_profile") if isinstance(memory, dict) else {}
     if isinstance(remembered, dict):
         for key, value in remembered.items():
-            if value and not profile.get(key):
+            if not value:
+                continue
+            if key in [
+                "professional_context",
+                "time_constraint",
+                "family_constraint",
+                "has_children",
+                "expertise",
+                "priority_goal",
+                "business_context",
+            ]:
+                profile[key] = value
+            elif not profile.get(key):
                 profile[key] = value
 
     return profile
 
 
 def extract_context_signals(message):
-    normalized = (message or "").lower()
+    normalized = _normalize(message)
     signals = {}
 
     if any(word in normalized for word in ["peu de temps", "pas le temps", "temps limite", "fatigue", "charge mentale"]):
@@ -117,14 +153,25 @@ def extract_context_signals(message):
         signals["family_constraint"] = "responsabilites familiales"
     if any(word in normalized for word in ["marketing", "communication", "agence", "ads", "contenu"]):
         signals["expertise"] = "marketing / acquisition / communication"
-    if any(word in normalized for word in ["salarie", "cdi", "emploi"]):
+    if any(word in normalized for word in ["salarie", "salari", "cdi", "emploi"]):
         signals["professional_context"] = "salarie"
+    if any(word in normalized for word in ["pas etudiant", "pas un etudiant", "ne suis pas etudiant", "non etudiant"]):
+        signals["professional_context"] = "salarie" if any(word in normalized for word in ["salarie", "salari"]) else "non etudiant"
+        signals["profile_correction"] = "ne pas considerer l'utilisateur comme etudiant"
     if any(word in normalized for word in ["entreprise", "business", "activite", "freelance"]):
         signals["business_context"] = "activite business existante ou a developper"
     if any(word in normalized for word in ["augmenter mes revenus", "plus de revenus", "revenus complementaires", "gagner plus"]):
         signals["priority_goal"] = "augmenter les revenus"
 
     return signals
+
+
+def merge_context_signals(base_profile, signals):
+    profile = dict(base_profile or {})
+    for key, value in (signals or {}).items():
+        if value:
+            profile[key] = value
+    return profile
 
 
 def summarize_context_profile(profile):
@@ -142,6 +189,8 @@ def summarize_context_profile(profile):
         fragments.append(f"expertise: {profile['expertise']}")
     if profile.get("professional_context"):
         fragments.append(f"situation: {profile['professional_context']}")
+    if profile.get("profile_correction"):
+        fragments.append(profile["profile_correction"])
     if profile.get("business_context"):
         fragments.append(profile["business_context"])
     businesses = profile.get("businesses") or []
