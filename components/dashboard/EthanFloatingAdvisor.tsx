@@ -23,24 +23,51 @@ export default function EthanFloatingAdvisor() {
 
   useEffect(() => {
     let cancelled = false;
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    let retryTimer: number | undefined;
 
-    apiRequest<Pick<ProductContext, "entitlements">>(
-      "/product/entitlements",
-      token
-    )
-      .then((product) => {
+    const loadEntitlements = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        if (cancelled) return;
+        setEnabled(false);
+        retryTimer = window.setTimeout(loadEntitlements, 800);
+        return;
+      }
+
+      try {
+        const product = await apiRequest<Pick<ProductContext, "entitlements">>(
+          "/product/entitlements",
+          token
+        );
         if (cancelled) return;
         const features = product?.entitlements?.features || [];
         setEnabled(features.includes("ethan_floating_chat"));
-      })
-      .catch(() => {
-        if (!cancelled) setEnabled(false);
-      });
+      } catch {
+        try {
+          const product = await apiRequest<Pick<ProductContext, "entitlements">>(
+            "/product/context",
+            token
+          );
+          if (cancelled) return;
+          const features = product?.entitlements?.features || [];
+          setEnabled(features.includes("ethan_floating_chat"));
+        } catch {
+          if (!cancelled) setEnabled(false);
+        }
+      }
+    };
+
+    loadEntitlements();
+
+    const handleRefresh = () => loadEntitlements();
+    window.addEventListener("focus", handleRefresh);
+    window.addEventListener("storage", handleRefresh);
 
     return () => {
       cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener("focus", handleRefresh);
+      window.removeEventListener("storage", handleRefresh);
     };
   }, []);
 
