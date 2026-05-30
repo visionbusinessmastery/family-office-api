@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { FinanceOverviewData, ProductContext } from "@/lib/types";
 
 const money = new Intl.NumberFormat("fr-FR", {
@@ -7,6 +19,9 @@ const money = new Intl.NumberFormat("fr-FR", {
 });
 
 const n = (value?: number | string | null) => Number(value || 0);
+
+const formatChartMoney = (value: number | string) =>
+  `${money.format(Number(value || 0))} EUR`;
 
 type HomeExecutiveSummaryProps = {
   product?: ProductContext | null;
@@ -52,6 +67,18 @@ export default function HomeExecutiveSummary({
     decision?.opportunity?.action ||
     "";
   const progress = Math.min(100, n(position?.progress_percent));
+  const wealthChartData = [
+    { label: "Visible", value: n(wealth?.visible_wealth) || visibleWealth, fill: "#3fa9f5" },
+    { label: "Activable", value: n(wealth?.activable_wealth), fill: "#f7d154" },
+    { label: "Potentiel", value: n(wealth?.total_potential), fill: "#16d99a" },
+  ].filter((item) => item.value > 0);
+  const futureChartData = (future?.film || [])
+    .map((chapter) => ({
+      year: String(chapter.year || ""),
+      wealth: n(chapter.wealth),
+    }))
+    .filter((item) => item.year && item.wealth > 0)
+    .slice(0, 5);
 
   return (
     <section className="space-y-5">
@@ -103,6 +130,47 @@ export default function HomeExecutiveSummary({
         </p>
       </div>
 
+      {wealthChartData.length > 0 && (
+        <div className="rounded-2xl border border-[#f7d154]/20 bg-zinc-950 p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-[#f7d154]">
+                Potentiel patrimonial
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-white">
+                Visible vs activable
+              </h2>
+            </div>
+            {wealth?.total_potential ? (
+              <p className="text-sm text-gray-400">
+                Potentiel total{" "}
+                <span className="font-bold text-white">
+                  {money.format(n(wealth.total_potential))} EUR
+                </span>
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={wealthChartData} margin={{ left: 4, right: 4, top: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 11 }} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} width={56} />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  formatter={(value) => formatChartMoney(String(value))}
+                />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {wealthChartData.map((item) => (
+                    <Cell key={item.label} fill={item.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-[#3fa9f5]/20 bg-zinc-950 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -143,6 +211,25 @@ export default function HomeExecutiveSummary({
             </span>
           </p>
         </div>
+        {futureChartData.length > 0 && (
+          <div className="mt-5 h-56 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={futureChartData} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="year" tick={{ fill: "#a1a1aa", fontSize: 11 }} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} width={56} />
+                <Tooltip formatter={(value) => formatChartMoney(String(value))} />
+                <Line
+                  type="monotone"
+                  dataKey="wealth"
+                  stroke="#3fa9f5"
+                  strokeWidth={3}
+                  dot={{ r: 3, fill: "#f7d154", stroke: "#f7d154" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
