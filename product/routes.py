@@ -630,6 +630,257 @@ def build_family_office_view(data_profile: dict, plan: str):
     }
 
 
+def build_wealth_gps(data_profile: dict, future_view: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    next_milestone = next(
+        (item for item in [100000, 250000, 500000, 1000000] if current_wealth < item),
+        1500000,
+    )
+    routes = [
+        {
+            "key": "markets",
+            "label": "Marches financiers",
+            "annual_return": 0.055,
+            "monthly_multiplier": 1,
+            "description": "Trajectoire liquide basee sur la capacite mensuelle et le portefeuille financier.",
+        },
+        {
+            "key": "real_estate",
+            "label": "Immobilier",
+            "annual_return": 0.045,
+            "monthly_multiplier": 1.1,
+            "description": "Trajectoire patrimoniale avec effet capital long terme et effort d'epargne plus structure.",
+        },
+        {
+            "key": "business",
+            "label": "Business",
+            "annual_return": 0.075,
+            "monthly_multiplier": 1.2,
+            "description": "Trajectoire orientee creation de valeur via activite, expertise ou revenus semi-recurrents.",
+        },
+        {
+            "key": "balanced",
+            "label": "Mix equilibre",
+            "annual_return": 0.06,
+            "monthly_multiplier": 1.05,
+            "description": "Trajectoire hybride entre liquidite, croissance et diversification progressive.",
+        },
+    ]
+
+    def project_route(route: dict, years: int):
+        value = current_wealth
+        annual_contribution = monthly_capacity * float(route["monthly_multiplier"]) * 12
+        for _ in range(years):
+            value = value * (1 + float(route["annual_return"])) + annual_contribution
+        return round(value, 2)
+
+    enriched_routes = []
+    for route in routes:
+        years_to_next = None
+        if next_milestone > current_wealth:
+            value = current_wealth
+            annual_contribution = monthly_capacity * float(route["monthly_multiplier"]) * 12
+            for year in range(1, 31):
+                value = value * (1 + float(route["annual_return"])) + annual_contribution
+                if value >= next_milestone:
+                    years_to_next = year
+                    break
+
+        enriched_routes.append({
+            **route,
+            "annual_return": round(float(route["annual_return"]) * 100, 2),
+            "value_10y": project_route(route, 10),
+            "years_to_next_milestone": years_to_next,
+        })
+
+    return {
+        "title": "GPS patrimonial",
+        "current_position": round(current_wealth, 2),
+        "next_destination": next_milestone,
+        "assumption": future_view.get("assumption"),
+        "routes": enriched_routes,
+    }
+
+
+def build_digital_twin(data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    scenarios = [
+        {
+            "key": "invest_500",
+            "label": "Investir 500 EUR/mois",
+            "monthly_delta": 500,
+            "annual_return": 0.055,
+            "description": "Simulation d'une discipline d'investissement mensuelle fixe.",
+        },
+        {
+            "key": "business_plus",
+            "label": "Developper un revenu business",
+            "monthly_delta": 750,
+            "annual_return": 0.06,
+            "description": "Simulation d'un surplus mensuel cree par activite ou offre recurrente.",
+        },
+        {
+            "key": "keep_current",
+            "label": "Continuer au rythme actuel",
+            "monthly_delta": 0,
+            "annual_return": 0.045,
+            "description": "Simulation de reference avec les donnees deja presentes dans le backend.",
+        },
+    ]
+
+    def simulate(monthly_delta: float, annual_return: float, years: int):
+        value = current_wealth
+        annual_contribution = max(monthly_capacity + monthly_delta, 0) * 12
+        for _ in range(years):
+            value = value * (1 + annual_return) + annual_contribution
+        return round(value, 2)
+
+    return {
+        "title": "Double patrimonial",
+        "basis": "Simulations backend hypothetiques, sans remplacer Ethan ni une decision personnelle.",
+        "scenarios": [
+            {
+                **scenario,
+                "annual_return": round(float(scenario["annual_return"]) * 100, 2),
+                "value_5y": simulate(float(scenario["monthly_delta"]), float(scenario["annual_return"]), 5),
+                "value_10y": simulate(float(scenario["monthly_delta"]), float(scenario["annual_return"]), 10),
+            }
+            for scenario in scenarios
+        ],
+    }
+
+
+def build_weak_signals(data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    allocation = {
+        "investments": float(data_profile.get("portfolio_value") or 0),
+        "real_estate": float(data_profile.get("real_estate_value") or 0),
+        "business": float(data_profile.get("business_value") or 0),
+    }
+    signals = []
+
+    if data_profile.get("completion_percent", 0) < 60:
+        signals.append({
+            "type": "data_depth",
+            "title": "Contexte incomplet",
+            "description": "Le cockpit manque encore de donnees pour lire toute la trajectoire.",
+            "severity": "medium",
+        })
+    if monthly_capacity <= 0 and (data_profile.get("monthly_income", 0) or data_profile.get("monthly_expenses", 0)):
+        signals.append({
+            "type": "capacity",
+            "title": "Capacite mensuelle fragile",
+            "description": "Les donnees backend ne montrent pas encore de marge mensuelle exploitable.",
+            "severity": "high",
+        })
+    if current_wealth > 0:
+        main_domain, main_value = max(allocation.items(), key=lambda item: item[1])
+        if main_value / current_wealth >= 0.7:
+            labels = {"investments": "investissements", "real_estate": "immobilier", "business": "business"}
+            signals.append({
+                "type": "concentration",
+                "title": "Concentration patrimoniale",
+                "description": f"Le domaine {labels.get(main_domain, main_domain)} porte une grande partie de la valeur suivie.",
+                "severity": "medium",
+            })
+    if not signals:
+        signals.append({
+            "type": "stability",
+            "title": "Aucun signal critique",
+            "description": "Les donnees disponibles ne font pas ressortir de fragilite immediate.",
+            "severity": "low",
+        })
+
+    return {
+        "title": "Signaux faibles",
+        "signals": signals[:4],
+    }
+
+
+def build_self_benchmark(conn, user_id: int, data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    value_6m = safe_float(
+        conn,
+        """
+        SELECT total_value
+        FROM portfolio_history
+        WHERE user_id = :user_id AND created_at <= NOW() - INTERVAL '6 months'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        {"user_id": user_id},
+    )
+    value_12m = safe_float(
+        conn,
+        """
+        SELECT total_value
+        FROM portfolio_history
+        WHERE user_id = :user_id AND created_at <= NOW() - INTERVAL '12 months'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        {"user_id": user_id},
+    )
+
+    def delta(previous: float):
+        if previous <= 0:
+            return None
+        return {
+            "previous_value": round(previous, 2),
+            "delta_value": round(current_wealth - previous, 2),
+            "delta_percent": round(((current_wealth - previous) / previous) * 100, 1),
+        }
+
+    return {
+        "title": "Classement contre toi-meme",
+        "current_wealth": round(current_wealth, 2),
+        "six_months": delta(value_6m),
+        "twelve_months": delta(value_12m),
+        "basis": "Comparaison backend avec l'historique portfolio disponible.",
+    }
+
+
+def build_wealth_story(data_profile: dict, progression: dict):
+    events = [
+        {
+            "label": "Aujourd'hui",
+            "title": "Point de depart patrimonial",
+            "description": f"{round(float(data_profile.get('current_wealth') or 0), 2)} EUR suivis dans White Rock.",
+        },
+        {
+            "label": "Progression",
+            "title": progression.get("level") or "Builder",
+            "description": f"{progression.get('xp', 0)} XP et {data_profile.get('completion_percent', 0)}% de contexte complete.",
+        },
+    ]
+    if data_profile.get("portfolio_count", 0) > 0:
+        events.append({
+            "label": "Investissements",
+            "title": "Portefeuille active",
+            "description": f"{data_profile.get('portfolio_count', 0)} ligne(s) financiere(s) suivie(s).",
+        })
+    if data_profile.get("real_estate_count", 0) > 0:
+        events.append({
+            "label": "Immobilier",
+            "title": "Brique immobiliere",
+            "description": f"{data_profile.get('real_estate_count', 0)} bien(s) integre(s) au patrimoine global.",
+        })
+    if data_profile.get("business_value", 0) > 0:
+        events.append({
+            "label": "Business",
+            "title": "Valeur entrepreneuriale",
+            "description": "Une valeur business est maintenant visible dans la carte patrimoniale.",
+        })
+
+    return {
+        "title": "Histoire de ta richesse",
+        "events": events,
+    }
+
+
 @router.get("/context")
 def product_context(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -667,6 +918,11 @@ def product_context(email: str = Depends(get_current_user)):
         wealth_timeline = build_wealth_timeline(data_profile)
         mission_control = build_mission_control(strategic_brief, missions, future_view)
         family_office_view = build_family_office_view(data_profile, plan)
+        wealth_gps = build_wealth_gps(data_profile, future_view)
+        digital_twin = build_digital_twin(data_profile)
+        weak_signals = build_weak_signals(data_profile)
+        self_benchmark = build_self_benchmark(conn, user_id, data_profile)
+        wealth_story = build_wealth_story(data_profile, progression)
 
     return {
         "plan": plan,
@@ -682,6 +938,11 @@ def product_context(email: str = Depends(get_current_user)):
         "future_view": future_view,
         "wealth_timeline": wealth_timeline,
         "family_office_view": family_office_view,
+        "wealth_gps": wealth_gps,
+        "digital_twin": digital_twin,
+        "weak_signals": weak_signals,
+        "self_benchmark": self_benchmark,
+        "wealth_story": wealth_story,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,
