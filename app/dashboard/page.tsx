@@ -50,6 +50,7 @@ import Header from "@/components/dashboard/Header";
 import AdvisorChat from "@/components/dashboard/AdvisorChat";
 import BalanceSheetModule from "@/components/dashboard/BalanceSheetModule";
 import FinanceModule from "@/components/dashboard/FinanceModule";
+import HomeExecutiveSummary from "@/components/dashboard/HomeExecutiveSummary";
 import LegacyOfficePanel from "@/components/dashboard/LegacyOfficePanel";
 import OpportunityDiscoveryPanel from "@/components/dashboard/OpportunityDiscoveryPanel";
 import OpportunitiesModule from "@/components/dashboard/OpportunitiesModule";
@@ -2150,46 +2151,16 @@ export default function Dashboard() {
             <div className="space-y-6">
               <SectionHeader
                 eyebrow="Accueil"
-                title="Ton cockpit du jour"
-                description="Une vue complete mais lisible: trajectoire, decisions, domaines patrimoniaux et prochaine action utile."
+                title="Command Center"
+                description="L'essentiel uniquement: situation, trajectoire, action et signal prioritaire."
               />
 
-              <WealthIntelligencePanel product={product} />
-
-              <FutureIntelligencePanel product={product} />
-
-              <DecisionIntelligencePanel product={product} />
-
-              <FamilyOfficeIntelligencePanel product={product} />
-
-              {planAllows(currentPlan, "ELITE") ? (
-                <FamilyOfficeCeoPanel product={product} />
-              ) : (
-                <LockedSection
-                  title="Family Office CEO"
-                  description="Debloque en ELITE le burn rate, la marge mensuelle, le runway et la lecture operationnelle de ta trajectoire."
-                  onUpgrade={handleUpgradePlan}
-                  plan="elite"
-                />
-              )}
-
-              {!planAllows(currentPlan, "LIBERTY") && (
-                <LockedSection
-                  title="Arbitrages Family Office"
-                  description="LIBERTY ajoute les priorites d'allocation, le board virtuel, les objectifs avances, les comptes enfants et la transmission."
-                  onUpgrade={handleUpgradePlan}
-                  plan="liberty"
-                />
-              )}
-
-              {!planAllows(currentPlan, "LEGACY") && (
-                <LockedSection
-                  title="Dynasty Office"
-                  description="Dynasty ouvre la projection generationnelle, la gouvernance familiale, la protection et les scenarios successoraux."
-                  onUpgrade={handleUpgradePlan}
-                  plan="legacy"
-                />
-              )}
+              <HomeExecutiveSummary
+                product={product}
+                financeOverview={financeOverview}
+                plan={currentPlan}
+                level={product?.progression?.level || commandCenter?.level || dashboard?.level}
+              />
             </div>
           )}
 
