@@ -20,6 +20,16 @@ LEGACY_CONTENT_PATTERNS = [
 
 ETHAN_TEXT_ORIGIN = "ethan_output_renderer"
 
+LIGHT_SOCIAL_PATTERNS = [
+    "bonjour",
+    "salut",
+    "hello",
+    "coucou",
+    "comment vas tu",
+    "comment ca va",
+    "merci",
+]
+
 
 def _normalize(value) -> str:
     raw = str(value or "").lower()
@@ -77,11 +87,30 @@ def _raw_signal(response_data):
     return _clean_visible_labels(raw)
 
 
-def _unavailable_text():
+def _is_light_social_message(message) -> bool:
+    normalized = _normalize(message)
+    return any(pattern in normalized for pattern in LIGHT_SOCIAL_PATTERNS)
+
+
+def _unavailable_text(message=None, status=None):
+    if _is_light_social_message(message):
+        return (
+            "Bonjour, je vais bien, merci. Je suis la avec ton contexte White Rock. "
+            "Dis-moi ce que tu veux regarder maintenant: une decision, un risque, une opportunite "
+            "ou simplement ta prochaine action utile."
+        )
+
+    if status == "openai_unconfigured":
+        return (
+            "Je suis bien connecte a ton contexte White Rock, mais le moteur IA n'est pas disponible "
+            "cote serveur pour l'instant. Je prefere etre transparent plutot que d'inventer une reponse: "
+            "verifie la configuration OpenAI sur Render, puis relance Ethan."
+        )
+
     return (
-        "Je n'ai pas pu acceder correctement au moteur Ethan sur cette demande. "
-        "Je prefere ne pas inventer une recommandation patrimoniale a partir d'un signal incomplet. "
-        "Relance ta question dans un instant: la reponse repartira du contexte backend actuel."
+        "Je suis la, mais je n'ai pas recu une reponse complete du moteur IA sur cette demande. "
+        "Pour eviter d'inventer, je prefere relancer proprement: repose ta question dans une phrase simple "
+        "et Ethan repartira du contexte backend actuel."
     )
 
 
@@ -95,9 +124,10 @@ def render_ethan_output(response_data, context=None, message=None, response_stra
     message only when the LLM produced no usable text.
     """
     status = response_data.get("status") if isinstance(response_data, dict) else "empty"
+    llm_status = response_data.get("llm_status") if isinstance(response_data, dict) else None
     signal = _raw_signal(response_data)
 
     if signal and status != "empty":
         return signal
 
-    return _unavailable_text()
+    return _unavailable_text(message=message, status=llm_status)

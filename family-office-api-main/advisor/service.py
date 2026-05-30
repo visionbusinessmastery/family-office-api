@@ -89,7 +89,7 @@ def advisor_logic(user_email, message, level=None, bypass_cache=False):
             response_strategy=response_strategy,
         )
 
-        llm_text, llm_cache_hit, input_tokens, output_tokens, actual_model = response_get_llm_response(
+        llm_text, llm_cache_hit, input_tokens, output_tokens, actual_model, llm_status = response_get_llm_response(
             messages,
             model,
             config["max_output_tokens"],
@@ -113,6 +113,7 @@ def advisor_logic(user_email, message, level=None, bypass_cache=False):
                 compact_portfolio_fn=compact_portfolio,
                 build_response_strategy_fn=build_response_strategy,
             )
+            response_data["llm_status"] = llm_status
         else:
             response_data = response_build_llm_response_data(
                 llm_text,
@@ -166,6 +167,7 @@ def advisor_logic(user_email, message, level=None, bypass_cache=False):
                 "complexity": complexity,
                 "soft_budget_active": soft_budget_active,
                 "cache_hit": llm_cache_hit,
+                "llm_status": llm_status,
                 "text_origin": ETHAN_TEXT_ORIGIN,
                 "cache_version": ETHAN_GLOBAL_CACHE_VERSION,
             },

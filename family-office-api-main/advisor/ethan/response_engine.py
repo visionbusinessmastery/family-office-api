@@ -114,10 +114,10 @@ def get_llm_response(
 
     cached = get_cache_fn(llm_cache_key)
     if cached and not is_legacy_ethan_response(cached):
-        return cached, True, estimate_tokens_fn(json.dumps(messages)), estimate_tokens_fn(cached), model
+        return cached, True, estimate_tokens_fn(json.dumps(messages)), estimate_tokens_fn(cached), model, "cache_hit"
 
     if not is_model_configured_fn():
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model
+        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_unconfigured"
 
     def _call(selected_model, token_param="max_completion_tokens"):
         kwargs = {
@@ -140,7 +140,7 @@ def get_llm_response(
                 response = _call(fallback_model, "max_tokens")
                 model = fallback_model
             except Exception:
-                return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model
+                return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_call_failed"
 
     try:
         llm_text = response.choices[0].message.content
@@ -149,9 +149,9 @@ def get_llm_response(
         output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens_fn(llm_text)
         if not is_legacy_ethan_response(llm_text):
             set_cache_fn(llm_cache_key, llm_text, ttl=1800)
-        return llm_text, False, input_tokens, output_tokens, model
+        return llm_text, False, input_tokens, output_tokens, model, "ready"
     except Exception:
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model
+        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_parse_failed"
 
 
 def build_fallback_response(

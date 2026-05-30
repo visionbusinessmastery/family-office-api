@@ -28,10 +28,10 @@ def main():
     runtime_engine = read("family-office-api-main/advisor/ethan/runtime_engine.py")
     advisor_chat = read("components/dashboard/AdvisorChat.tsx")
 
-    if 'ETHAN_GLOBAL_CACHE_VERSION = "v21-llm-first"' in read("family-office-api-main/advisor/ethan/cache_policy.py"):
-        ok(passes, "global cache version is v21-llm-first")
+    if 'ETHAN_GLOBAL_CACHE_VERSION = "v22-llm-diagnostics"' in read("family-office-api-main/advisor/ethan/cache_policy.py"):
+        ok(passes, "global cache version is v22-llm-diagnostics")
     else:
-        fail(issues, "cache", "ETHAN_GLOBAL_CACHE_VERSION must be v21-llm-first")
+        fail(issues, "cache", "ETHAN_GLOBAL_CACHE_VERSION must be v22-llm-diagnostics")
 
     advisor_core_block = routes.split("def advisor_core", 1)[1].split("def advisor_legacy_route", 1)[0]
     if (
@@ -73,10 +73,10 @@ def main():
     else:
         fail(issues, "advisor_cache", "ADVISOR_CACHE_VERSION must point to ETHAN_GLOBAL_CACHE_VERSION")
 
-    if 'const CONVERSATION_CACHE_VERSION = "v21-llm-first"' in advisor_chat:
+    if 'const CONVERSATION_CACHE_VERSION = "v22-llm-diagnostics"' in advisor_chat:
         ok(passes, "frontend conversation cache follows global cache version")
     else:
-        fail(issues, "frontend_cache", "AdvisorChat cache version must be v21-llm-first")
+        fail(issues, "frontend_cache", "AdvisorChat cache version must be v22-llm-diagnostics")
 
     if "data.result" not in advisor_chat and "result?:" not in advisor_chat:
         ok(passes, "frontend consumes direct Ethan contract only")
