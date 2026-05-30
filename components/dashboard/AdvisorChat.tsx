@@ -20,7 +20,7 @@ const initialMessages: ChatMessage[] = [];
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED_MESSAGES = 40;
-const CONVERSATION_CACHE_VERSION = "v22-llm-diagnostics";
+const CONVERSATION_CACHE_VERSION = "v23-openai-resilience";
 const LEGACY_RESPONSE_PATTERNS = [
   "ton score est",
   "score 39/100",
@@ -31,6 +31,9 @@ const LEGACY_RESPONSE_PATTERNS = [
   "clarifier la capacite",
   "capacite mensuelle disponible",
   "ethan vient d'ecarter",
+  "je suis la, mais je n'ai pas recu",
+  "moteur ia n'est pas disponible",
+  "moteur ethan sur cette demande",
 ];
 
 type CachedConversation = {

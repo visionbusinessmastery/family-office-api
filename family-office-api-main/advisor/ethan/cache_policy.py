@@ -1,1 +1,1 @@
-ETHAN_GLOBAL_CACHE_VERSION = "v22-llm-diagnostics"
+ETHAN_GLOBAL_CACHE_VERSION = "v23-openai-resilience"
