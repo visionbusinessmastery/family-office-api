@@ -1,1 +1,1 @@
-ETHAN_GLOBAL_CACHE_VERSION = "v25-advisor-arbitrage"
+ETHAN_GLOBAL_CACHE_VERSION = "v26-memory-priority"

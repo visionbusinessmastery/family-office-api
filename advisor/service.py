@@ -1,6 +1,12 @@
 from advisor.ethan.context_engine import compact_context, compact_portfolio
 from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
-from advisor.ethan.memory_engine import build_life_context, get_memory, update_memory
+from advisor.ethan.memory_engine import (
+    build_life_context,
+    extract_context_signals,
+    get_memory,
+    merge_context_signals,
+    update_memory,
+)
 from advisor.ethan.openai_gateway import ethan_chat_completion, is_ethan_openai_configured
 from advisor.ethan.output_renderer import ETHAN_TEXT_ORIGIN, render_ethan_output
 from advisor.ethan.persistence_engine import (
@@ -51,7 +57,11 @@ def advisor_logic(user_email, message, level=None, bypass_cache=False):
         portfolio = unified_state["portfolio"]
         opportunities = unified_state["opportunities"]
         memory = get_memory(conn, user_id)
-        life_context = build_life_context(conn, user_id, memory)
+        explicit_context_signals = extract_context_signals(message)
+        life_context = merge_context_signals(
+            build_life_context(conn, user_id, memory),
+            explicit_context_signals,
+        )
         context["life_context"] = life_context
         response_strategy = build_response_strategy(message, memory)
 
