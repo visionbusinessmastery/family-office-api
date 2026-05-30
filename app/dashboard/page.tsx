@@ -2541,6 +2541,20 @@ export default function Dashboard() {
                   </button>
                 </div>
               </section>
+
+              <section className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+                  <p className="text-xs uppercase tracking-widest text-[#ffd21a]">
+                    Parrainage
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold">Recommandations et invitations</h2>
+                  <p className="mt-2 text-sm text-gray-400">
+                    Invite des proches depuis l'espace abonnement, sans melanger parrainage et gouvernance familiale.
+                  </p>
+                </div>
+
+                <ProfileReferralPanel mode="referral" />
+              </section>
             </div>
           )}
 
@@ -2558,9 +2572,9 @@ export default function Dashboard() {
                     <p className="text-xs uppercase tracking-widest text-amber-200">
                       Family Office Profile
                     </p>
-                    <h2 className="mt-2 text-2xl font-bold">Famille, transmission et vision</h2>
+                    <h2 className="mt-2 text-2xl font-bold">La vision patrimoniale qui guide les decisions de long terme</h2>
                     <p className="mt-2 text-sm text-gray-400">
-                      Les donnees qui preparent les niveaux Liberty et Dynasty sans complexifier ton espace actuel.
+                      Les informations qui permettent a White Rock de comprendre la dimension familiale, successorale et patrimoniale de ton projet.
                     </p>
                   </div>
                   <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs font-bold text-amber-100">
@@ -2569,6 +2583,14 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-widest text-gray-500">
+                      Mission familiale
+                    </p>
+                    <p className="mt-2 text-sm text-gray-200">
+                      {compactText(wealthProfile?.motivation || wealthProfile?.transmission_goal)}
+                    </p>
+                  </div>
                   <div className="rounded-xl border border-white/10 bg-black/25 p-4">
                     <p className="text-xs uppercase tracking-widest text-gray-500">
                       Transmission
@@ -2596,14 +2618,54 @@ export default function Dashboard() {
                 </div>
               </section>
 
+              <section className="rounded-2xl border border-[#ffd21a]/20 bg-[#ffd21a]/5 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-[#ffd21a]">
+                      Maturite Family Office
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold">Foundation</h2>
+                    <p className="mt-2 text-sm text-gray-400">
+                      Une lecture simple des piliers deja renseignes et des sujets familiaux a clarifier progressivement.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#ffd21a]/35 bg-[#ffd21a]/10 px-3 py-1 text-xs font-bold text-[#ffd21a]">
+                    {[
+                      wealthProfile?.motivation,
+                      wealthProfile?.transmission_goal,
+                      wealthProfile?.governance_need,
+                      wealthProfile?.has_children,
+                      wealthProfile?.family_strategy,
+                    ].filter(Boolean).length}/5 complete
+                  </span>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {[
+                    ["Vision familiale", wealthProfile?.motivation],
+                    ["Transmission", wealthProfile?.transmission_goal],
+                    ["Gouvernance", wealthProfile?.governance_need],
+                    ["Heritiers", wealthProfile?.has_children],
+                    ["Succession", wealthProfile?.family_strategy],
+                  ].map(([label, done]) => (
+                    <div key={label as string} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                      <p className="text-sm font-semibold text-white">{label}</p>
+                      <p className={`mt-1 text-xs ${done ? "text-emerald-300" : "text-gray-500"}`}>
+                        {done ? "Renseigne" : "A clarifier"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               <section className="space-y-4">
                 <div className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
                   <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-                    Family Office Spaces
+                    Mon Family Office
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold">Gouvernance et multi-user</h2>
+                  <h2 className="mt-2 text-2xl font-bold">Espaces, membres et droits</h2>
                   <p className="mt-2 text-sm text-gray-400">
-                    Espaces, membres, invitations et permissions pour preparer conjoint, conseiller, associe ou heritier.
+                    Une organisation lisible pour inviter un conjoint, un associe, un conseiller ou un heritier au bon moment.
                   </p>
                 </div>
 
@@ -2613,8 +2675,6 @@ export default function Dashboard() {
                   onInvite={handleInviteWorkspaceMember}
                   onSwitch={handleSwitchWorkspace}
                 />
-
-                <ProfileReferralPanel mode="referral" />
               </section>
             </div>
           )}
