@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CockpitBackLink from "@/components/CockpitBackLink";
 import { apiRequest } from "@/lib/api";
 
@@ -31,6 +31,32 @@ type Plan = {
 
 type PricingPlansProps = {
   mode: "standard" | "founder";
+};
+
+type CurrentSubscription = {
+  plan: string;
+  status: string;
+  subscription_plan?: string;
+  current_period_end?: string | null;
+  pending_plan?: string | null;
+  pending_effective_at?: string | null;
+  pending_change_type?: string | null;
+};
+
+type ScheduleDowngradeResponse = {
+  status: string;
+  current_plan: string;
+  pending_plan: string;
+  pending_effective_at?: string | null;
+  change_type?: string;
+};
+
+const planOrder: Record<string, number> = {
+  FREE: 0,
+  GOLD: 1,
+  ELITE: 2,
+  LIBERTY: 3,
+  LEGACY: 4,
 };
 
 const ladder = [
@@ -207,6 +233,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [subscription, setSubscription] = useState<CurrentSubscription | null>(null);
   const founder = mode === "founder";
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -217,6 +244,37 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
     return monthly * 12 - yearly;
   };
   const intervalLabel = interval === "monthly" ? "/ mois" : "/ an";
+  const currentPlan = (subscription?.plan || "FREE").toUpperCase();
+  const pendingPlan = subscription?.pending_plan?.toUpperCase() || null;
+  const formatDate = (value?: string | null) => {
+    if (!value) return null;
+    try {
+      return new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    let alive = true;
+    apiRequest<CurrentSubscription>("/billing/current-subscription", token)
+      .then((data) => {
+        if (alive) setSubscription(data);
+      })
+      .catch(() => {
+        if (alive) setSubscription(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [token]);
 
   const startCheckout = async (plan: Plan) => {
     if (!token) {
@@ -256,6 +314,50 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
       setMessage(
         "Impossible d'ouvrir le paiement. Réessaie dans quelques instants."
       );
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  const scheduleDowngrade = async (planId: string) => {
+    if (!token) {
+      window.location.assign(
+        `/login?next=${encodeURIComponent(
+          `/plans/${mode === "founder" ? "founder" : "standard"}`
+        )}`
+      );
+      return;
+    }
+
+    setLoadingPlan(planId);
+    setMessage("");
+
+    try {
+      const response = await apiRequest<ScheduleDowngradeResponse>(
+        "/billing/schedule-downgrade",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            plan: planId,
+            interval,
+          }),
+        }
+      );
+
+      setSubscription((current) => ({
+        ...(current || {
+          plan: response.current_plan || currentPlan,
+          status: "active",
+        }),
+        pending_plan: response.pending_plan || planId.toUpperCase(),
+        pending_effective_at: response.pending_effective_at || null,
+        pending_change_type: response.change_type || "downgrade",
+      }));
+      setMessage("Changement programme. Vos acces actuels restent actifs jusqu'a la prochaine echeance.");
+    } catch (err) {
+      console.error(err);
+      setMessage("Impossible de programmer ce changement pour le moment.");
     } finally {
       setLoadingPlan(null);
     }
@@ -334,6 +436,47 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
           </div>
         )}
 
+        {token && subscription && (
+          <section className="mt-5 rounded-[1.75rem] border border-[#3fa9f5]/25 bg-[#3fa9f5]/10 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-[#8bd0ff]">
+                  Transition abonnement
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm font-black">
+                  <span className="rounded-full border border-white/15 bg-black/25 px-3 py-1">
+                    Plan actuel : {currentPlan}
+                  </span>
+                  {pendingPlan && (
+                    <span className="rounded-full border border-amber-300/35 bg-amber-300/12 px-3 py-1 text-amber-100">
+                      Plan futur : {pendingPlan}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-gray-300">
+                  {pendingPlan
+                    ? `Le changement prendra effet a la prochaine echeance${
+                        formatDate(subscription.pending_effective_at)
+                          ? ` : ${formatDate(subscription.pending_effective_at)}`
+                          : ""
+                      }.`
+                    : "Vos droits actifs suivent votre abonnement actuel. Un downgrade planifie garde les acces jusqu'a l'echeance."}
+                </p>
+              </div>
+
+              {planOrder[currentPlan] > 0 && pendingPlan !== "FREE" && (
+                <button
+                  onClick={() => scheduleDowngrade("free")}
+                  disabled={loadingPlan !== null}
+                  className="rounded-2xl border border-white/15 bg-black/25 px-4 py-3 text-sm font-black text-white transition hover:border-[#3fa9f5]/45 hover:bg-white/10 disabled:opacity-60"
+                >
+                  {loadingPlan === "free" ? "Programmation..." : "Revenir a Free a l'echeance"}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-5">
             <p className="text-xs uppercase tracking-[0.3em] text-emerald-300">
             Lecture de valeur
@@ -364,6 +507,23 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
           {plans.map((plan) => {
             const displayPrice = founder ? plan.founderPrice[interval] : plan.price[interval];
             const saving = yearlySaving(plan);
+            const targetPlan = plan.id.toUpperCase();
+            const targetRank = planOrder[targetPlan] ?? 0;
+            const currentRank = planOrder[currentPlan] ?? 0;
+            const isCurrentPlan = targetPlan === currentPlan && !pendingPlan;
+            const isPendingPlan = targetPlan === pendingPlan;
+            const isDowngrade = targetRank < currentRank;
+            const actionLabel = isCurrentPlan
+              ? "Plan actuel"
+              : isPendingPlan
+                ? "Plan futur programme"
+                : isDowngrade
+                  ? `Programmer ${plan.name}`
+                  : founder
+                    ? `Rejoindre ${plan.name} Founder`
+                    : plan.cta;
+            const isActionDisabled =
+              loadingPlan !== null || isCurrentPlan || isPendingPlan;
 
             return (
               <article
@@ -436,16 +596,22 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                     </span>
                   </div>
 
+                  {isDowngrade && !isPendingPlan && (
+                    <p className="mt-5 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-xs font-bold leading-relaxed text-amber-100">
+                      Ce changement prendra effet a la prochaine echeance. Vos acces actuels restent ouverts jusque-la.
+                    </p>
+                  )}
+
                   <button
-                    onClick={() => startCheckout(plan)}
-                    disabled={loadingPlan !== null}
+                    onClick={() => (isDowngrade ? scheduleDowngrade(plan.id) : startCheckout(plan))}
+                    disabled={isActionDisabled}
                     className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#3fa9f5] to-emerald-400 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-400/20 transition hover:-translate-y-0.5 hover:shadow-emerald-300/30 disabled:opacity-60"
                   >
                     {loadingPlan === plan.id
-                      ? "Ouverture du paiement..."
-                      : founder
-                        ? `Rejoindre ${plan.name} Founder`
-                        : plan.cta}
+                      ? isDowngrade
+                        ? "Programmation..."
+                        : "Ouverture du paiement..."
+                      : actionLabel}
                   </button>
                 </div>
               </article>
