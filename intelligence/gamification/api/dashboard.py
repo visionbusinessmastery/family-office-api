@@ -167,6 +167,144 @@ def build_upgrade(score: float, level, plan: str = "FREE"):
     }
 
 
+def parse_metadata(value):
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return {}
+
+
+def timeline_title(event_type: str, metadata: dict | None = None):
+    metadata = metadata or {}
+    explicit_title = metadata.get("title") or metadata.get("mission_title")
+    if explicit_title:
+        return explicit_title
+
+    event_type = str(event_type or "").lower()
+    if "mission" in event_type:
+        return "Mission patrimoniale validee"
+    if "badge" in event_type:
+        return "Accomplissement debloque"
+    if "profile" in event_type:
+        return "Profil enrichi"
+    if "portfolio" in event_type or "asset" in event_type:
+        return "Patrimoine mis a jour"
+    if "finance" in event_type or "cashflow" in event_type:
+        return "Contexte financier enrichi"
+    return "Progression enregistree"
+
+
+def timeline_description(event_type: str, metadata: dict | None = None):
+    metadata = metadata or {}
+    explicit_description = metadata.get("description") or metadata.get("reason")
+    if explicit_description:
+        return explicit_description
+
+    event_type = str(event_type or "").lower()
+    if "mission" in event_type:
+        return "Une action mesurable a ete ajoutee a ton parcours White Rock."
+    if "badge" in event_type:
+        return "Un jalon de progression a ete atteint."
+    if "profile" in event_type:
+        return "Ton profil devient plus exploitable pour le pilotage patrimonial."
+    if "portfolio" in event_type or "asset" in event_type:
+        return "Une nouvelle information patrimoniale ameliore la vision consolidee."
+    if "finance" in event_type or "cashflow" in event_type:
+        return "Le contexte revenus, charges ou epargne devient plus lisible."
+    return "Un evenement de progression a ete enregistre par White Rock."
+
+
+def build_progression_timeline(conn, user_id: int):
+    ensure_gamification_tables(conn)
+
+    events = []
+
+    xp_rows = conn.execute(text("""
+        SELECT event_type, xp, metadata, created_at
+        FROM xp_events
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC
+        LIMIT 25
+    """), {"user_id": user_id}).fetchall()
+
+    for row in xp_rows:
+        metadata = parse_metadata(row.metadata)
+        events.append({
+            "date": row.created_at.isoformat() if row.created_at else None,
+            "type": row.event_type or "xp_event",
+            "title": timeline_title(row.event_type, metadata),
+            "description": timeline_description(row.event_type, metadata),
+            "impact": metadata.get("impact") or "Ameliore la qualite du pilotage patrimonial.",
+            "xp": int(row.xp or 0),
+            "source": "xp_events",
+        })
+
+    profile = conn.execute(text("""
+        SELECT xp, level_name, status, created_at, updated_at
+        FROM progression_profiles
+        WHERE user_id = :user_id
+    """), {"user_id": user_id}).fetchone()
+
+    if profile:
+        events.append({
+            "date": profile.updated_at.isoformat() if profile.updated_at else None,
+            "type": "level_state",
+            "title": f"Niveau actuel: {profile.level_name or 'Foundation'}",
+            "description": f"Statut de parcours: {profile.status or 'Foundation'}.",
+            "impact": "Donne une lecture consolidee de ton avancement White Rock.",
+            "xp": int(profile.xp or 0),
+            "source": "progression_profiles",
+        })
+        events.append({
+            "date": profile.created_at.isoformat() if profile.created_at else None,
+            "type": "profile_created",
+            "title": "Parcours White Rock initialise",
+            "description": "La progression patrimoniale a commence a etre suivie.",
+            "impact": "Cree le point de depart de la trajectoire.",
+            "xp": 0,
+            "source": "progression_profiles",
+        })
+
+    gamification = conn.execute(text("""
+        SELECT badges, updated_at
+        FROM user_gamification
+        WHERE user_id = :user_id
+    """), {"user_id": user_id}).fetchone()
+
+    if gamification and gamification.badges:
+        try:
+            if isinstance(gamification.badges, str) and gamification.badges.startswith("["):
+                badges = json.loads(gamification.badges)
+            else:
+                badges = [
+                    item.strip()
+                    for item in str(gamification.badges).split(",")
+                    if item.strip()
+                ]
+        except Exception:
+            badges = []
+
+        if badges:
+            events.append({
+                "date": gamification.updated_at.isoformat() if gamification.updated_at else None,
+                "type": "accomplishments_state",
+                "title": f"{len(badges)} accomplissement(s) actifs",
+                "description": ", ".join(badges[:5]),
+                "impact": "Rend visibles les jalons deja atteints dans le parcours.",
+                "xp": 0,
+                "source": "user_gamification",
+            })
+
+    events = [event for event in events if event.get("date")]
+    events.sort(key=lambda item: item.get("date") or "", reverse=True)
+
+    return events[:20]
+
+
 # =========================
 # GET USER ID
 # =========================
@@ -296,3 +434,28 @@ def get_gamification(user=Depends(get_current_user)):
         set_cache(cache_key, result, ttl=300)
 
         return result
+
+
+@router.get("/progression-timeline")
+def get_progression_timeline(user=Depends(get_current_user)):
+    email = user.get("email") if isinstance(user, dict) else user
+
+    with engine.begin() as conn:
+        identity = get_user_identity(conn, email)
+        user_id = identity["id"] if identity else None
+        plan = identity["plan"] if identity else "FREE"
+
+        if not user_id:
+            return {
+                "version": "progression-timeline-v1",
+                "plan": plan,
+                "timeline": [],
+            }
+
+        timeline = build_progression_timeline(conn, user_id)
+
+        return {
+            "version": "progression-timeline-v1",
+            "plan": plan,
+            "timeline": timeline,
+        }
