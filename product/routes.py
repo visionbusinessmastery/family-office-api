@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
@@ -520,8 +522,39 @@ def build_future_view(data_profile: dict, score: int, plan: str):
     }
 
 
-def build_wealth_timeline(data_profile: dict):
+MONTH_LABELS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"]
+
+
+def add_months(base_date: date, months: int):
+    month_index = base_date.month - 1 + max(months, 0)
+    year = base_date.year + month_index // 12
+    month = month_index % 12 + 1
+    return date(year, month, 1)
+
+
+def estimate_months_to_target(current_wealth: float, monthly_capacity: float, annual_return: float, target: float):
+    if target <= current_wealth:
+        return 0
+    if monthly_capacity <= 0 and current_wealth <= 0:
+        return None
+    value = current_wealth
+    monthly_return = (1 + annual_return) ** (1 / 12) - 1
+    for month in range(1, 481):
+        value = value * (1 + monthly_return) + max(monthly_capacity, 0)
+        if value >= target:
+            return month
+    return None
+
+
+def format_month_label(target_date: date):
+    return f"{MONTH_LABELS[target_date.month - 1]} {target_date.year}"
+
+
+def build_wealth_timeline(data_profile: dict, future_view: dict | None = None):
     current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    annual_return = float((future_view or {}).get("annual_return") or 4.5) / 100
+    today = date.today()
     stages = [
         ("Aujourd'hui", 0),
         ("100k", 100000),
@@ -537,21 +570,46 @@ def build_wealth_timeline(data_profile: dict):
         if target == 0:
             status = "current"
             progress = 100
+            months_to_target = 0
+            estimated_date = today.isoformat()
+            estimated_label = "Aujourd'hui"
         else:
             status = "achieved" if current_wealth >= target else "locked"
             progress = min(100, round((current_wealth / target) * 100, 1)) if target else 100
+            months_to_target = estimate_months_to_target(current_wealth, monthly_capacity, annual_return, float(target))
+            if months_to_target is None:
+                estimated_date = None
+                estimated_label = "Date a confirmer"
+            elif months_to_target == 0:
+                estimated_date = today.isoformat()
+                estimated_label = "Franchi"
+            else:
+                target_date = add_months(today, months_to_target)
+                estimated_date = target_date.isoformat()
+                estimated_label = format_month_label(target_date)
             if status == "locked" and next_stage is None:
-                next_stage = {"label": label, "target": target}
+                next_stage = {
+                    "label": label,
+                    "target": target,
+                    "months_to_target": months_to_target,
+                    "estimated_date": estimated_date,
+                    "estimated_label": estimated_label,
+                }
 
         timeline.append({
             "label": label,
             "target": target,
             "status": status,
             "progress_percent": progress,
+            "distance_remaining": max(round(target - current_wealth, 2), 0) if target else 0,
+            "months_to_target": months_to_target,
+            "estimated_date": estimated_date,
+            "estimated_label": estimated_label,
         })
 
     return {
         "current_wealth": round(current_wealth, 2),
+        "monthly_velocity": round(monthly_capacity, 2),
         "progress_percent": min(100, round((current_wealth / 1000000) * 100, 1)) if current_wealth else 0,
         "next_milestone": next_stage,
         "stages": timeline,
@@ -1045,6 +1103,75 @@ def build_personal_command_center(mission_control: dict, opportunity_radar: dict
     }
 
 
+def build_wealth_map(data_profile: dict, wealth_timeline: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_velocity = float(wealth_timeline.get("monthly_velocity") or 0)
+    destination = wealth_timeline.get("next_milestone") or {"label": "1M", "target": 1000000}
+    target = float(destination.get("target") or 1000000)
+    return {
+        "title": "Wealth Map",
+        "destination": destination,
+        "current_position": round(current_wealth, 2),
+        "progress_percent": min(100, round((current_wealth / target) * 100, 1)) if target > 0 else 0,
+        "distance_remaining": max(round(target - current_wealth, 2), 0),
+        "monthly_velocity": round(monthly_velocity, 2),
+        "estimated_label": destination.get("estimated_label"),
+        "months_to_destination": destination.get("months_to_target"),
+    }
+
+
+def build_invisible_wealth(data_profile: dict, digital_twin: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    scenarios = digital_twin.get("scenarios") or []
+    best = max(scenarios, key=lambda item: float(item.get("value_10y") or 0), default=None)
+    projected = float((best or {}).get("value_10y") or current_wealth)
+    return {
+        "title": "Richesse invisible",
+        "current_wealth": round(current_wealth, 2),
+        "projected_wealth": round(projected, 2),
+        "untapped_capital": max(round(projected - current_wealth, 2), 0),
+        "best_path": best,
+        "story": "Ecart entre la position actuelle et le meilleur futur simule par le backend.",
+    }
+
+
+def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency_detector: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    portfolio_value = float(data_profile.get("portfolio_value") or 0)
+    real_estate_value = float(data_profile.get("real_estate_value") or 0)
+    business_value = float(data_profile.get("business_value") or 0)
+    debt_total = float(data_profile.get("debt_total") or 0)
+    concentration_flag = any(
+        item.get("type") in {"concentration", "asset_concentration"}
+        for item in (weak_signals.get("signals") or []) + (dependency_detector.get("signals") or [])
+    )
+
+    def status(score: int):
+        if score >= 75:
+            return "green"
+        if score >= 45:
+            return "amber"
+        return "red"
+
+    diversification_domains = sum(1 for value in [portfolio_value, real_estate_value, business_value] if value > 0)
+    items = [
+        ("growth", "Croissance", 80 if monthly_capacity > 0 or business_value > 0 else 40),
+        ("diversification", "Diversification", 35 + diversification_domains * 20),
+        ("concentration", "Concentration", 35 if concentration_flag else 80),
+        ("income", "Revenus", 80 if data_profile.get("monthly_income", 0) else 35),
+        ("liquidity", "Liquidite", 75 if monthly_capacity > 0 else 40),
+        ("debt", "Dette", 40 if debt_total > max(current_wealth * 0.35, 1) else 75),
+    ]
+    return {
+        "title": "Family Office Radar",
+        "items": [
+            {"key": key, "label": label, "score": min(100, score), "status": status(min(100, score))}
+            for key, label, score in items
+        ],
+    }
+
+
 @router.get("/context")
 def product_context(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -1079,7 +1206,7 @@ def product_context(email: str = Depends(get_current_user)):
         missions = build_missions(data_profile, score, plan)
         strategic_brief = build_strategic_brief(data_profile, score, plan)
         future_view = build_future_view(data_profile, score, plan)
-        wealth_timeline = build_wealth_timeline(data_profile)
+        wealth_timeline = build_wealth_timeline(data_profile, future_view)
         mission_control = build_mission_control(strategic_brief, missions, future_view)
         family_office_view = build_family_office_view(data_profile, plan)
         wealth_gps = build_wealth_gps(data_profile, future_view)
@@ -1098,6 +1225,9 @@ def product_context(email: str = Depends(get_current_user)):
             dependency_detector,
             time_value,
         )
+        wealth_map = build_wealth_map(data_profile, wealth_timeline)
+        invisible_wealth = build_invisible_wealth(data_profile, digital_twin)
+        family_office_radar = build_family_office_radar(data_profile, weak_signals, dependency_detector)
 
     return {
         "plan": plan,
@@ -1124,6 +1254,9 @@ def product_context(email: str = Depends(get_current_user)):
         "wealth_blocks": wealth_blocks,
         "dependency_detector": dependency_detector,
         "personal_command_center": personal_command_center,
+        "wealth_map": wealth_map,
+        "invisible_wealth": invisible_wealth,
+        "family_office_radar": family_office_radar,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,
