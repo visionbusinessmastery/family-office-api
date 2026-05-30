@@ -216,9 +216,7 @@ export default function Home() {
         <section className="mb-8 rounded-2xl border border-amber-300/20 bg-black/50 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
             <div>
-              <p className="text-xs uppercase tracking-widest text-amber-200">
-                Legacy
-              </p>
+              <p className="text-xs uppercase tracking-widest text-amber-200">Dynasty</p>
               <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">
                 Beyond Financial Freedom
               </h2>
@@ -259,3 +257,4 @@ export default function Home() {
     </AuthExperienceShell>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import CockpitBackLink from "@/components/CockpitBackLink";
@@ -31,6 +31,19 @@ type Plan = {
 
 type PricingPlansProps = {
   mode: "standard" | "founder";
+};
+
+type BackendPricingGroup = {
+  label: string;
+  items: string[];
+};
+
+type BackendBillingPlan = {
+  id: string;
+  name?: string;
+  entitlements?: {
+    pricing_groups?: BackendPricingGroup[];
+  };
 };
 
 type CurrentSubscription = {
@@ -87,7 +100,7 @@ const ladder = [
   { label: "GOLD", role: "Trajectoire", tone: "border-[#3fa9f5]/25 bg-[#3fa9f5]/10 text-[#8bd0ff]" },
   { label: "ELITE", role: "Optimisation", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" },
   { label: "LIBERTY", role: "Arbitrages", tone: "border-amber-300/50 bg-amber-300/[0.12] text-amber-100" },
-  { label: "LEGACY", role: "Dynasty Office", tone: "border-[#ffe600] bg-[#ffe600]/[0.26] text-[#fff8a6] shadow-lg shadow-[#ffe600]/20" },
+  { label: "DYNASTY", role: "Transmission", tone: "border-[#ffe600] bg-[#ffe600]/[0.26] text-[#fff8a6] shadow-lg shadow-[#ffe600]/20" },
 ];
 
 const plans: Plan[] = [
@@ -203,7 +216,7 @@ const plans: Plan[] = [
     capabilityGroups: [
       {
         label: "Family Office personnel",
-        items: ["50 assets financiers", "Immobilier illimite", "Business illimites", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Scenarios de vie avances", "Probabilites d'atteinte", "Architecture patrimoniale", "Legacy planning"],
+        items: ["50 assets financiers", "Immobilier illimite", "Business illimites", "Family Office Mode complet", "Comptes enfants", "Multi-objectifs", "Scenarios de vie avances", "Probabilites d'atteinte", "Architecture patrimoniale", "Dynasty planning"],
       },
       {
         label: "Architecture patrimoniale",
@@ -213,7 +226,7 @@ const plans: Plan[] = [
   },
   {
     id: "legacy",
-    name: "Legacy",
+    name: "Dynasty",
     subtitle: "Dynasty Office",
     rank: "Niveau 4",
     badge: "Dynasty Grade",
@@ -239,11 +252,11 @@ const plans: Plan[] = [
     },
     tone: "border-[#ffe600] bg-[#ffe600]/[0.22] shadow-2xl shadow-[#ffe600]/25 ring-1 ring-[#fff8a6]/25",
     glow: "from-[#ffe600]/65 via-[#facc15]/35 to-[#3fa9f5]/10",
-    cta: "Entrer Legacy",
+    cta: "Entrer Dynasty",
     capabilityGroups: [
       {
         label: "Dynasty Layer",
-        items: ["Assets financiers illimites", "Immobilier et business illimites", "Projection 30 ans", "Transmission familiale", "Family Vault", "Heirs mode", "Protection layer", "Asset protection", "Dynasty governance", "Succession planning", "Global strategy", "Legacy timeline"],
+        items: ["Assets financiers illimites", "Immobilier et business illimites", "Projection 30 ans", "Transmission familiale", "Family Vault", "Heirs mode", "Protection layer", "Asset protection", "Dynasty governance", "Succession planning", "Global strategy", "Dynasty timeline"],
       },
       {
         label: "Family Office Infrastructure",
@@ -257,6 +270,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null);
+  const [backendPlans, setBackendPlans] = useState<Record<string, BackendBillingPlan>>({});
   const founder = mode === "founder";
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -299,6 +313,25 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
     };
   }, [token]);
 
+  useEffect(() => {
+    let alive = true;
+    apiRequest<{ plans?: BackendBillingPlan[] }>("/billing/plans")
+      .then((data) => {
+        if (!alive) return;
+        const indexed = Object.fromEntries(
+          (data.plans || []).map((plan) => [plan.id, plan])
+        );
+        setBackendPlans(indexed);
+      })
+      .catch(() => {
+        if (alive) setBackendPlans({});
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const startCheckout = async (plan: Plan) => {
     if (!token) {
       window.location.assign(
@@ -335,7 +368,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
     } catch (err) {
       console.error(err);
       setMessage(
-        "Impossible d'ouvrir le paiement. Réessaie dans quelques instants."
+        "Impossible d'ouvrir le paiement. RÃ©essaie dans quelques instants."
       );
     } finally {
       setLoadingPlan(null);
@@ -408,8 +441,8 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                 </h1>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-300 sm:text-base">
                   {founder
-                    ? "Une fenêtre limitée pour entrer plus tôt dans l'architecture White Rock, avec une perception de statut plus rare et plus fondatrice."
-                    : "Chaque niveau inclut le précédent et débloque une couche plus sophistiquée de pilotage patrimonial."}
+                    ? "Une fenÃªtre limitÃ©e pour entrer plus tÃ´t dans l'architecture White Rock, avec une perception de statut plus rare et plus fondatrice."
+                    : "Chaque niveau inclut le prÃ©cÃ©dent et dÃ©bloque une couche plus sophistiquÃ©e de pilotage patrimonial."}
                 </p>
               </div>
 
@@ -448,8 +481,8 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
 
         {founder && (
           <div className="mt-5 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm leading-relaxed text-emerald-100">
-            Founder Access est pensé comme une entrée rare : même parcours de paiement,
-            même sécurité, mais une présentation plus exclusive pour les premiers membres.
+            Founder Access est pensÃ© comme une entrÃ©e rare : mÃªme parcours de paiement,
+            mÃªme sÃ©curitÃ©, mais une prÃ©sentation plus exclusive pour les premiers membres.
           </div>
         )}
 
@@ -514,7 +547,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/10 p-4">
               <p className="text-sm font-black">Chaque niveau debloque un univers</p>
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Analytics, Wealth OS, Freedom Engine puis Dynasty Office apparaissent comme des paliers de puissance.
+                Analytics, Wealth OS, Freedom Engine puis Dynasty apparaissent comme des paliers de puissance.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -533,10 +566,15 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
             const targetPlan = plan.id.toUpperCase();
             const targetRank = planOrder[targetPlan] ?? 0;
             const currentRank = planOrder[currentPlan] ?? 0;
+            const backendPlan = backendPlans[plan.id];
+            const displayGroups =
+              backendPlan?.entitlements?.pricing_groups?.length
+                ? backendPlan.entitlements.pricing_groups
+                : plan.capabilityGroups;
             const isCurrentPlan = targetPlan === currentPlan && !pendingPlan;
             const isPendingPlan = targetPlan === pendingPlan;
             const isDowngrade = targetRank < currentRank;
-            const optionCount = plan.capabilityGroups.reduce(
+            const optionCount = displayGroups.reduce(
               (total, group) => total + group.items.length,
               0
             );
@@ -595,7 +633,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
 
                   <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4">
                     <p className="text-xs uppercase tracking-widest text-emerald-300">
-                      Ce que vous débloquez
+                      Ce que vous dÃ©bloquez
                     </p>
                     <p className="mt-2 text-sm font-black text-white">{plan.unlock}</p>
                   </div>
@@ -652,7 +690,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                   </div>
 
                   <div className="mt-5 space-y-3">
-                    {plan.capabilityGroups.map((group) => (
+                    {displayGroups.map((group) => (
                       <div key={group.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                         <p className="text-xs font-black uppercase tracking-widest text-gray-500">
                           {group.label}
@@ -660,7 +698,7 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
                         <ul className="mt-3 space-y-2 text-sm text-gray-300">
                           {group.items.map((item) => (
                             <li key={item} className="flex gap-2">
-                              <span className="text-emerald-300">•</span>
+                              <span className="text-emerald-300">â€¢</span>
                               <span>{item}</span>
                             </li>
                           ))}
@@ -702,4 +740,5 @@ export default function PricingPlans({ mode }: PricingPlansProps) {
     </main>
   );
 }
+
 

@@ -15,7 +15,7 @@ export default function Header({ dashboard, onUpgrade }: HeaderProps) {
     nextPlan === "liberty"
       ? "Debloquer Liberty"
       : nextPlan === "legacy"
-        ? "Passer Legacy"
+        ? "Passer Dynasty"
       : nextPlan === "elite"
         ? "Passer en Wealth OS"
         : "Debloquer Gold";
@@ -72,7 +72,7 @@ export default function Header({ dashboard, onUpgrade }: HeaderProps) {
                   plan
                 )}`}
               >
-                {plan}
+                {plan === "LEGACY" ? "DYNASTY" : plan}
               </span>
             </div>
 

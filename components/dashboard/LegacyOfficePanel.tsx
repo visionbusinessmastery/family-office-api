@@ -8,7 +8,7 @@ type LegacyOfficePanelProps = {
 
 const fallbackInsights = [
   "Le vrai luxe est la stabilite.",
-  "La richesse se construit vite. L'heritage demande plusieurs generations.",
+  "La richesse se construit vite. Une dynastie patrimoniale demande plusieurs generations.",
   "Ton patrimoine doit survivre a tes emotions.",
 ];
 
@@ -34,13 +34,13 @@ const legacyModules = [
     description: "Residence fiscale, diversification geographique et international.",
   },
   {
-    title: "Legacy Timeline",
+    title: "Dynasty Timeline",
     description: "Vision 10 ans, 20 ans et projection generationnelle.",
   },
 ];
 
 const scoreCards = [
-  ["Legacy Score", "legacy_score"],
+  ["Dynasty Score", "legacy_score"],
   ["Dynasty Stability", "dynasty_stability_score"],
   ["Transmission", "transmission_readiness"],
   ["Gouvernance", "family_governance_index"],
@@ -59,7 +59,7 @@ export default function LegacyOfficePanel({
     return (
       <section className="rounded-2xl border border-amber-300/20 bg-gradient-to-br from-[#080b12] via-black to-[#111827] p-5 shadow-2xl">
         <p className="text-xs uppercase tracking-widest text-amber-200">
-          Legacy
+          Dynasty
         </p>
         <h2 className="mt-2 text-2xl font-black text-white">
           Dynasty Office
@@ -73,7 +73,7 @@ export default function LegacyOfficePanel({
             onClick={() => onUpgrade("legacy")}
             className="mt-5 rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-black transition hover:bg-amber-200"
           >
-            Debloquer Legacy
+            Debloquer Dynasty
           </button>
         )}
       </section>
@@ -85,7 +85,7 @@ export default function LegacyOfficePanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-widest text-amber-200">
-            Legacy
+            Dynasty
           </p>
           <h2 className="mt-2 text-2xl font-black text-white">
             Dynasty Office
@@ -113,7 +113,7 @@ export default function LegacyOfficePanel({
 
       <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-4">
-          <h3 className="font-bold text-amber-100">Signaux Legacy</h3>
+          <h3 className="font-bold text-amber-100">Signaux Dynasty</h3>
           <div className="mt-3 space-y-3">
             {insights.slice(0, 3).map((insight) => (
               <p key={insight} className="text-sm leading-relaxed text-gray-300">

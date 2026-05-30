@@ -993,7 +993,7 @@ export default function Dashboard() {
       ? [
           {
             key: "legacy" as const,
-            label: "Legacy",
+            label: "Dynasty",
             description: "Transmission",
           },
         ]
@@ -2039,7 +2039,7 @@ export default function Dashboard() {
               {!planAllows(currentPlan, "LEGACY") && (
                 <LockedSection
                   title="Dynasty Office"
-                  description="LEGACY ouvre la projection generationnelle, la gouvernance familiale, la protection et les scenarios successoraux."
+                  description="Dynasty ouvre la projection generationnelle, la gouvernance familiale, la protection et les scenarios successoraux."
                   onUpgrade={handleUpgradePlan}
                   plan="legacy"
                 />
@@ -2364,7 +2364,7 @@ export default function Dashboard() {
           {activeSection === "legacy" && legacyNavigationEnabled && (
             <div className="space-y-6">
               <SectionHeader
-                eyebrow="Legacy"
+                eyebrow="Dynasty"
                 title="Dynasty Office"
                 description="Transmission, héritiers, gouvernance familiale, protection et stratégie long terme."
               />
@@ -2500,7 +2500,7 @@ export default function Dashboard() {
                     Liberty - Sovereign Wealth
                   </button>
                   <button onClick={() => handleUpgradePlan("legacy")} className="rounded-xl border border-amber-300/40 bg-black px-4 py-2 text-sm font-semibold text-amber-200">
-                    Legacy - Dynasty Office
+                    Dynasty Office
                   </button>
                   <button onClick={handleOpenBillingPortal} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white">
                     Gerer mon abonnement

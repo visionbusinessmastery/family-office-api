@@ -73,7 +73,7 @@ const dataLabels: Record<string, string> = {
   real_estate: "Actifs immobiliers",
   ethan_memory: "Memoire Ethan",
   notifications: "Notifications",
-  legacy: "Elements Legacy",
+  legacy: "Elements Dynasty",
   oauth_accounts: "Comptes sociaux",
 };
 
@@ -430,3 +430,4 @@ export default function PrivacyCenterPage() {
     </AuthExperienceShell>
   );
 }
+

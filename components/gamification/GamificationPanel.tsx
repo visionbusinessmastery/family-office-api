@@ -24,7 +24,7 @@ const badgeCollection = [
   { key: "Risk Sentinel", label: "Risk Sentinel", rarity: "Rare", tone: "border-blue-300/45 bg-blue-300/10 text-blue-100" },
   { key: "Strategic Operator", label: "Strategic Operator", rarity: "Epic", tone: "border-orange-300/45 bg-orange-300/10 text-orange-100" },
   { key: "Family Protector", label: "Family Protector", rarity: "Epic", tone: "border-amber-200/45 bg-amber-200/10 text-amber-100" },
-  { key: "Legacy Builder", label: "Legacy Builder", rarity: "Legend", tone: "border-amber-300/55 bg-amber-300/10 text-amber-100" },
+  { key: "Dynasty Builder", label: "Dynasty Builder", rarity: "Legend", tone: "border-amber-300/55 bg-amber-300/10 text-amber-100" },
 ];
 
 function BadgeMedal({
@@ -282,7 +282,7 @@ export default function GamificationPanel({
             <p className="mt-1 text-sm font-semibold text-white">
               {gamification.upgrade?.title ||
                 (recommendedPlan === "legacy"
-                  ? "Passer en LEGACY - Dynasty Office"
+                  ? "Passer en DYNASTY - Family Office"
                   : recommendedPlan === "liberty"
                     ? "Debloquer LIBERTY - Sovereign Wealth"
                     : recommendedPlan === "elite"
