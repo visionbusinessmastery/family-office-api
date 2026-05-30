@@ -1322,6 +1322,20 @@ def build_family_office_ceo_dashboard(data_profile: dict, strategic_intelligence
     return {"title": "Family Office CEO", "question": "Comment piloter ma vie financiere comme une holding personnelle ?", "operating_reading": operating_reading, "wealth": round(current_wealth, 2), "monthly_income": round(monthly_income, 2), "monthly_expenses": round(monthly_expenses, 2), "monthly_capacity": round(monthly_capacity, 2), "burn_rate": round(burn_rate, 2), "runway_months": runway_months, "debt_total": round(float(data_profile.get("debt_total") or 0), 2), "active_projects": int(data_profile.get("completed_steps") or 0), "objective": wealth_narrative.get("memorable_insight"), "decision": decision, "risk": risk, "weakest_dimension": weakest_dimension, "mission": missions[0] if missions else None}
 
 
+def build_wealth_intelligence(wealth_narrative: dict, family_office_view: dict, hidden_wealth: dict, gravity_center: dict):
+    return {"title": "Wealth Intelligence", "question": "Ou j'en suis ?", "headline": wealth_narrative.get("headline"), "narrative": wealth_narrative.get("narrative"), "memorable_insight": wealth_narrative.get("memorable_insight"), "why_it_matters": wealth_narrative.get("why_it_matters"), "visible_wealth": wealth_narrative.get("visible_wealth"), "activable_wealth": wealth_narrative.get("activable_wealth"), "total_potential": wealth_narrative.get("total_potential"), "gravity_reading": gravity_center.get("reading") or wealth_narrative.get("gravity_reading"), "domains": family_office_view.get("allocation") or [], "hidden_items": hidden_wealth.get("items") or []}
+
+
+def build_decision_intelligence(strategic_intelligence: dict, family_office_ceo: dict):
+    cards = strategic_intelligence.get("cards") or []
+    decision = next((card for card in cards if card.get("key") == "decision"), {})
+    risk = next((card for card in cards if card.get("key") == "risk"), {})
+    opportunity = next((card for card in cards if card.get("key") == "opportunity"), {})
+    leverage = next((card for card in cards if card.get("key") == "leverage"), {})
+    mission = family_office_ceo.get("mission") or {}
+    return {"title": "Decision Intelligence", "question": "Qu'est-ce que je fais maintenant ?", "why_it_matters": "Une bonne interface patrimoniale ne montre pas toutes les possibilites: elle isole la decision utile.", "decision": decision, "risk": risk, "opportunity": opportunity, "leverage": leverage, "next_action": decision.get("action") or opportunity.get("action") or mission.get("description"), "cards": [risk, opportunity, decision, leverage]}
+
+
 def build_wealth_narrative(data_profile: dict, hidden_wealth: dict, gravity_center: dict, wealth_map: dict, leverage_engine: dict):
     current_wealth = float(data_profile.get("current_wealth") or 0)
     activable = float(hidden_wealth.get("activable_wealth") or 0)
@@ -1430,6 +1444,8 @@ def product_context(email: str = Depends(get_current_user)):
         strategic_intelligence = build_strategic_intelligence(mission_control, opportunity_radar, decision_engine, leverage_engine, board_briefing)
         family_office_intelligence = build_family_office_intelligence(family_office_scorecard, stress_tests, dependency_detector, weak_signals, life_wealth, family_office_radar)
         family_office_ceo = build_family_office_ceo_dashboard(data_profile, strategic_intelligence, wealth_narrative, family_office_intelligence, missions)
+        wealth_intelligence = build_wealth_intelligence(wealth_narrative, family_office_view, hidden_wealth, gravity_center)
+        decision_intelligence = build_decision_intelligence(strategic_intelligence, family_office_ceo)
 
     return {
         "plan": plan,
@@ -1468,8 +1484,10 @@ def product_context(email: str = Depends(get_current_user)):
         "family_office_scorecard": family_office_scorecard,
         "board_briefing": board_briefing,
         "wealth_narrative": wealth_narrative,
+        "wealth_intelligence": wealth_intelligence,
         "future_intelligence": future_intelligence,
         "strategic_intelligence": strategic_intelligence,
+        "decision_intelligence": decision_intelligence,
         "family_office_intelligence": family_office_intelligence,
         "family_office_ceo": family_office_ceo,
         "founder": {
