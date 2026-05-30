@@ -828,6 +828,7 @@ export default function Dashboard() {
     legacyOverview,
     onboarding,
     finance,
+    financeOverview,
     gamification,
     commandCenter,
     workspaces,
@@ -2188,28 +2189,26 @@ export default function Dashboard() {
             <div className="space-y-6">
               <SectionHeader
                 eyebrow="Finances"
-                title="Base financiere"
-                description="Revenus, charges, epargne, dettes et cashflow. Cette section sert a clarifier les fondations avant l'allocation."
+                title="Financial Clarity"
+                description="Cashflow, reste a vivre, epargne et dettes. Cette section clarifie ta marge de liberte mensuelle."
               />
 
               <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
-                <div className="mb-4 flex justify-between gap-4">
-                  <h2 className="text-2xl font-bold">Situation</h2>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-emerald-300">
+                      Realite financiere actuelle
+                    </p>
+                    <h2 className="mt-1 text-2xl font-bold">Marge de liberte</h2>
+                  </div>
                   <button
                     onClick={handleUpdateOnboarding}
-                    className="rounded-xl bg-[#3fa9f5] px-4 py-2"
+                    className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-bold text-gray-100 transition hover:border-[#3fa9f5]/40 hover:bg-[#3fa9f5]/10"
                   >
-                    Modifier
+                    Modifier le profil
                   </button>
                 </div>
-                <FinanceModule
-                  revenusMensuels={
-                    onboarding?.revenus_mensuels ?? onboarding?.monthly_income ?? 0
-                  }
-                  chargesMensuelles={
-                    onboarding?.charges_mensuelles ?? onboarding?.monthly_expenses ?? 0
-                  }
-                />
+                <FinanceModule overview={financeOverview} />
               </section>
 
               <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">

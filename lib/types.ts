@@ -16,6 +16,27 @@ export type FinancePayload = {
 
 export type FinanceData = Record<FinanceType, FinanceEntry[]>;
 
+export type FinanceOverviewData = {
+  version?: string;
+  source?: string;
+  totals?: {
+    income?: number | string;
+    expenses?: number | string;
+    cashflow?: number | string;
+    living_margin?: number | string;
+    savings?: number | string;
+    debt?: number | string;
+  };
+  ratios?: {
+    savings_rate?: number | string;
+    debt_to_income?: number | string;
+    liquid_months?: number | string;
+  };
+  counts?: Partial<Record<FinanceType, number>>;
+  reading?: string;
+  priority?: string;
+};
+
 export type ChildAccount = {
   id: number;
   child_name: string;

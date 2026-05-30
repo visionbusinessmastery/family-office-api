@@ -8,6 +8,7 @@ import type {
   CommandCenter,
   DashboardSummary,
   FinanceData,
+  FinanceOverviewData,
   GamificationData,
   LegacyOverview,
   OnboardingData,
@@ -95,6 +96,7 @@ type DashboardSessionSnapshot = {
   billingSubscription?: BillingSubscription | null;
   progressionTimeline: ProgressionTimelineData | null;
   finance: FinanceData;
+  financeOverview: FinanceOverviewData | null;
 };
 
 const extractPortfolio = (data: PortfolioResponse | null) => {
@@ -231,6 +233,8 @@ export function useDashboard() {
   const [progressionTimeline, setProgressionTimeline] =
     useState<ProgressionTimelineData | null>(null);
   const [finance, setFinance] = useState<FinanceData>(emptyFinance);
+  const [financeOverview, setFinanceOverview] =
+    useState<FinanceOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const applyUserProfile = useCallback((userData: UserProfile | null) => {
@@ -294,6 +298,7 @@ export function useDashboard() {
     setBillingSubscription(snapshot.billingSubscription || null);
     setProgressionTimeline(snapshot.progressionTimeline || null);
     setFinance(snapshot.finance);
+    setFinanceOverview(snapshot.financeOverview || null);
   }, []);
 
   const loadUserProfile = useCallback(async () => {
@@ -376,6 +381,12 @@ export function useDashboard() {
   const loadFinance = useCallback(async () => {
     const data = await safeFetch<Partial<FinanceData>>("/finance/");
     setFinance({ ...emptyFinance, ...data });
+  }, [safeFetch]);
+
+  const loadFinanceOverview = useCallback(async () => {
+    const data = await safeFetch<FinanceOverviewData>("/finance/overview");
+    setFinanceOverview(data || null);
+    return data;
   }, [safeFetch]);
 
   const loadPortfolio = useCallback(async () => {
@@ -496,6 +507,7 @@ export function useDashboard() {
       loadVentureAssets(),
       loadBusinessIntelligence(),
       loadFinance(),
+      loadFinanceOverview(),
       loadCategoryOpportunities(),
       loadOnboarding(userData),
       loadCommandCenter(),
@@ -505,6 +517,7 @@ export function useDashboard() {
   }, [
     loadCommandCenter,
     loadFinance,
+    loadFinanceOverview,
     loadCategoryOpportunities,
     loadGamification,
     loadProgressionTimeline,
@@ -529,6 +542,7 @@ export function useDashboard() {
       loadCommandCenter(),
       loadCategoryOpportunities(),
       loadBusinessIntelligence(),
+      loadFinanceOverview(),
       loadGamification(),
       loadProgressionTimeline(),
     ]);
@@ -537,6 +551,7 @@ export function useDashboard() {
     loadCategoryOpportunities,
     loadCommandCenter,
     loadBusinessIntelligence,
+    loadFinanceOverview,
     loadGamification,
     loadProgressionTimeline,
     loadProductContext,
@@ -617,6 +632,7 @@ export function useDashboard() {
       billingSubscription,
       progressionTimeline,
       finance,
+      financeOverview,
     });
   }, [
     billingSubscription,
@@ -625,6 +641,7 @@ export function useDashboard() {
     commandCenter,
     dashboard,
     finance,
+    financeOverview,
     gamification,
     history,
     intelligence,
@@ -665,8 +682,10 @@ export function useDashboard() {
     billingSubscription,
     progressionTimeline,
     finance,
+    financeOverview,
     gamification,
     loadFinance,
+    loadFinanceOverview,
     loadPortfolio,
     loadProductContext,
     loadWorkspaces,

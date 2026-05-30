@@ -51,10 +51,10 @@ export default function ChildAccountsPanel({ enabled, onUpgrade }: ChildAccounts
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">Liberty+</p>
-            <h3 className="mt-2 text-xl font-black text-white">Comptes enfants</h3>
+            <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">Transmission Preview</p>
+            <h3 className="mt-2 text-xl font-black text-white">Objectifs enfants et transmission</h3>
             <p className="mt-2 text-sm text-gray-400">
-              Portefeuille enfant, objectifs education et transmission deviennent disponibles a partir de Liberty.
+              Disponible a partir de Liberty: gestion des comptes enfants, objectifs education et trajectoire de transmission.
             </p>
           </div>
           {onUpgrade && (
