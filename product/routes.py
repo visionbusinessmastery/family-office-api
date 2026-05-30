@@ -1283,23 +1283,67 @@ def build_board_briefing(personal_command_center: dict, gravity_center: dict, st
     return {"title": "Conseil d'administration personnel", "headline": personal_command_center.get("situation"), "what_changed": gravity_center.get("reading"), "main_risk": (personal_command_center.get("threat") or {}).get("title"), "main_opportunity": (personal_command_center.get("opportunity") or {}).get("title"), "stress_watch": downside, "next_step": personal_command_center.get("next_step")}
 
 
+def build_memorable_wealth_insight(data_profile: dict, hidden_wealth: dict, gravity_center: dict, wealth_map: dict, leverage_engine: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    activable = float(hidden_wealth.get("activable_wealth") or 0)
+    total_potential = float(hidden_wealth.get("total_potential") or 0)
+    dominant_future = gravity_center.get("dominant_future")
+    main_lever = leverage_engine.get("main_lever") or {}
+    destination = wealth_map.get("destination") or {}
+    estimated_label = wealth_map.get("estimated_label") or destination.get("estimated_label")
+    if current_wealth > 0 and activable >= current_wealth * 2:
+        return f"Ton patrimoine activable represente environ {round(activable / current_wealth, 1)} fois ton patrimoine visible: c'est probablement le signal le plus important a surveiller."
+    if dominant_future and main_lever.get("label"):
+        return f"Ton futur patrimonial semble moins dependre de ce que tu possedes deja que de ta capacite a activer {str(main_lever.get('label')).lower()}."
+    if estimated_label:
+        return f"A ce rythme, ton prochain palier patrimonial devient lisible autour de {estimated_label}."
+    if total_potential > current_wealth:
+        return "White Rock detecte deja plus de potentiel activable que de capital visible."
+    return "Le premier enjeu est de rendre la trajectoire assez claire pour que chaque action compte."
+
+
+def build_family_office_ceo_dashboard(data_profile: dict, strategic_intelligence: dict, wealth_narrative: dict, family_office_intelligence: dict, missions: list[dict]):
+    monthly_income = float(data_profile.get("monthly_income") or 0)
+    monthly_expenses = float(data_profile.get("monthly_expenses") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    burn_rate = monthly_expenses
+    runway_months = None
+    if burn_rate > 0 and monthly_capacity < 0:
+        runway_months = max(0, round(current_wealth / burn_rate, 1))
+    elif monthly_capacity >= 0:
+        runway_months = "stable"
+    cards = strategic_intelligence.get("cards") or []
+    decision = next((card for card in cards if card.get("key") == "decision"), {})
+    risk = next((card for card in cards if card.get("key") == "risk"), {})
+    scorecard = family_office_intelligence.get("scorecard") or []
+    weakest_dimension = min(scorecard, key=lambda item: float(item.get("score") or 0), default=None)
+    operating_reading = "Ton systeme produit une capacite mensuelle positive." if monthly_capacity > 0 else "Ton systeme genere du revenu, mais la marge de manoeuvre reste fragile." if monthly_income > 0 else "Le cockpit doit encore consolider les revenus pour lire la marge reelle."
+    return {"title": "Family Office CEO", "question": "Comment piloter ma vie financiere comme une holding personnelle ?", "operating_reading": operating_reading, "wealth": round(current_wealth, 2), "monthly_income": round(monthly_income, 2), "monthly_expenses": round(monthly_expenses, 2), "monthly_capacity": round(monthly_capacity, 2), "burn_rate": round(burn_rate, 2), "runway_months": runway_months, "debt_total": round(float(data_profile.get("debt_total") or 0), 2), "active_projects": int(data_profile.get("completed_steps") or 0), "objective": wealth_narrative.get("memorable_insight"), "decision": decision, "risk": risk, "weakest_dimension": weakest_dimension, "mission": missions[0] if missions else None}
+
+
 def build_wealth_narrative(data_profile: dict, hidden_wealth: dict, gravity_center: dict, wealth_map: dict, leverage_engine: dict):
     current_wealth = float(data_profile.get("current_wealth") or 0)
     activable = float(hidden_wealth.get("activable_wealth") or 0)
     destination = wealth_map.get("destination") or {}
     main_lever = leverage_engine.get("main_lever") or {}
     estimated_label = wealth_map.get("estimated_label") or destination.get("estimated_label")
+    memorable_insight = build_memorable_wealth_insight(data_profile, hidden_wealth, gravity_center, wealth_map, leverage_engine)
     if activable > current_wealth and main_lever.get("label"):
-        narrative = f"Ton patrimoine visible est deja mesurable, mais la partie la plus interessante semble etre le potentiel activable. Le centre de gravite peut progressivement se deplacer vers {str(gravity_center.get('dominant_future') or 'un levier futur').lower()}, avec {str(main_lever.get('label')).lower()} comme accelerateur principal."
+        narrative = f"Ton patrimoine visible repose aujourd'hui sur une base mesurable. Mais la lecture Family Office montre autre chose: ton potentiel futur peut se deplacer vers {str(gravity_center.get('dominant_future') or 'un levier futur').lower()}, avec {str(main_lever.get('label')).lower()} comme accelerateur principal. Ce n'est pas seulement une question de valeur detenue: c'est une question de capital encore activable."
     elif estimated_label:
-        narrative = f"Ta trajectoire est maintenant lisible: le prochain palier patrimonial est estime autour de {estimated_label}. White Rock rend la distance et le rythme visibles."
+        narrative = f"Ta trajectoire est maintenant lisible: le prochain palier patrimonial est estime autour de {estimated_label}. White Rock rend la distance, le rythme et la decision suivante visibles."
     else:
         narrative = "White Rock commence a transformer les donnees patrimoniales en trajectoire. Plus les revenus, actifs et objectifs seront renseignes, plus le recit deviendra precis."
-    return {"title": "Wealth Narrative", "headline": "Ce que raconte ta trajectoire", "narrative": narrative, "visible_wealth": round(current_wealth, 2), "activable_wealth": round(activable, 2), "total_potential": hidden_wealth.get("total_potential"), "next_milestone": destination, "main_lever": main_lever, "gravity_reading": gravity_center.get("reading")}
+    return {"title": "Wealth Narrative", "headline": "Ce que raconte ta trajectoire", "narrative": narrative, "memorable_insight": memorable_insight, "why_it_matters": "Parce que les decisions patrimoniales deviennent plus simples quand la trajectoire raconte une histoire claire.", "visible_wealth": round(current_wealth, 2), "activable_wealth": round(activable, 2), "total_potential": hidden_wealth.get("total_potential"), "next_milestone": destination, "main_lever": main_lever, "gravity_reading": gravity_center.get("reading")}
 
 
 def build_future_intelligence(wealth_map: dict, wealth_timeline: dict, digital_twin: dict, wealth_gps: dict, future_film: dict):
-    return {"title": "Future Intelligence", "question": "Ou vais-je ?", "position": {"current": wealth_map.get("current_position"), "destination": wealth_map.get("destination"), "progress_percent": wealth_map.get("progress_percent"), "distance_remaining": wealth_map.get("distance_remaining"), "monthly_velocity": wealth_map.get("monthly_velocity"), "estimated_label": wealth_map.get("estimated_label")}, "timeline": wealth_timeline.get("stages") or [], "routes": wealth_gps.get("routes") or [], "simulations": digital_twin.get("scenarios") or [], "film": future_film.get("chapters") or []}
+    destination = wealth_map.get("destination") or {}
+    months_to_target = wealth_map.get("months_to_destination") or destination.get("months_to_target")
+    time_to_next = f"{int(months_to_target)} mois" if months_to_target else None
+    why_it_matters = f"Le prochain palier n'est plus abstrait: il peut etre suivi comme une distance temporelle de {time_to_next}." if time_to_next else "Cette vue transforme le patrimoine en trajectoire, puis la trajectoire en decisions."
+    return {"title": "Future Intelligence", "question": "Ou vais-je ?", "why_it_matters": why_it_matters, "time_to_next": time_to_next, "position": {"current": wealth_map.get("current_position"), "destination": wealth_map.get("destination"), "progress_percent": wealth_map.get("progress_percent"), "distance_remaining": wealth_map.get("distance_remaining"), "monthly_velocity": wealth_map.get("monthly_velocity"), "estimated_label": wealth_map.get("estimated_label")}, "timeline": wealth_timeline.get("stages") or [], "routes": wealth_gps.get("routes") or [], "simulations": digital_twin.get("scenarios") or [], "film": future_film.get("chapters") or []}
 
 
 def build_strategic_intelligence(mission_control: dict, opportunity_radar: dict, decision_engine: dict, leverage_engine: dict, board_briefing: dict):
@@ -1385,6 +1429,7 @@ def product_context(email: str = Depends(get_current_user)):
         future_intelligence = build_future_intelligence(wealth_map, wealth_timeline, digital_twin, wealth_gps, future_film)
         strategic_intelligence = build_strategic_intelligence(mission_control, opportunity_radar, decision_engine, leverage_engine, board_briefing)
         family_office_intelligence = build_family_office_intelligence(family_office_scorecard, stress_tests, dependency_detector, weak_signals, life_wealth, family_office_radar)
+        family_office_ceo = build_family_office_ceo_dashboard(data_profile, strategic_intelligence, wealth_narrative, family_office_intelligence, missions)
 
     return {
         "plan": plan,
@@ -1426,6 +1471,7 @@ def product_context(email: str = Depends(get_current_user)):
         "future_intelligence": future_intelligence,
         "strategic_intelligence": strategic_intelligence,
         "family_office_intelligence": family_office_intelligence,
+        "family_office_ceo": family_office_ceo,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,
