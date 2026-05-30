@@ -1,1 +1,1 @@
-ETHAN_GLOBAL_CACHE_VERSION = "v21-llm-first"
+ETHAN_GLOBAL_CACHE_VERSION = "v22-llm-diagnostics"
