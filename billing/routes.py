@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, timezone
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -118,6 +119,7 @@ def invalidate_subscription_caches(email: str | None, user_id: int | None = None
         delete_cache_patterns(
             f"intel:{email}*",
             f"context:{email}*",
+            f"product:{email}*",
             f"gamification:{email}*",
             f"quests:{email}*",
         )
@@ -147,6 +149,15 @@ def plan_from_price_id(price_id: str | None):
                 return plan_id.upper()
 
     return None
+
+
+def stripe_timestamp(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).replace(tzinfo=None)
+    except (TypeError, ValueError, OSError):
+        return None
 
 
 def ensure_billing_tables(conn):
@@ -286,6 +297,166 @@ def stripe_nested_value(obj, *keys, default=None):
             continue
         current = stripe_value(current, key, default)
     return default if current is None else current
+
+
+def normalize_subscription_event(event_type: str, stripe_object):
+    subscription_id = stripe_value(stripe_object, "id")
+    status = normalize_subscription_status(stripe_value(stripe_object, "status"))
+
+    if event_type == "customer.subscription.deleted":
+        status = "canceled"
+    if event_type == "customer.subscription.paused":
+        status = "paused"
+
+    price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
+    plan = plan_from_price_id(price_id)
+
+    return {
+        "event_type": "SUBSCRIPTION_UPDATED",
+        "stripe_customer_id": stripe_value(stripe_object, "customer"),
+        "stripe_subscription_id": subscription_id,
+        "stripe_price_id": price_id,
+        "plan": plan,
+        "status": status,
+        "cancel_at_period_end": bool(stripe_value(stripe_object, "cancel_at_period_end")),
+        "current_period_end": stripe_timestamp(stripe_value(stripe_object, "current_period_end")),
+    }
+
+
+def normalize_checkout_event(session):
+    metadata = stripe_value(session, "metadata", {}) or {}
+    plan = str(stripe_value(metadata, "plan") or "").upper() or None
+    return {
+        "event_type": "CHECKOUT_COMPLETED",
+        "email": stripe_value(metadata, "email") or stripe_value(session, "customer_email"),
+        "stripe_customer_id": stripe_value(session, "customer"),
+        "stripe_subscription_id": stripe_value(session, "subscription"),
+        "stripe_price_id": stripe_value(metadata, "stripe_price_id"),
+        "plan": normalize_plan(plan) if plan else None,
+        "status": "active",
+        "cancel_at_period_end": False,
+        "current_period_end": None,
+        "founder_checkout": str(stripe_value(metadata, "founder_checkout") or "").lower() == "true",
+    }
+
+
+def find_subscription_user(conn, event: dict):
+    if event.get("email"):
+        user = conn.execute(text("""
+            SELECT id, email
+            FROM users
+            WHERE email = :email
+        """), {"email": event["email"]}).fetchone()
+        if user:
+            return user
+
+    if event.get("stripe_subscription_id"):
+        user = conn.execute(text("""
+            SELECT users.id, users.email
+            FROM subscriptions
+            JOIN users ON users.id = subscriptions.user_id
+            WHERE subscriptions.stripe_subscription_id = :stripe_subscription_id
+        """), {"stripe_subscription_id": event["stripe_subscription_id"]}).fetchone()
+        if user:
+            return user
+
+    if event.get("stripe_customer_id"):
+        user = conn.execute(text("""
+            SELECT users.id, users.email
+            FROM subscriptions
+            JOIN users ON users.id = subscriptions.user_id
+            WHERE subscriptions.stripe_customer_id = :stripe_customer_id
+        """), {"stripe_customer_id": event["stripe_customer_id"]}).fetchone()
+        if user:
+            return user
+
+    return None
+
+
+def update_subscription_state(conn, event: dict):
+    user = find_subscription_user(conn, event)
+    if not user:
+        logger.warning(
+            "billing_subscription_event_without_user event_type=%s customer=%s subscription=%s email=%s",
+            event.get("event_type"),
+            event.get("stripe_customer_id"),
+            event.get("stripe_subscription_id"),
+            event.get("email"),
+        )
+        return None
+
+    current_subscription = conn.execute(text("""
+        SELECT plan
+        FROM subscriptions
+        WHERE user_id = :user_id
+    """), {"user_id": user.id}).fetchone()
+
+    status = normalize_subscription_status(event.get("status"))
+    plan = normalize_plan(
+        event.get("plan")
+        or (current_subscription.plan if current_subscription else None)
+        or "FREE"
+    )
+    active_status = status in {"active", "trialing", "past_due"}
+    effective_user_plan = plan if active_status else "FREE"
+
+    conn.execute(text("""
+        INSERT INTO subscriptions (
+            user_id, plan, status, stripe_customer_id, stripe_subscription_id,
+            stripe_price_id, current_period_end, environment,
+            cancel_at_period_end, updated_at
+        )
+        VALUES (
+            :user_id, :plan, :status, :stripe_customer_id, :stripe_subscription_id,
+            :stripe_price_id, :current_period_end, :environment,
+            :cancel_at_period_end, NOW()
+        )
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+            plan = EXCLUDED.plan,
+            status = EXCLUDED.status,
+            stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, subscriptions.stripe_customer_id),
+            stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, subscriptions.stripe_subscription_id),
+            stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, subscriptions.stripe_price_id),
+            current_period_end = COALESCE(EXCLUDED.current_period_end, subscriptions.current_period_end),
+            environment = EXCLUDED.environment,
+            cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+            updated_at = NOW()
+    """), {
+        "user_id": user.id,
+        "plan": plan,
+        "status": status,
+        "stripe_customer_id": event.get("stripe_customer_id"),
+        "stripe_subscription_id": event.get("stripe_subscription_id"),
+        "stripe_price_id": event.get("stripe_price_id"),
+        "current_period_end": event.get("current_period_end"),
+        "environment": os.getenv("STRIPE_MODE", "sandbox"),
+        "cancel_at_period_end": bool(event.get("cancel_at_period_end")),
+    })
+
+    conn.execute(text("""
+        UPDATE users
+        SET plan = :plan,
+            is_founder = CASE WHEN :founder_checkout THEN TRUE ELSE is_founder END,
+            founder_tier = CASE WHEN :founder_checkout THEN :founder_tier ELSE founder_tier END
+        WHERE id = :user_id
+    """), {
+        "plan": effective_user_plan,
+        "founder_checkout": bool(event.get("founder_checkout")),
+        "founder_tier": plan if event.get("founder_checkout") else None,
+        "user_id": user.id,
+    })
+
+    invalidate_subscription_caches(user.email, user.id)
+    logger.info(
+        "subscription_state_updated event_type=%s user_id=%s plan=%s status=%s effective_plan=%s",
+        event.get("event_type"),
+        user.id,
+        plan,
+        status,
+        effective_user_plan,
+    )
+    return user
 
 
 @router.get("/plans")
@@ -663,179 +834,59 @@ async def stripe_webhook(request: Request):
             metadata={"event_id": event_id, "event_type": event_type},
         )
 
-    if event_type == "checkout.session.completed":
-        session = event.data.object
-        metadata = stripe_value(session, "metadata", {}) or {}
-        email = stripe_value(metadata, "email") or stripe_value(session, "customer_email")
-        plan = str(stripe_value(metadata, "plan") or "").lower()
-        founder_checkout = str(stripe_value(metadata, "founder_checkout") or "").lower() == "true"
+    subscription_events = {
+        "checkout.session.completed",
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
+        "customer.subscription.paused",
+    }
 
-        if email and plan:
-            internal_status = normalize_subscription_status("active")
-            with engine.begin() as conn:
-                ensure_billing_tables(conn)
-                user = conn.execute(text("""
-                    SELECT id
-                    FROM users
-                    WHERE email = :email
-                """), {"email": email}).fetchone()
-
-                user_update = conn.execute(text("""
-                    UPDATE users
-                    SET plan = :plan,
-                        is_founder = CASE WHEN :founder_checkout THEN TRUE ELSE is_founder END,
-                        founder_tier = CASE WHEN :founder_checkout THEN :founder_tier ELSE founder_tier END
-                    WHERE email = :email
-                """), {
-                    "plan": plan.upper(),
-                    "founder_checkout": founder_checkout,
-                    "founder_tier": plan.upper(),
-                    "email": email,
-                })
-                logger.info(
-                    "billing_webhook_user_plan_updated event_id=%s email=%s plan=%s rowcount=%s",
-                    event_id,
-                    email,
-                    plan.upper(),
-                    user_update.rowcount,
-                )
-
-                if user:
-                    subscription_upsert = conn.execute(text("""
-                    INSERT INTO subscriptions (
-                            user_id,
-                            plan,
-                            status,
-                            stripe_customer_id,
-                            stripe_subscription_id,
-                            stripe_price_id,
-                            environment,
-                            updated_at
-                        )
-                        VALUES (
-                            :user_id,
-                            :plan,
-                            :status,
-                            :stripe_customer_id,
-                            :stripe_subscription_id,
-                            :stripe_price_id,
-                            :environment,
-                            NOW()
-                        )
-                        ON CONFLICT (user_id)
-                        DO UPDATE SET
-                            plan = EXCLUDED.plan,
-                            status = EXCLUDED.status,
-                            stripe_customer_id = EXCLUDED.stripe_customer_id,
-                            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-                            stripe_price_id = EXCLUDED.stripe_price_id,
-                            environment = EXCLUDED.environment,
-                            updated_at = NOW()
-                    """), {
-                        "user_id": user.id,
-                        "plan": plan.upper(),
-                        "status": internal_status,
-                        "stripe_customer_id": stripe_value(session, "customer"),
-                        "stripe_subscription_id": stripe_value(session, "subscription"),
-                        "stripe_price_id": stripe_value(metadata, "stripe_price_id")
-                        or os.getenv(PLANS.get(plan, {}).get("price_env") or ""),
-                        "environment": os.getenv("STRIPE_MODE", "sandbox"),
-                    })
-                    logger.info(
-                        "billing_webhook_subscription_upserted event_id=%s user_id=%s plan=%s status=%s rowcount=%s",
-                        event_id,
-                        user.id,
-                        plan.upper(),
-                        internal_status,
-                        subscription_upsert.rowcount,
-                    )
-
-                invalidate_subscription_caches(email, user.id if user else None)
-                if user:
-                    capture_event(
-                        conn,
-                        FOUNDER_UPGRADE if bool(stripe_value(metadata, "is_founder") == "true") else SUBSCRIPTION_UPGRADED,
-                        user_id=user.id,
-                        email=email,
-                        properties={"plan": plan.upper(), "stripe_event": event_id},
-                    )
-                logger.info(
-                    "subscription_change event=checkout_completed email=%s user_id=%s plan=%s status=%s",
-                    email,
-                    user.id if user else None,
-                    plan.upper(),
-                    internal_status,
-                )
-
-    if event_type in ["customer.subscription.updated", "customer.subscription.deleted"]:
-        subscription = event.data.object
-        stripe_subscription_id = stripe_value(subscription, "id")
-        status = normalize_subscription_status(stripe_value(subscription, "status"))
-        if event_type == "customer.subscription.deleted":
-            status = "canceled"
-        cancel_at_period_end = bool(stripe_value(subscription, "cancel_at_period_end"))
-        price_id = stripe_nested_value(subscription, "items", "data", 0, "price", "id")
-        next_plan = plan_from_price_id(price_id)
+    if event_type in subscription_events:
+        normalized_event = (
+            normalize_checkout_event(event.data.object)
+            if event_type == "checkout.session.completed"
+            else normalize_subscription_event(event_type, event.data.object)
+        )
 
         with engine.begin() as conn:
             ensure_billing_tables(conn)
-            current = conn.execute(text("""
-                SELECT users.email, users.id
-                FROM subscriptions
-                JOIN users ON users.id = subscriptions.user_id
-                WHERE subscriptions.stripe_subscription_id = :stripe_subscription_id
-            """), {
-                "stripe_subscription_id": stripe_subscription_id,
-            }).fetchone()
-
+            user = update_subscription_state(conn, normalized_event)
             conn.execute(text("""
-                UPDATE subscriptions
-                SET plan = COALESCE(:plan, plan),
-                    status = :status,
-                    cancel_at_period_end = :cancel_at_period_end,
-                    updated_at = NOW()
-                WHERE stripe_subscription_id = :stripe_subscription_id
+                UPDATE subscription_events
+                SET user_id = :user_id,
+                    plan = :plan,
+                    status = :status
+                WHERE stripe_event_id = :stripe_event_id
             """), {
-                "plan": next_plan,
-                "status": status,
-                "cancel_at_period_end": cancel_at_period_end,
-                "stripe_subscription_id": stripe_subscription_id,
+                "user_id": user.id if user else None,
+                "plan": normalized_event.get("plan"),
+                "status": normalized_event.get("status"),
+                "stripe_event_id": event_id,
             })
 
-            if current and next_plan and status in ["active", "trialing", "past_due"]:
-                conn.execute(text("""
-                    UPDATE users
-                    SET plan = :plan
-                    WHERE id = :user_id
-                """), {"plan": next_plan, "user_id": current.id})
-
-            if current and event_type == "customer.subscription.deleted":
-                conn.execute(text("""
-                    UPDATE users
-                    SET plan = 'FREE'
-                    WHERE id = :user_id
-                """), {"user_id": current.id})
-
-            invalidate_subscription_caches(
-                current.email if current else None,
-                current.id if current else None,
-            )
-            logger.info(
-                "subscription_change event=%s user_id=%s plan=%s status=%s stripe_subscription_id=%s",
-                event_type,
-                current.id if current else None,
-                next_plan,
-                status,
-                stripe_subscription_id,
-            )
+            if user and event_type == "checkout.session.completed":
+                capture_event(
+                    conn,
+                    FOUNDER_UPGRADE
+                    if bool(normalized_event.get("founder_checkout"))
+                    else SUBSCRIPTION_UPGRADED,
+                    user_id=user.id,
+                    email=user.email,
+                    properties={
+                        "plan": normalized_event.get("plan"),
+                        "stripe_event": event_id,
+                    },
+                )
 
     if event_type in ["invoice.paid", "invoice.payment_failed"]:
         invoice = event.data.object
         with engine.begin() as conn:
             ensure_billing_tables(conn)
             subscription = conn.execute(text("""
-                SELECT user_id
+                SELECT subscriptions.user_id, users.email
                 FROM subscriptions
+                JOIN users ON users.id = subscriptions.user_id
                 WHERE stripe_subscription_id = :stripe_subscription_id
                    OR stripe_customer_id = :stripe_customer_id
             """), {
@@ -872,5 +923,44 @@ async def stripe_webhook(request: Request):
                 "status": stripe_value(invoice, "status"),
                 "hosted_invoice_url": stripe_value(invoice, "hosted_invoice_url"),
             })
+
+            if subscription:
+                next_status = "active" if event_type == "invoice.paid" else "past_due"
+                conn.execute(text("""
+                    UPDATE subscriptions
+                    SET status = :status,
+                        updated_at = NOW()
+                    WHERE user_id = :user_id
+                """), {
+                    "status": next_status,
+                    "user_id": subscription.user_id,
+                })
+                invalidate_subscription_caches(subscription.email, subscription.user_id)
+
+    if event_type == "customer.deleted":
+        customer = event.data.object
+        with engine.begin() as conn:
+            ensure_billing_tables(conn)
+            current = conn.execute(text("""
+                SELECT subscriptions.user_id, users.email
+                FROM subscriptions
+                JOIN users ON users.id = subscriptions.user_id
+                WHERE subscriptions.stripe_customer_id = :stripe_customer_id
+            """), {"stripe_customer_id": stripe_value(customer, "id")}).fetchone()
+
+            if current:
+                conn.execute(text("""
+                    UPDATE subscriptions
+                    SET status = 'canceled',
+                        plan = 'FREE',
+                        updated_at = NOW()
+                    WHERE user_id = :user_id
+                """), {"user_id": current.user_id})
+                conn.execute(text("""
+                    UPDATE users
+                    SET plan = 'FREE'
+                    WHERE id = :user_id
+                """), {"user_id": current.user_id})
+                invalidate_subscription_caches(current.email, current.user_id)
 
     return {"received": True}

@@ -19,6 +19,14 @@ PLAN_ALIASES = {
 }
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
+INACTIVE_SUBSCRIPTION_STATUSES = {
+    "canceled",
+    "cancelled",
+    "inactive",
+    "expired",
+    "paused",
+    "unpaid",
+}
 
 FEATURE_MIN_PLAN = {
     "portfolio_basic": "FREE",
@@ -132,11 +140,13 @@ def resolve_effective_plan(
     subscription_plan: str | None = None,
     subscription_status: str | None = None,
 ) -> str:
-    if (
-        subscription_plan
-        and str(subscription_status or "").lower() in ACTIVE_SUBSCRIPTION_STATUSES
-    ):
-        return highest_plan(user_plan, subscription_plan)
+    status = str(subscription_status or "").lower()
+
+    if subscription_plan and status in ACTIVE_SUBSCRIPTION_STATUSES:
+        return normalize_plan(subscription_plan)
+
+    if subscription_plan and status in INACTIVE_SUBSCRIPTION_STATUSES:
+        return "FREE"
 
     return normalize_plan(user_plan)
 
