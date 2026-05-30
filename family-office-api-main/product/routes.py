@@ -121,6 +121,13 @@ def safe_count(conn, query: str, params: dict):
         return 0
 
 
+def safe_float(conn, query: str, params: dict):
+    try:
+        return float(conn.execute(text(query), params).scalar() or 0)
+    except Exception:
+        return 0.0
+
+
 def get_score(email: str) -> int:
     try:
         result = compute_user_intelligence(email) or {}
@@ -247,6 +254,84 @@ def build_data_profile(conn, user_id: int):
         {"user_id": user_id},
     )
     total_assets_count = count_user_assets(conn, user_id)
+    finance_income = safe_float(
+        conn,
+        "SELECT COALESCE(SUM(amount), 0) FROM finance_items WHERE user_id = :user_id AND type = 'revenus'",
+        {"user_id": user_id},
+    )
+    finance_expenses = safe_float(
+        conn,
+        "SELECT COALESCE(SUM(amount), 0) FROM finance_items WHERE user_id = :user_id AND type = 'charges'",
+        {"user_id": user_id},
+    )
+    finance_savings = safe_float(
+        conn,
+        "SELECT COALESCE(SUM(amount), 0) FROM finance_items WHERE user_id = :user_id AND type = 'epargne'",
+        {"user_id": user_id},
+    )
+    finance_debt = safe_float(
+        conn,
+        "SELECT COALESCE(SUM(amount), 0) FROM finance_items WHERE user_id = :user_id AND type = 'dettes'",
+        {"user_id": user_id},
+    )
+    onboarding_income = safe_float(
+        conn,
+        "SELECT COALESCE(revenus_mensuels, 0) FROM users WHERE id = :user_id",
+        {"user_id": user_id},
+    )
+    onboarding_expenses = safe_float(
+        conn,
+        "SELECT COALESCE(charges_mensuelles, 0) FROM users WHERE id = :user_id",
+        {"user_id": user_id},
+    )
+    monthly_income = finance_income or onboarding_income
+    monthly_expenses = finance_expenses or onboarding_expenses
+    monthly_capacity = max(finance_savings, monthly_income - monthly_expenses, 0)
+    portfolio_value = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(quantity, 0) * COALESCE(purchase_price, 0)), 0)
+        FROM portfolio
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    real_estate_value = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(NULLIF(estimated_value, 0), NULLIF(resale_price, 0), purchase_price, 0)), 0)
+        FROM real_estate_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    yield_value = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(principal, 0) * (1 + (COALESCE(average_rate, 0) / 100) * (COALESCE(duration_months, 12) / 12.0))), 0)
+        FROM yield_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    venture_value = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(
+            CASE
+                WHEN COALESCE(valuation, 0) > 0 THEN valuation
+                ELSE GREATEST(COALESCE(revenue, 0) - COALESCE(charges, 0), 0)
+                    + COALESCE(fundraising, 0)
+                    - COALESCE(debts, 0)
+            END
+        ), 0)
+        FROM venture_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    business_value = yield_value + venture_value
+    current_wealth = portfolio_value + real_estate_value + business_value
 
     completed_steps = sum([
         finance_count > 0,
@@ -265,6 +350,17 @@ def build_data_profile(conn, user_id: int):
         "total_assets_count": total_assets_count,
         "completed_steps": completed_steps,
         "completion_percent": round((completed_steps / 5) * 100),
+        "monthly_income": round(monthly_income, 2),
+        "monthly_expenses": round(monthly_expenses, 2),
+        "monthly_savings": round(finance_savings, 2),
+        "monthly_capacity": round(monthly_capacity, 2),
+        "debt_total": round(finance_debt, 2),
+        "portfolio_value": round(portfolio_value, 2),
+        "real_estate_value": round(real_estate_value, 2),
+        "yield_value": round(yield_value, 2),
+        "venture_value": round(venture_value, 2),
+        "business_value": round(business_value, 2),
+        "current_wealth": round(current_wealth, 2),
     }
 
 
@@ -469,6 +565,166 @@ def build_strategic_brief(data_profile: dict, score: int, plan: str, life_profil
     }
 
 
+def build_future_view(data_profile: dict, score: int, plan: str):
+    normalized = normalize_plan(plan)
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+
+    if plan_allows(normalized, "LIBERTY"):
+        annual_return = 0.055
+    elif plan_allows(normalized, "GOLD"):
+        annual_return = 0.045
+    else:
+        annual_return = 0.035
+
+    if score >= 70:
+        annual_return += 0.005
+    elif score < 35:
+        annual_return -= 0.005
+
+    annual_contribution = max(monthly_capacity, 0) * 12
+
+    def project(years: int):
+        value = current_wealth
+        for _ in range(years):
+            value = value * (1 + annual_return) + annual_contribution
+        return round(value, 2)
+
+    if current_wealth > 0 and monthly_capacity > 0:
+        confidence = "solid"
+        assumption = "Projection backend: patrimoine actuel, capacite mensuelle declaree et rendement prudent."
+    elif current_wealth > 0:
+        confidence = "asset_based"
+        assumption = "Projection backend: patrimoine actuel uniquement, sans capacite mensuelle exploitable."
+    else:
+        confidence = "data_light"
+        assumption = "Projection backend limitee: ajoute revenus, charges et actifs pour rendre le futur lisible."
+
+    return {
+        "title": "Future View",
+        "current_wealth": round(current_wealth, 2),
+        "monthly_capacity": round(monthly_capacity, 2),
+        "annual_return": round(annual_return * 100, 2),
+        "confidence": confidence,
+        "assumption": assumption,
+        "scenarios": [
+            {"label": "3 ans", "years": 3, "value": project(3)},
+            {"label": "5 ans", "years": 5, "value": project(5)},
+            {"label": "10 ans", "years": 10, "value": project(10)},
+        ],
+    }
+
+
+def build_wealth_timeline(data_profile: dict):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    stages = [
+        ("Aujourd'hui", 0),
+        ("100k", 100000),
+        ("250k", 250000),
+        ("500k", 500000),
+        ("1M", 1000000),
+        ("Liberte financiere", 1500000),
+    ]
+    timeline = []
+    next_stage = None
+
+    for label, target in stages:
+        if target == 0:
+            status = "current"
+            progress = 100
+        else:
+            status = "achieved" if current_wealth >= target else "locked"
+            progress = min(100, round((current_wealth / target) * 100, 1)) if target else 100
+            if status == "locked" and next_stage is None:
+                next_stage = {"label": label, "target": target}
+
+        timeline.append({
+            "label": label,
+            "target": target,
+            "status": status,
+            "progress_percent": progress,
+        })
+
+    return {
+        "current_wealth": round(current_wealth, 2),
+        "progress_percent": min(100, round((current_wealth / 1000000) * 100, 1)) if current_wealth else 0,
+        "next_milestone": next_stage,
+        "stages": timeline,
+    }
+
+
+def build_mission_control(strategic_brief: dict, missions: list[dict], data_profile: dict, future_view: dict):
+    mission = next((item for item in missions if item.get("status") != "verified"), None)
+    if not mission and missions:
+        mission = missions[0]
+
+    return {
+        "risk": {
+            "title": "Risque principal",
+            "description": strategic_brief.get("main_risk"),
+        },
+        "opportunity": {
+            "title": "Opportunite",
+            "description": strategic_brief.get("opportunity"),
+        },
+        "decision": {
+            "title": "Decision du moment",
+            "description": strategic_brief.get("priority"),
+            "action": strategic_brief.get("next_action"),
+        },
+        "mission": {
+            "title": mission.get("title") if mission else "Contexte a enrichir",
+            "description": mission.get("description") if mission else "Ajoute une donnee utile pour activer une mission verifiable.",
+            "status": mission.get("status") if mission else "pending",
+            "xp": mission.get("xp") if mission else 0,
+        },
+        "future_signal": {
+            "title": "Projection",
+            "description": future_view.get("assumption"),
+            "confidence": future_view.get("confidence"),
+        },
+    }
+
+
+def build_family_office_view(data_profile: dict, plan: str):
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    allocation = [
+        {
+            "key": "investments",
+            "label": "Investissements",
+            "value": round(float(data_profile.get("portfolio_value") or 0), 2),
+            "description": "Actifs financiers suivis par le portefeuille backend.",
+        },
+        {
+            "key": "real_estate",
+            "label": "Immobilier",
+            "value": round(float(data_profile.get("real_estate_value") or 0), 2),
+            "description": "Valeur estimee des biens immobiliers suivis.",
+        },
+        {
+            "key": "business",
+            "label": "Business",
+            "value": round(float(data_profile.get("business_value") or 0), 2),
+            "description": "Yield assets, private equity et activites valorisees.",
+        },
+    ]
+
+    active_domains = sum(1 for item in allocation if item["value"] > 0)
+    if current_wealth > 0:
+        summary = "Lecture globale active: le patrimoine est consolide par domaines."
+    else:
+        summary = "Lecture globale prete: ajoute actifs, immobilier ou business pour activer la valeur."
+
+    return {
+        "title": "Family Office Mode",
+        "summary": summary,
+        "global_wealth": round(current_wealth, 2),
+        "active_domains": active_domains,
+        "plan": normalize_plan(plan),
+        "allocation": allocation,
+    }
+
+
 @router.get("/entitlements")
 def product_entitlements(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -545,6 +801,10 @@ def product_context(email: str = Depends(get_current_user)):
         )
         life_profile = build_life_profile(conn, user_id)
         strategic_brief = build_strategic_brief(data_profile, score, plan, life_profile)
+        future_view = build_future_view(data_profile, score, plan)
+        wealth_timeline = build_wealth_timeline(data_profile)
+        mission_control = build_mission_control(strategic_brief, missions, data_profile, future_view)
+        family_office_view = build_family_office_view(data_profile, plan)
 
     return {
         "plan": plan,
@@ -557,6 +817,10 @@ def product_context(email: str = Depends(get_current_user)):
         "modules": modules,
         "missions": missions,
         "strategic_brief": strategic_brief,
+        "mission_control": mission_control,
+        "future_view": future_view,
+        "wealth_timeline": wealth_timeline,
+        "family_office_view": family_office_view,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,

@@ -17,6 +17,7 @@ import type {
   FinancePayload,
   PortfolioAsset,
   PortfolioPayload,
+  ProductContext,
   RealEstateAsset,
   RealEstatePayload,
   RealEstateType,
@@ -176,6 +177,206 @@ function SectionHeader({
         {description}
       </p>
     </div>
+  );
+}
+
+function MissionControlPanel({
+  product,
+  onOpenMission,
+}: {
+  product?: ProductContext | null;
+  onOpenMission: () => void;
+}) {
+  const control = product?.mission_control;
+  const items = [
+    control?.risk,
+    control?.opportunity,
+    control?.decision,
+    control?.mission,
+  ].filter(Boolean);
+
+  if (!items.length) return null;
+
+  return (
+    <section className="rounded-2xl border border-[#3fa9f5]/25 bg-zinc-950 p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+            Mission Control
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            Une lecture. Une direction.
+          </h2>
+        </div>
+        <button
+          onClick={onOpenMission}
+          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-200 transition hover:border-[#3fa9f5]/50"
+        >
+          Voir progression
+        </button>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        {items.map((item, index) => (
+          <div key={`${item?.title}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs uppercase tracking-widest text-gray-500">
+              {index === 0 ? "Risque" : index === 1 ? "Opportunite" : index === 2 ? "Decision" : "Mission"}
+            </p>
+            <h3 className="mt-2 text-sm font-bold text-white">{item?.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-400">
+              {item?.description}
+            </p>
+            {item?.action && (
+              <p className="mt-3 text-xs font-semibold text-[#3fa9f5]">
+                {item.action}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FutureViewPanel({ product }: { product?: ProductContext | null }) {
+  const future = product?.future_view;
+  const scenarios = future?.scenarios || [];
+
+  if (!future || scenarios.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+            Future View
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            Ton futur patrimonial visible
+          </h2>
+        </div>
+        <div className="text-sm text-gray-400">
+          Capacite mensuelle backend:{" "}
+          <span className="font-bold text-white">
+            {money.format(Number(future.monthly_capacity || 0))} EUR
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {scenarios.map((scenario) => (
+          <div key={scenario.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs uppercase tracking-widest text-gray-500">
+              {scenario.label}
+            </p>
+            <p className="mt-2 text-3xl font-black text-white">
+              {money.format(Number(scenario.value || 0))} EUR
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-gray-400">
+        {future.assumption}
+      </p>
+    </section>
+  );
+}
+
+function WealthTimelinePanel({ product }: { product?: ProductContext | null }) {
+  const timeline = product?.wealth_timeline;
+  const stages = timeline?.stages || [];
+
+  if (!timeline || stages.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-zinc-950 p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+            Timeline patrimoniale
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            Le GPS de ta richesse globale
+          </h2>
+        </div>
+        {timeline.next_milestone?.label && (
+          <p className="text-sm text-gray-400">
+            Prochain palier:{" "}
+            <span className="font-bold text-white">{timeline.next_milestone.label}</span>
+          </p>
+        )}
+      </div>
+      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-6">
+        {stages.map((stage) => {
+          const active = stage.status === "achieved" || stage.status === "current";
+          return (
+            <div
+              key={stage.label}
+              className={`rounded-xl border p-4 ${
+                active
+                  ? "border-[#3fa9f5]/50 bg-[#3fa9f5]/10"
+                  : "border-white/10 bg-white/[0.03]"
+              }`}
+            >
+              <p className="text-sm font-bold text-white">{stage.label}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#3fa9f5]"
+                  style={{ width: `${Math.min(100, Number(stage.progress_percent || 0))}%` }}
+                />
+              </div>
+              {stage.target ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  {money.format(Number(stage.target || 0))} EUR
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FamilyOfficeModePanel({ product }: { product?: ProductContext | null }) {
+  const view = product?.family_office_view;
+  const allocation = view?.allocation || [];
+
+  if (!view || allocation.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-[#d6b35a]/30 bg-gradient-to-br from-[#151006] via-zinc-950 to-black p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#d6b35a]">
+            Family Office Mode
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            Tu ne pilotes plus des modules. Tu pilotes ta richesse.
+          </h2>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Patrimoine global backend</p>
+          <p className="text-2xl font-black text-white">
+            {money.format(Number(view.global_wealth || 0))} EUR
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-gray-400">{view.summary}</p>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {allocation.map((item) => (
+          <div key={item.key || item.label} className="rounded-xl border border-white/10 bg-black/30 p-4">
+            <p className="text-xs uppercase tracking-widest text-gray-500">
+              {item.label}
+            </p>
+            <p className="mt-2 text-2xl font-black text-white">
+              {money.format(Number(item.value || 0))} EUR
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-400">
+              {item.description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -426,6 +627,11 @@ export default function Dashboard() {
   const ventureGain = Number(ventureAssets?.totals?.total_result || 0);
   const globalPortfolioValue =
     totalValue + realEstateFinal + yieldFinal + ventureFinal;
+  const backendGlobalWealth = Number(
+    product?.family_office_view?.global_wealth ??
+      product?.data_profile?.current_wealth ??
+      globalPortfolioValue
+  );
   const globalPortfolioGain =
     portfolioGain + realEstateGain + yieldGain + ventureGain;
   const globalPortfolioGainClass =
@@ -1431,6 +1637,17 @@ export default function Dashboard() {
                 onOpenOpportunities={() => goToSection("opportunities")}
               />
 
+              <MissionControlPanel
+                product={product}
+                onOpenMission={() => goToSection("progression")}
+              />
+
+              <FutureViewPanel product={product} />
+
+              <WealthTimelinePanel product={product} />
+
+              <FamilyOfficeModePanel product={product} />
+
               <section className="rounded-2xl border border-[#3fa9f5]/20 bg-gradient-to-br from-[#08131f] via-black to-[#0b2035] p-6">
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_1.4fr]">
                   <div>
@@ -1453,7 +1670,7 @@ export default function Dashboard() {
                     <button onClick={() => goToSection("settings")} className={`rounded-2xl border border-white/10 bg-white/5 p-4 text-left ${interactiveCard}`}>
                       <p className="text-xs text-gray-400">Patrimoine global</p>
                       <h3 className="mt-2 text-2xl font-black">
-                        {money.format(globalPortfolioValue)} EUR
+                        {money.format(backendGlobalWealth)} EUR
                       </h3>
                     </button>
                     <button onClick={() => goToSection("investments")} className={`rounded-2xl border border-white/10 bg-white/5 p-4 text-left ${interactiveCard}`}>

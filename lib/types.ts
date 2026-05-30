@@ -92,6 +92,15 @@ export type ProductMission = {
   status?: "pending" | "completed" | "verified" | string;
 };
 
+export type ProductSignal = {
+  title?: string;
+  description?: string;
+  action?: string;
+  status?: string;
+  confidence?: string;
+  xp?: number;
+};
+
 export type ProductContext = {
   plan?: string;
   next_plan?: string | null;
@@ -130,6 +139,17 @@ export type ProductContext = {
     total_assets_count?: number;
     completed_steps?: number;
     completion_percent?: number;
+    monthly_income?: number;
+    monthly_expenses?: number;
+    monthly_savings?: number;
+    monthly_capacity?: number;
+    debt_total?: number;
+    portfolio_value?: number;
+    real_estate_value?: number;
+    yield_value?: number;
+    venture_value?: number;
+    business_value?: number;
+    current_wealth?: number;
   };
   life_profile?: {
     goals?: string[];
@@ -155,6 +175,53 @@ export type ProductContext = {
       has_children?: boolean;
       professional_context?: string | null;
     };
+  };
+  mission_control?: {
+    risk?: ProductSignal;
+    opportunity?: ProductSignal;
+    decision?: ProductSignal;
+    mission?: ProductSignal;
+    future_signal?: ProductSignal;
+  };
+  future_view?: {
+    title?: string;
+    current_wealth?: number;
+    monthly_capacity?: number;
+    annual_return?: number;
+    confidence?: string;
+    assumption?: string;
+    scenarios?: Array<{
+      label?: string;
+      years?: number;
+      value?: number;
+    }>;
+  };
+  wealth_timeline?: {
+    current_wealth?: number;
+    progress_percent?: number;
+    next_milestone?: {
+      label?: string;
+      target?: number;
+    } | null;
+    stages?: Array<{
+      label?: string;
+      target?: number;
+      status?: string;
+      progress_percent?: number;
+    }>;
+  };
+  family_office_view?: {
+    title?: string;
+    summary?: string;
+    global_wealth?: number;
+    active_domains?: number;
+    plan?: string;
+    allocation?: Array<{
+      key?: string;
+      label?: string;
+      value?: number;
+      description?: string;
+    }>;
   };
 };
 
