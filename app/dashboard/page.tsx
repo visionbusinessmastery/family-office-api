@@ -884,7 +884,7 @@ export default function Dashboard() {
   }, [router]);
 
   useEffect(() => {
-    if (activeSection !== "settings" || !token) return;
+    if (!["profile", "settings"].includes(activeSection) || !token) return;
     loadWealthProfile();
   }, [activeSection, loadWealthProfile, token]);
 
@@ -1022,6 +1022,42 @@ export default function Dashboard() {
     billingSubscription?.future_plan || billingSubscription?.pending_plan,
     ""
   );
+  const profileIncome = Number(
+    onboarding?.revenus_mensuels ?? onboarding?.monthly_income ?? 0
+  );
+  const profileExpenses = Number(
+    onboarding?.charges_mensuelles ?? onboarding?.monthly_expenses ?? 0
+  );
+  const profileCapacity =
+    profileIncome > 0 && profileExpenses >= 0 ? profileIncome - profileExpenses : null;
+  const profileCompletionItems = [
+    wealthProfile?.first_name,
+    onboarding?.age,
+    onboarding?.situation_pro || wealthProfile?.investor_profile,
+    wealthProfile?.motivation,
+    wealthProfile?.horizon,
+    wealthProfile?.risk_level,
+    wealthProfile?.main_currency,
+    profileIncome > 0,
+    profileExpenses > 0,
+  ];
+  const profileCompletedCount = profileCompletionItems.filter(Boolean).length;
+  const profileCompletionPercent = Math.round(
+    (profileCompletedCount / profileCompletionItems.length) * 100
+  );
+  const profileNarrative = `${compactText(
+    wealthProfile?.first_name,
+    "Ton profil"
+  )} construit un projet ${compactText(
+    wealthProfile?.motivation,
+    "patrimonial"
+  ).toLowerCase()} avec un horizon ${compactText(
+    wealthProfile?.horizon,
+    "a preciser"
+  ).toLowerCase()} et un profil ${compactText(
+    wealthProfile?.risk_level,
+    "a definir"
+  ).toLowerCase()}.`;
   const eliteChartsEnabled = planAllows(currentPlan, "ELITE");
   const legacyNavigationEnabled = planAllows(currentPlan, "LIBERTY");
   const progressionMissions = product?.missions || [];
@@ -2490,12 +2526,17 @@ export default function Dashboard() {
                       {compactText(wealthProfile?.first_name, "Profil White Rock")}
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
-                      Les informations qui permettent de personnaliser ton espace sans melanger profil personnel et organisation patrimoniale.
+                      {profileNarrative}
                     </p>
                   </div>
-                  <ActionButton onClick={handleUpdateOnboarding}>
-                    Modifier mon profil
-                  </ActionButton>
+                  <div className="flex flex-col gap-3 sm:items-end">
+                    <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-100">
+                      Profil complete a {profileCompletionPercent}%
+                    </span>
+                    <ActionButton onClick={handleUpdateOnboarding}>
+                      Modifier mon profil
+                    </ActionButton>
+                  </div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -2508,6 +2549,8 @@ export default function Dashboard() {
                     ["Age", compactText(onboarding?.age)],
                     ["Revenus", (onboarding?.revenus_mensuels ?? onboarding?.monthly_income) ? `${money.format(Number(onboarding?.revenus_mensuels ?? onboarding?.monthly_income))} EUR` : "A completer"],
                     ["Charges", (onboarding?.charges_mensuelles ?? onboarding?.monthly_expenses) ? `${money.format(Number(onboarding?.charges_mensuelles ?? onboarding?.monthly_expenses))} EUR` : "A completer"],
+                    ["Capacite mensuelle", profileCapacity !== null ? `${money.format(profileCapacity)} EUR` : "A completer"],
+                    ["Completion", `${profileCompletedCount}/${profileCompletionItems.length} informations`],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                       <p className="text-xs uppercase tracking-widest text-gray-500">

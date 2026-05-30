@@ -29,7 +29,6 @@ type IdentityPanelProps = {
 };
 
 export function IdentityPanel({
-  level,
   profile,
   saving,
   onSubmit,
@@ -60,11 +59,11 @@ export function IdentityPanel({
         </div>
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
-            Identite patrimoniale
+            Informations personnelles
           </p>
-          <h2 className="mt-1 text-2xl font-bold">Identite</h2>
+          <h2 className="mt-1 text-2xl font-bold">Identite et preferences</h2>
           <p className="mt-1 text-sm text-gray-400">
-            Niveau: {level || "en construction"}
+            Prenom, bio courte, photo et devise de reference.
           </p>
         </div>
       </div>
@@ -101,21 +100,6 @@ export function IdentityPanel({
         />
         <label className="space-y-1">
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-            Horizon
-          </span>
-          <select
-            value={profile.horizon || "5-10 ans"}
-            onChange={(event) => onUpdate("horizon", event.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-[#3fa9f5]"
-          >
-            <option value="1-3 ans">1 - 3 ans</option>
-            <option value="3-5 ans">3 - 5 ans</option>
-            <option value="5-10 ans">5 - 10 ans</option>
-            <option value="10 ans et plus">10 ans et plus</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">
             Devise du compte
           </span>
           <select
@@ -128,38 +112,6 @@ export function IdentityPanel({
             <option value="CAD">CAD</option>
             <option value="CHF">CHF</option>
             <option value="GBP">GBP</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-            Profil d&apos;investissement
-          </span>
-          <select
-            value={profile.risk_level || "equilibre"}
-            onChange={(event) => onUpdate("risk_level", event.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-[#3fa9f5]"
-          >
-            <option value="prudent">Prudent</option>
-            <option value="equilibre">Equilibre</option>
-            <option value="dynamique">Dynamique</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-            Objectif vise
-          </span>
-          <select
-            value={profile.motivation || ""}
-            onChange={(event) => onUpdate("motivation", event.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-[#3fa9f5]"
-          >
-            <option value="">Objectif vise</option>
-            <option value="liberte financiere">Liberte financiere</option>
-            <option value="revenus passifs">Revenus passifs</option>
-            <option value="retraite">Retraite</option>
-            <option value="famille">Famille</option>
-            <option value="voyager">Voyager</option>
-            <option value="independance">Independance</option>
           </select>
         </label>
       </div>
