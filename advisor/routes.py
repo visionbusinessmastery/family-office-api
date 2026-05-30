@@ -31,7 +31,12 @@ from .ethan.persistence_engine import (
 from .ethan_core import run_ethan_chat
 from analytics.analytics_events import AUTOPILOT_SIMULATION_USED, ETHAN_USED
 from analytics.posthog_service import capture_event
-from advisor.ethan.memory_engine import extract_context_signals
+from advisor.ethan.memory_engine import (
+    build_life_context,
+    extract_context_signals,
+    get_memory,
+    summarize_context_profile,
+)
 from product.entitlements import plan_allows
 from profile.routes import ensure_profile_tables
 
@@ -185,6 +190,47 @@ def advisor_core(request: Request, data: AdvisorRequest):
         })
 
     return safe_execute(_run, module_name="ADVISOR_CORE")
+
+
+@router.get("/context-summary")
+def advisor_context_summary(email: str = Depends(get_current_user)):
+    with engine.begin() as conn:
+        ensure_ethan_ai_tables(conn)
+        user_id, plan = get_user_plan(conn, email)
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        memory = get_memory(conn, user_id)
+        life_context = build_life_context(conn, user_id, memory)
+        memory_reading = (
+            summarize_context_profile(life_context)
+            or memory.get("key_signals")
+            or "Ethan construit progressivement une lecture fiable de ton contexte."
+        )
+
+        normalized_plan = str(plan or "FREE").upper()
+        if plan_allows(normalized_plan, "LIBERTY"):
+            mode = "Expert"
+            depth = "Strategie, projection et arbitrage patrimonial."
+        elif plan_allows(normalized_plan, "GOLD"):
+            mode = "Avance"
+            depth = "Analyse, decision et opportunite priorisee."
+        else:
+            mode = "Simple"
+            depth = "Un insight clair et une action utile."
+
+    return {
+        "version": "advisor-context-summary-v1",
+        "plan": plan,
+        "mode": mode,
+        "depth": depth,
+        "memory": {
+            "reading": memory_reading,
+            "profile": life_context,
+            "last_topic": memory.get("last_topic"),
+        },
+        "decision_framework": ["Situation", "Analyse", "Decision"],
+    }
 
 
 @router.post("/")
