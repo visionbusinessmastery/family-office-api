@@ -268,6 +268,21 @@ function WealthNarrativePanel({ product }: { product?: ProductContext | null }) 
           <p className="mt-4 max-w-3xl text-base leading-relaxed text-gray-300">
             {narrative.narrative}
           </p>
+          {narrative.memorable_insight ? (
+            <div className="mt-5 rounded-2xl border border-[#f0b429]/30 bg-[#f0b429]/10 p-4">
+              <p className="text-xs uppercase tracking-widest text-[#f0b429]">
+                Insight memorable
+              </p>
+              <p className="mt-2 text-lg font-black leading-snug text-white">
+                {narrative.memorable_insight}
+              </p>
+              {narrative.why_it_matters ? (
+                <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                  {narrative.why_it_matters}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <p className="mt-4 text-sm leading-relaxed text-gray-500">
             {narrative.gravity_reading}
           </p>
@@ -341,6 +356,86 @@ function WealthNarrativePanel({ product }: { product?: ProductContext | null }) 
   );
 }
 
+function FamilyOfficeCeoPanel({ product }: { product?: ProductContext | null }) {
+  const ceo = product?.family_office_ceo;
+
+  if (!ceo) return null;
+
+  const runway =
+    ceo.runway_months === "stable"
+      ? "Stable"
+      : ceo.runway_months !== null && ceo.runway_months !== undefined
+        ? `${ceo.runway_months} mois`
+        : "A confirmer";
+
+  return (
+    <section className="rounded-2xl border border-[#f0b429]/35 bg-[radial-gradient(circle_at_top_right,_rgba(240,180,41,0.2),_transparent_34%),linear-gradient(135deg,#070707,#111827_58%,#1c1303)] p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#f0b429]">
+            {ceo.title || "Family Office CEO"}
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            {ceo.question || "Piloter sa vie financiere"}
+          </h2>
+        </div>
+        <p className="max-w-xl text-sm leading-relaxed text-gray-400">
+          {ceo.operating_reading}
+        </p>
+      </div>
+
+      {ceo.objective ? (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">
+            Pourquoi c&apos;est important
+          </p>
+          <p className="mt-2 text-lg font-black leading-snug text-white">
+            {ceo.objective}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ["Patrimoine", ceo.wealth],
+          ["Revenus / mois", ceo.monthly_income],
+          ["Burn rate", ceo.burn_rate],
+          ["Marge / mois", ceo.monthly_capacity],
+        ].map(([label, value]) => (
+          <div key={String(label)} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className="mt-2 text-xl font-black text-white">
+              {money.format(Number(value || 0))} EUR
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Runway</p>
+          <p className="mt-2 text-xl font-black text-[#f0b429]">{runway}</p>
+          <p className="mt-1 text-xs text-gray-500">Lecture operationnelle backend</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Decision</p>
+          <p className="mt-2 text-sm font-bold text-white">{ceo.decision?.title || "A consolider"}</p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-400">{ceo.decision?.action || ceo.decision?.description}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Point faible</p>
+          <p className="mt-2 text-sm font-bold text-white">{ceo.weakest_dimension?.label || ceo.risk?.title || "A confirmer"}</p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-400">
+            {ceo.weakest_dimension?.score !== undefined
+              ? `${ceo.weakest_dimension.score}/100`
+              : ceo.risk?.description}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FutureIntelligencePanel({ product }: { product?: ProductContext | null }) {
   const future = product?.future_intelligence;
   const position = future?.position;
@@ -367,6 +462,11 @@ function FutureIntelligencePanel({ product }: { product?: ProductContext | null 
           <h2 className="mt-1 text-2xl font-black text-white">
             {future.question || "Ou vais-je ?"}
           </h2>
+          {future.why_it_matters ? (
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
+              {future.why_it_matters}
+            </p>
+          ) : null}
         </div>
         <div className="text-sm text-gray-400">
           Prochain palier:{" "}
@@ -1851,6 +1951,8 @@ export default function Dashboard() {
               />
 
               <WealthNarrativePanel product={product} />
+
+              <FamilyOfficeCeoPanel product={product} />
 
               <FutureIntelligencePanel product={product} />
 

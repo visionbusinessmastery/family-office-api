@@ -480,6 +480,8 @@ export type ProductContext = {
     title?: string;
     headline?: string;
     narrative?: string;
+    memorable_insight?: string;
+    why_it_matters?: string;
     visible_wealth?: number;
     activable_wealth?: number;
     total_potential?: number;
@@ -499,6 +501,8 @@ export type ProductContext = {
   future_intelligence?: {
     title?: string;
     question?: string;
+    why_it_matters?: string;
+    time_to_next?: string | null;
     position?: {
       current?: number;
       destination?: {
@@ -538,6 +542,42 @@ export type ProductContext = {
     weak_signals?: ProductDependencySignal[];
     life_dimensions?: NonNullable<ProductContext["life_wealth"]>["dimensions"];
     radar?: NonNullable<ProductContext["family_office_radar"]>["items"];
+  };
+  family_office_ceo?: {
+    title?: string;
+    question?: string;
+    operating_reading?: string;
+    wealth?: number;
+    monthly_income?: number;
+    monthly_expenses?: number;
+    monthly_capacity?: number;
+    burn_rate?: number;
+    runway_months?: number | string | null;
+    debt_total?: number;
+    active_projects?: number;
+    objective?: string;
+    decision?: {
+      key?: string;
+      label?: string;
+      title?: string;
+      description?: string;
+      action?: string;
+      score?: number;
+    } | null;
+    risk?: {
+      key?: string;
+      label?: string;
+      title?: string;
+      description?: string;
+      action?: string;
+      score?: number;
+    } | null;
+    weakest_dimension?: {
+      key?: string;
+      label?: string;
+      score?: number;
+    } | null;
+    mission?: ProductMission | null;
   };
 };
 
