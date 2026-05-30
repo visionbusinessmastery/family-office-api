@@ -2433,37 +2433,57 @@ export default function Dashboard() {
             <div className="space-y-6">
               <SectionHeader
                 eyebrow="Opportunites"
-                title="Opportunity Center"
+                title="Centre d'opportunites"
                 description="Recherche, exploration et signaux centralises. Les pages metier restent dediees au pilotage."
               />
 
-              <section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-                <OpportunityDiscoveryPanel
-                  universe="investments"
-                  title="Investissements"
-                  description="Explorer les pistes d'allocation selon l'horizon, le risque, le portefeuille et les signaux disponibles."
-                  plan={currentPlan}
-                  token={token}
-                />
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#3fa9f5]">
+                      Explorateur d'opportunites
+                    </p>
+                    <h2 className="mt-1 text-2xl font-bold">Explorer manuellement</h2>
+                    <p className="mt-1 text-sm text-gray-400">
+                      Recherche par univers quand tu veux comparer plusieurs pistes.
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-widest text-gray-500">
+                    Investissement / Immobilier / Business
+                  </span>
+                </div>
 
-                <OpportunityDiscoveryPanel
-                  universe="real_estate"
-                  title="Immobilier"
-                  description="Explorer residence principale, locatif, achat-revente ou commercial avec une lecture de rendement et de risque."
-                  plan={currentPlan}
-                  token={token}
-                />
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+                  <OpportunityDiscoveryPanel
+                    universe="investments"
+                    title="Investissements"
+                    description="Explorer les pistes d'allocation selon l'horizon, le risque, le portefeuille et les signaux disponibles."
+                    plan={currentPlan}
+                    token={token}
+                  />
 
-                <OpportunityDiscoveryPanel
-                  universe="business"
-                  title="Business"
-                  description="Explorer business digital, startup, franchise, reprise, crowdfunding et private equity selon ton contexte White Rock."
-                  plan={currentPlan}
-                  token={token}
-                />
+                  <OpportunityDiscoveryPanel
+                    universe="real_estate"
+                    title="Immobilier"
+                    description="Explorer residence principale, locatif, achat-revente ou commercial avec une lecture de rendement et de risque."
+                    plan={currentPlan}
+                    token={token}
+                  />
+
+                  <OpportunityDiscoveryPanel
+                    universe="business"
+                    title="Business"
+                    description="Explorer business digital, startup, franchise, reprise, crowdfunding et private equity selon ton contexte White Rock."
+                    plan={currentPlan}
+                    token={token}
+                  />
+                </div>
               </section>
 
-              <OpportunitiesModule commandCenter={commandCenter} />
+              <OpportunitiesModule
+                commandCenter={commandCenter}
+                plan={currentPlan}
+              />
             </div>
           )}
 
