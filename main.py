@@ -19,6 +19,64 @@ from analytics.posthog_service import ensure_analytics_tables
 from feature_flags.engine import ensure_feature_flags_table
 from feature_flags.routes import router as feature_flags_router
 
+PUBLIC_PATHS = {
+    "/",
+    "/health",
+    "/health/db",
+    "/health/openai",
+    "/health/stripe",
+    "/health/cache",
+    "/info",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/auth/register",
+    "/auth/login",
+    "/auth/verify-email",
+    "/auth/set-password",
+    "/auth/oauth/providers",
+    "/auth/oauth/session",
+    "/billing/plans",
+    "/billing/config",
+    "/billing/webhook",
+    "/privacy/region",
+    "/privacy/cookie-consent",
+    "/referrals/track",
+}
+
+PUBLIC_PREFIXES = (
+    "/auth/oauth/session/",
+    "/privacy/delete-account/confirm/",
+)
+
+
+def is_public_path(path: str) -> bool:
+    normalized_path = "/" + path.strip("/")
+    if normalized_path == "/":
+        normalized_path = "/"
+
+    if normalized_path in PUBLIC_PATHS or any(normalized_path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+        return True
+
+    parts = normalized_path.strip("/").split("/")
+    return (
+        len(parts) == 4
+        and parts[0] == "auth"
+        and parts[1] == "oauth"
+        and parts[3] in {"start", "callback"}
+    )
+
+
+def extract_bearer_token(header_value: str | None) -> str | None:
+    if not header_value:
+        return None
+
+    parts = header_value.strip().split()
+    if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1]:
+        return parts[1]
+
+    return None
+
 # =========================
 # ROUTERS IMPORT
 # =========================
@@ -170,31 +228,35 @@ async def global_error_handler(request: Request, exc: Exception):
 # =========================
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    request.state.user_email = "anonymous"
+    request.state.auth_error = None
 
-    try:
-        if request.method == "OPTIONS":
-            request.state.user_email = "anonymous"
-            return await call_next(request)
+    if request.method == "OPTIONS":
+        return await call_next(request)
 
-        token = request.headers.get("Authorization")
+    path = request.url.path
+    public_path = is_public_path(path)
+    token = extract_bearer_token(request.headers.get("Authorization"))
 
-        if token:
-            token = token.replace("Bearer ", "")
-            try:
-                request.state.user_email = decode_token(token)
-            except Exception as e:
-                logging.warning("AUTH TOKEN IGNORED: %s", str(e))
-                request.state.user_email = "anonymous"
-                request.state.auth_error = "invalid_token"
-        else:
-            request.state.user_email = "anonymous"
+    if token:
+        try:
+            request.state.user_email = decode_token(token)
+        except Exception as e:
+            logging.warning("AUTH TOKEN REJECTED: %s", str(e))
+            request.state.auth_error = "invalid_token"
+            if not public_path:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Token invalide"},
+                )
+    elif not public_path:
+        request.state.auth_error = "missing_token"
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authentification requise"},
+        )
 
-    except Exception as e:
-        logging.warning("AUTH MIDDLEWARE WARNING: %s", str(e))
-        request.state.user_email = "anonymous"
-
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
 
 logging.info("AUTH OK")
