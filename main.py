@@ -262,8 +262,8 @@ def health_db():
 
 
 @app.get("/health/openai")
-def health_openai():
-    return check_openai()
+def health_openai(live: bool = False):
+    return check_openai(live=live)
 
 
 @app.get("/health/stripe")

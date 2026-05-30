@@ -3,6 +3,7 @@ import time
 
 from sqlalchemy import text
 
+from advisor.ethan.openai_gateway import ethan_chat_completion
 from core.cache import redis_client
 from database import engine
 from billing.routes import PLANS
@@ -41,10 +42,59 @@ def check_cache():
     return _timed(run)
 
 
-def check_openai():
-    return {
-        "status": "ok" if bool(os.getenv("OPENAI_API_KEY")) else "degraded",
-        "configured": bool(os.getenv("OPENAI_API_KEY")),
+def _openai_model_candidates():
+    candidates = [
+        os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini"),
+        os.getenv("ETHAN_MODEL_FALLBACK"),
+        os.getenv("OPENAI_MODEL"),
+        "gpt-4o-mini",
+        "gpt-4.1-mini",
+    ]
+    seen = set()
+    return [model for model in candidates if model and not (model in seen or seen.add(model))]
+
+
+def _check_openai_live():
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "live_status": "skipped",
+            "live_error": "openai_unconfigured",
+        }
+
+    for model in _openai_model_candidates():
+        for token_param in ["max_completion_tokens", "max_tokens"]:
+            try:
+                response = ethan_chat_completion(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "Healthcheck White Rock. Reponds OK."},
+                        {"role": "user", "content": "ping"},
+                    ],
+                    **{token_param: 8},
+                )
+                text = str(response.choices[0].message.content or "").strip()
+                return {
+                    "live_status": "ok" if text else "empty_output",
+                    "tested_model": model,
+                    "token_param": token_param,
+                    "has_text": bool(text),
+                }
+            except Exception as exc:
+                last_error = {
+                    "live_status": "failed",
+                    "tested_model": model,
+                    "token_param": token_param,
+                    "error_type": exc.__class__.__name__,
+                }
+
+    return last_error
+
+
+def check_openai(live: bool = False):
+    configured = bool(os.getenv("OPENAI_API_KEY"))
+    payload = {
+        "status": "ok" if configured else "degraded",
+        "configured": configured,
         "models": {
             "light": os.getenv("ETHAN_MODEL_LIGHT", "gpt-5-nano"),
             "standard": os.getenv("ETHAN_MODEL_STANDARD", "gpt-5-mini"),
@@ -52,6 +102,14 @@ def check_openai():
             "dynasty": os.getenv("ETHAN_MODEL_DYNASTY", os.getenv("ETHAN_MODEL_PREMIUM", "gpt-5")),
         },
     }
+
+    if live:
+        live_payload = _check_openai_live()
+        payload.update(live_payload)
+        if live_payload.get("live_status") not in ["ok"]:
+            payload["status"] = "degraded"
+
+    return payload
 
 
 def check_stripe():
