@@ -1,11 +1,14 @@
 import json
+import logging
 import unicodedata
 
 from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
 
 
+logger = logging.getLogger(__name__)
 ETHAN_CORE_SYSTEM = "ETHAN_CORE_V4"
 CORE_EMPTY_STATUS = "empty"
+SAFE_MODEL_FALLBACKS = ["gpt-4o-mini", "gpt-4.1-mini"]
 
 LEGACY_ETHAN_RESPONSE_PATTERNS = [
     "ton score est",
@@ -89,6 +92,33 @@ def build_llm_response_data(raw_llm_output, context, tier="ESSENTIALS", *, compl
     }
 
 
+def _extract_text_part(part):
+    if isinstance(part, str):
+        return part
+    if isinstance(part, dict):
+        return part.get("text") or part.get("content") or ""
+    return getattr(part, "text", None) or getattr(part, "content", None) or ""
+
+
+def extract_llm_text(response):
+    try:
+        message = response.choices[0].message
+    except Exception:
+        return ""
+
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return "\n".join(
+            str(text).strip()
+            for text in (_extract_text_part(part) for part in content)
+            if str(text or "").strip()
+        ).strip()
+
+    return str(content or "").strip()
+
+
 def get_llm_response(
     messages,
     model,
@@ -128,30 +158,49 @@ def get_llm_response(
         return chat_completion_fn(**kwargs)
 
     response = None
+    selected_model = model
+    attempted = set()
+    attempts = []
 
-    try:
-        response = _call(model)
-    except Exception:
+    for candidate in [model, fallback_model, *SAFE_MODEL_FALLBACKS]:
+        if not candidate or candidate in attempted:
+            continue
+        attempted.add(candidate)
+        attempts.append((candidate, "max_completion_tokens"))
+        attempts.append((candidate, "max_tokens"))
+
+    for candidate, token_param in attempts:
         try:
-            response = _call(fallback_model)
-            model = fallback_model
+            response = _call(candidate, token_param)
+            selected_model = candidate
+            break
         except Exception:
-            try:
-                response = _call(fallback_model, "max_tokens")
-                model = fallback_model
-            except Exception:
-                return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_call_failed"
+            logger.warning(
+                "Ethan OpenAI attempt failed",
+                extra={"model": candidate, "token_param": token_param},
+                exc_info=True,
+            )
+
+    if response is None:
+        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, selected_model, "openai_call_failed"
 
     try:
-        llm_text = response.choices[0].message.content
+        llm_text = extract_llm_text(response)
         usage = getattr(response, "usage", None)
         input_tokens = getattr(usage, "prompt_tokens", None) or estimate_tokens_fn(json.dumps(messages))
         output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens_fn(llm_text)
+        if not llm_text:
+            logger.warning(
+                "Ethan OpenAI returned empty content",
+                extra={"model": selected_model},
+            )
+            return None, False, input_tokens, output_tokens, selected_model, "openai_empty_output"
         if not is_legacy_ethan_response(llm_text):
             set_cache_fn(llm_cache_key, llm_text, ttl=1800)
-        return llm_text, False, input_tokens, output_tokens, model, "ready"
+        return llm_text, False, input_tokens, output_tokens, selected_model, "ready"
     except Exception:
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_parse_failed"
+        logger.warning("Ethan OpenAI response parsing failed", exc_info=True)
+        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, selected_model, "openai_parse_failed"
 
 
 def build_fallback_response(
