@@ -107,6 +107,23 @@ export type ProductBenchmarkDelta = {
   delta_percent?: number;
 };
 
+export type ProductOpportunityRadarItem = {
+  key?: string;
+  title?: string;
+  why_fit?: string;
+  time_fit?: string;
+  impact?: string;
+  next_action?: string;
+  priority?: string;
+};
+
+export type ProductDependencySignal = {
+  type?: string;
+  title?: string;
+  description?: string;
+  severity?: string;
+};
+
 export type ProductContext = {
   plan?: string;
   next_plan?: string | null;
@@ -280,6 +297,59 @@ export type ProductContext = {
       title?: string;
       description?: string;
     }>;
+  };
+  opportunity_radar?: {
+    title?: string;
+    principle?: string;
+    items?: ProductOpportunityRadarItem[];
+  };
+  decision_engine?: {
+    title?: string;
+    decisions?: Array<{
+      key?: string;
+      label?: string;
+      cashflow?: string;
+      liquidity?: string;
+      risk?: string;
+      freedom_impact?: string;
+      fit?: string;
+      comment?: string;
+    }>;
+  };
+  time_value?: {
+    title?: string;
+    hourly_value?: number;
+    monthly_capacity?: number;
+    basis?: string;
+    levers?: Array<{
+      label?: string;
+      time_cost?: string;
+      leverage?: string;
+      reading?: string;
+    }>;
+  };
+  wealth_blocks?: {
+    title?: string;
+    blocks?: Array<{
+      key?: string;
+      label?: string;
+      value?: number;
+      status?: string;
+      description?: string;
+    }>;
+  };
+  dependency_detector?: {
+    title?: string;
+    signals?: ProductDependencySignal[];
+  };
+  personal_command_center?: {
+    title?: string;
+    situation?: string;
+    threat?: ProductDependencySignal | null;
+    opportunity?: ProductOpportunityRadarItem | ProductSignal | null;
+    mission?: ProductSignal | null;
+    next_step?: string;
+    time_value?: ProductContext["time_value"];
   };
 };
 

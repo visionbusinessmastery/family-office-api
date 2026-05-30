@@ -992,6 +992,268 @@ def build_wealth_story(data_profile: dict, progression: dict):
     }
 
 
+def build_opportunity_radar(data_profile: dict, life_profile: dict | None = None):
+    life_profile = life_profile or {}
+    professional = str(life_profile.get("professional_context") or "").lower()
+    goals_text = " ".join(life_profile.get("goals") or []).lower()
+    motivation = str(life_profile.get("motivation") or "").lower()
+    wants_income = any(word in f"{goals_text} {motivation}" for word in ["revenu", "liberte", "business"])
+    marketing_fit = any(word in professional for word in ["marketing", "communication", "commerce", "business"])
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+
+    opportunities = []
+    if marketing_fit or wants_income:
+        opportunities.append({
+            "key": "marketing_recurring_offer",
+            "title": "Offre recurrente marketing",
+            "why_fit": "Compatible avec une expertise existante et une contrainte de temps forte.",
+            "time_fit": "Court si l'offre est standardisee.",
+            "impact": "Peut augmenter les revenus sans creer un nouveau chantier lourd.",
+            "next_action": "Formaliser une offre simple, un prix fixe et une cible precise.",
+            "priority": "high",
+        })
+        opportunities.append({
+            "key": "digital_product",
+            "title": "Produit numerique issu de l'expertise",
+            "why_fit": "Transforme une competence deja presente en actif reutilisable.",
+            "time_fit": "Moyen: utile seulement si le format reste tres simple.",
+            "impact": "Potentiel de revenu scalable, mais validation commerciale indispensable.",
+            "next_action": "Identifier une douleur client repetitive et une promesse vendable.",
+            "priority": "medium",
+        })
+
+    if monthly_capacity > 0:
+        opportunities.append({
+            "key": "automated_investing",
+            "title": "Investissement mensuel automatise",
+            "why_fit": "La capacite mensuelle existe dans les donnees backend.",
+            "time_fit": "Faible charge mentale si la regle est simple.",
+            "impact": "Construit une trajectoire patrimoniale sans multiplier les decisions.",
+            "next_action": "Fixer un montant prudent et une frequence automatique.",
+            "priority": "medium",
+        })
+
+    opportunities.append({
+        "key": "small_business_acquisition",
+        "title": "Acquisition d'un petit actif digital",
+        "why_fit": "Interessant si le business complete les competences existantes.",
+        "time_fit": "A filtrer strictement: beaucoup d'opportunites sont incompatibles avec peu de temps.",
+        "impact": "Peut creer un levier, mais uniquement avec operations simples.",
+        "next_action": "Lister les criteres d'exclusion avant de regarder des deals.",
+        "priority": "low",
+    })
+
+    return {
+        "title": "Radar d'opportunites",
+        "principle": "Les opportunites sont filtrees par coherence avec la situation, pas par popularite.",
+        "items": opportunities[:3],
+    }
+
+
+def build_decision_engine(data_profile: dict):
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    business_value = float(data_profile.get("business_value") or 0)
+
+    return {
+        "title": "Moteur de decisions",
+        "decisions": [
+            {
+                "key": "develop_business",
+                "label": "Developper l'activite",
+                "cashflow": "+",
+                "liquidity": "+",
+                "risk": "moyen",
+                "freedom_impact": "+++",
+                "fit": "fort" if business_value > 0 or monthly_capacity <= 1000 else "moyen",
+                "comment": "Levier prioritaire si l'objectif est d'augmenter les revenus avec une competence existante.",
+            },
+            {
+                "key": "buy_real_estate",
+                "label": "Acheter un bien immobilier",
+                "cashflow": "+/-",
+                "liquidity": "-",
+                "risk": "moyen",
+                "freedom_impact": "++",
+                "fit": "moyen" if monthly_capacity > 0 else "faible",
+                "comment": "Decision pertinente seulement si la marge mensuelle et la reserve de securite sont suffisantes.",
+            },
+            {
+                "key": "invest_monthly",
+                "label": "Investir chaque mois",
+                "cashflow": "-",
+                "liquidity": "+/-",
+                "risk": "modere",
+                "freedom_impact": "++",
+                "fit": "fort" if monthly_capacity > 0 else "faible",
+                "comment": "Decision robuste quand elle reste automatique et proportionnee a la capacite disponible.",
+            },
+            {
+                "key": "balanced_path",
+                "label": "Mixer business + investissement",
+                "cashflow": "+",
+                "liquidity": "+/-",
+                "risk": "moyen",
+                "freedom_impact": "+++",
+                "fit": "fort" if current_wealth > 0 and monthly_capacity > 0 else "moyen",
+                "comment": "Chemin coherent si l'utilisateur veut croissance sans dependance a un seul levier.",
+            },
+        ],
+    }
+
+
+def build_time_value(data_profile: dict):
+    monthly_income = float(data_profile.get("monthly_income") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    hourly_value = round(monthly_income / 151.67, 2) if monthly_income > 0 else 0
+
+    return {
+        "title": "Valeur du temps",
+        "hourly_value": hourly_value,
+        "monthly_capacity": round(monthly_capacity, 2),
+        "basis": "Estimation backend basee sur le revenu mensuel et un temps plein standard.",
+        "levers": [
+            {
+                "label": "Prestation sur mesure",
+                "time_cost": "eleve",
+                "leverage": "faible a moyen",
+                "reading": "A limiter si le temps familial est rare.",
+            },
+            {
+                "label": "Offre packagée",
+                "time_cost": "moyen",
+                "leverage": "fort",
+                "reading": "Meilleur rapport temps/revenu si la promesse est claire.",
+            },
+            {
+                "label": "Produit digital",
+                "time_cost": "initial eleve",
+                "leverage": "fort apres validation",
+                "reading": "Interessant seulement apres preuve de demande.",
+            },
+        ],
+    }
+
+
+def build_wealth_blocks(data_profile: dict):
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    debt_total = float(data_profile.get("debt_total") or 0)
+
+    return {
+        "title": "Construction par blocs",
+        "blocks": [
+            {
+                "key": "security",
+                "label": "Bloc securite",
+                "value": max(monthly_capacity * 3, 0),
+                "status": "active" if monthly_capacity > 0 else "to_build",
+                "description": "Reserve et marge mensuelle disponibles.",
+            },
+            {
+                "key": "income",
+                "label": "Bloc revenus",
+                "value": float(data_profile.get("monthly_income") or 0),
+                "status": "active" if data_profile.get("monthly_income", 0) else "to_build",
+                "description": "Base de revenus suivie par le backend.",
+            },
+            {
+                "key": "markets",
+                "label": "Bloc marches financiers",
+                "value": float(data_profile.get("portfolio_value") or 0),
+                "status": "active" if data_profile.get("portfolio_value", 0) else "to_build",
+                "description": "Actifs financiers liquides.",
+            },
+            {
+                "key": "real_estate",
+                "label": "Bloc immobilier",
+                "value": float(data_profile.get("real_estate_value") or 0),
+                "status": "active" if data_profile.get("real_estate_value", 0) else "to_build",
+                "description": "Actifs immobiliers et valeur estimee.",
+            },
+            {
+                "key": "business",
+                "label": "Bloc business",
+                "value": float(data_profile.get("business_value") or 0),
+                "status": "active" if data_profile.get("business_value", 0) else "to_build",
+                "description": "Valeur entrepreneuriale, yield assets et ventures.",
+            },
+            {
+                "key": "debt",
+                "label": "Bloc dette",
+                "value": debt_total,
+                "status": "watch" if debt_total > 0 else "clear",
+                "description": "Dette suivie dans les finances.",
+            },
+        ],
+    }
+
+
+def build_dependency_detector(data_profile: dict, life_profile: dict | None = None):
+    life_profile = life_profile or {}
+    current_wealth = float(data_profile.get("current_wealth") or 0)
+    monthly_income = float(data_profile.get("monthly_income") or 0)
+    business_value = float(data_profile.get("business_value") or 0)
+    signals = []
+
+    if monthly_income > 0 and business_value <= 0:
+        signals.append({
+            "type": "income_source",
+            "title": "Dependance au revenu actif",
+            "description": "Le backend voit un revenu mensuel mais pas encore de bloc business valorise.",
+            "severity": "medium",
+        })
+    if data_profile.get("portfolio_count", 0) <= 1 and current_wealth > 0:
+        signals.append({
+            "type": "asset_concentration",
+            "title": "Dependance a peu d'actifs",
+            "description": "Le patrimoine suivi repose sur peu de lignes mesurables.",
+            "severity": "medium",
+        })
+    if life_profile.get("has_children") and monthly_income > 0:
+        signals.append({
+            "type": "family_income",
+            "title": "Dependance familiale au revenu courant",
+            "description": "La charge familiale rend l'interruption de revenus plus sensible.",
+            "severity": "high",
+        })
+    if not signals:
+        signals.append({
+            "type": "balanced",
+            "title": "Aucune dependance majeure detectee",
+            "description": "Les donnees backend ne montrent pas encore de fragilite de dependance dominante.",
+            "severity": "low",
+        })
+
+    return {
+        "title": "Detecteur de dependances",
+        "signals": signals[:3],
+    }
+
+
+def build_personal_command_center(
+    mission_control: dict,
+    opportunity_radar: dict,
+    dependency_detector: dict,
+    time_value: dict,
+):
+    radar_items = opportunity_radar.get("items") or []
+    dependencies = dependency_detector.get("signals") or []
+
+    return {
+        "title": "Centre de commandement personnel",
+        "situation": mission_control.get("decision", {}).get("description"),
+        "threat": dependencies[0] if dependencies else None,
+        "opportunity": radar_items[0] if radar_items else mission_control.get("opportunity"),
+        "mission": mission_control.get("mission"),
+        "next_step": (
+            radar_items[0].get("next_action")
+            if radar_items
+            else mission_control.get("decision", {}).get("action")
+        ),
+        "time_value": time_value,
+    }
+
+
 @router.get("/entitlements")
 def product_entitlements(email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -1077,6 +1339,17 @@ def product_context(email: str = Depends(get_current_user)):
         weak_signals = build_weak_signals(data_profile, life_profile)
         self_benchmark = build_self_benchmark(conn, user_id, data_profile)
         wealth_story = build_wealth_story(data_profile, progression)
+        opportunity_radar = build_opportunity_radar(data_profile, life_profile)
+        decision_engine = build_decision_engine(data_profile)
+        time_value = build_time_value(data_profile)
+        wealth_blocks = build_wealth_blocks(data_profile)
+        dependency_detector = build_dependency_detector(data_profile, life_profile)
+        personal_command_center = build_personal_command_center(
+            mission_control,
+            opportunity_radar,
+            dependency_detector,
+            time_value,
+        )
 
     return {
         "plan": plan,
@@ -1098,6 +1371,12 @@ def product_context(email: str = Depends(get_current_user)):
         "weak_signals": weak_signals,
         "self_benchmark": self_benchmark,
         "wealth_story": wealth_story,
+        "opportunity_radar": opportunity_radar,
+        "decision_engine": decision_engine,
+        "time_value": time_value,
+        "wealth_blocks": wealth_blocks,
+        "dependency_detector": dependency_detector,
+        "personal_command_center": personal_command_center,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,

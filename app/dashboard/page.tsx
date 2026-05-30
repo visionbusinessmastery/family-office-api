@@ -609,6 +609,157 @@ function WealthStoryPanel({ product }: { product?: ProductContext | null }) {
   );
 }
 
+function PersonalCommandCenterPanel({ product }: { product?: ProductContext | null }) {
+  const center = product?.personal_command_center;
+  const radarItems = product?.opportunity_radar?.items || [];
+  const decisions = product?.decision_engine?.decisions || [];
+  const blocks = product?.wealth_blocks?.blocks || [];
+  const dependencies = product?.dependency_detector?.signals || [];
+  const timeValue = product?.time_value;
+  const commandOpportunity = center?.opportunity;
+  const commandOpportunityText =
+    commandOpportunity && "why_fit" in commandOpportunity
+      ? commandOpportunity.why_fit
+      : commandOpportunity && "description" in commandOpportunity
+        ? commandOpportunity.description
+        : undefined;
+
+  if (!center) return null;
+
+  return (
+    <section className="rounded-2xl border border-[#3fa9f5]/30 bg-gradient-to-br from-[#061827] via-zinc-950 to-black p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-[#3fa9f5]">
+            Centre de commandement personnel
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-white">
+            Une seule vue pour décider
+          </h2>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-right">
+          <p className="text-xs text-gray-500">Valeur estimee d&apos;une heure</p>
+          <p className="text-2xl font-black text-white">
+            {money.format(Number(timeValue?.hourly_value || 0))} EUR
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Situation</p>
+          <p className="mt-2 text-sm leading-relaxed text-gray-300">
+            {center.situation || "Situation en cours de consolidation backend."}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Menace</p>
+          <h3 className="mt-2 text-sm font-bold text-white">{center.threat?.title}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-gray-400">
+            {center.threat?.description}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Opportunite</p>
+          <h3 className="mt-2 text-sm font-bold text-white">{center.opportunity?.title}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-gray-400">
+            {commandOpportunityText}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-xs uppercase tracking-widest text-gray-500">Prochaine etape</p>
+          <p className="mt-2 text-sm font-bold leading-relaxed text-[#3fa9f5]">
+            {center.next_step || "Attendre un signal backend plus precis."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[1.1fr_1fr]">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-bold text-white">Radar d&apos;opportunites</h3>
+            <span className="text-xs text-gray-500">filtre profil backend</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            {radarItems.map((item) => (
+              <div key={item.key || item.title} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <p className="text-sm font-bold text-white">{item.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                  {item.impact}
+                </p>
+                <p className="mt-2 text-xs font-semibold text-[#3fa9f5]">
+                  {item.next_action}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="font-bold text-white">Detecteur de dependances</h3>
+          <div className="mt-3 space-y-2">
+            {dependencies.map((signal) => (
+              <div key={`${signal.type}-${signal.title}`} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-white">{signal.title}</p>
+                  <span className="text-xs uppercase text-gray-500">{signal.severity}</span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                  {signal.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="font-bold text-white">Moteur de decisions</h3>
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {decisions.slice(0, 4).map((decision) => (
+              <div key={decision.key || decision.label} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-white">{decision.label}</p>
+                  <span className="rounded-full bg-[#3fa9f5]/15 px-2 py-1 text-xs text-[#3fa9f5]">
+                    fit {decision.fit}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-400">
+                  <span>cashflow {decision.cashflow}</span>
+                  <span>liquidite {decision.liquidity}</span>
+                  <span>risque {decision.risk}</span>
+                  <span>liberte {decision.freedom_impact}</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                  {decision.comment}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="font-bold text-white">Blocs de richesse</h3>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
+            {blocks.slice(0, 6).map((block) => (
+              <div key={block.key || block.label} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <p className="text-xs uppercase tracking-widest text-gray-500">
+                  {block.label}
+                </p>
+                <p className="mt-2 text-lg font-black text-white">
+                  {money.format(Number(block.value || 0))} EUR
+                </p>
+                <p className="mt-1 text-xs text-[#3fa9f5]">{block.status}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const getAssetValue = (asset: PortfolioAsset) =>
   Number(asset.value ?? asset.current_value ?? 0);
 
@@ -1870,6 +2021,8 @@ export default function Dashboard() {
                 product={product}
                 onOpenMission={() => goToSection("progression")}
               />
+
+              <PersonalCommandCenterPanel product={product} />
 
               <FutureViewPanel product={product} />
 
