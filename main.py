@@ -246,7 +246,7 @@ async def global_error_handler(request: Request, exc: Exception):
 # =========================
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    request.state.user_email = "anonymous"
+    request.state.user_email = None
     request.state.auth_error = None
 
     if request.method == "OPTIONS":
@@ -254,25 +254,28 @@ async def auth_middleware(request: Request, call_next):
 
     path = request.url.path
     public_path = is_public_path(path)
+
     token = extract_bearer_token(request.headers.get("Authorization"))
+
+    email = None
 
     if token:
         try:
-            request.state.user_email = decode_token(token)
+            email = decode_token(token)
         except Exception as e:
             logging.warning("AUTH TOKEN REJECTED: %s", str(e))
             request.state.auth_error = "invalid_token"
+
             if not public_path:
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Token invalide"},
-                )
-    elif not public_path:
-        request.state.auth_error = "missing_token"
+                return JSONResponse(status_code=401, content={"detail": "Token invalide"})
+
+    if not email and not public_path:
         return JSONResponse(
             status_code=401,
             content={"detail": "Authentification requise"},
         )
+
+    request.state.user_email = email or "anonymous"
 
     return await call_next(request)
 
