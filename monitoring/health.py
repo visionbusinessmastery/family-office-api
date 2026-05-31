@@ -36,7 +36,8 @@ def check_cache():
     def run():
         if not redis_client:
             return {"status": "degraded", "detail": "Redis not configured"}
-        redis_client.ping()
+        if not redis_client.ping():
+            return {"status": "degraded", "detail": "Redis unavailable"}
         return {"status": "ok"}
 
     return _timed(run)
@@ -120,7 +121,7 @@ def check_openai(live: bool = False):
 
 
 def check_stripe():
-    missing_prices = []
+    price_configuration = []
     for plan_id, plan in PLANS.items():
         if plan_id == "free":
             continue
@@ -134,9 +135,10 @@ def check_stripe():
         ]
 
         if not has_legacy_price and not configured_intervals:
-            missing_prices.append(
+            price_configuration.append(
                 {
                     "plan": plan_id.upper(),
+                    "configured": False,
                     "accepted_envs": [
                         legacy_price_env,
                         *[
@@ -146,16 +148,25 @@ def check_stripe():
                     ],
                 }
             )
+        else:
+            price_configuration.append(
+                {
+                    "plan": plan_id.upper(),
+                    "configured": True,
+                    "intervals": configured_intervals,
+                    "legacy_price": has_legacy_price,
+                }
+            )
 
     configured = bool(os.getenv("STRIPE_SECRET_KEY"))
     webhook = bool(os.getenv("STRIPE_WEBHOOK_SECRET"))
-    status = "ok" if configured and webhook and not missing_prices else "degraded"
+    status = "ok" if configured and webhook else "degraded"
     return {
         "status": status,
         "configured": configured,
         "webhook_configured": webhook,
         "mode": os.getenv("STRIPE_MODE", "sandbox"),
-        "missing_prices": missing_prices,
+        "price_configuration": price_configuration,
     }
 
 

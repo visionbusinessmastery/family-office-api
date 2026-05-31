@@ -42,6 +42,11 @@ def main():
         default=None,
         help="Optional valid JWT to test authenticated /auth/me.",
     )
+    parser.add_argument(
+        "--expired-token",
+        default=None,
+        help="Optional expired JWT to verify that expired sessions return 401.",
+    )
     args = parser.parse_args()
 
     checks = [
@@ -71,6 +76,15 @@ def main():
                 "protected /auth/me valid token",
                 request_status(args.base_url, "/auth/me", token=args.valid_token),
                 200,
+            )
+        )
+
+    if args.expired_token:
+        checks.append(
+            (
+                "protected /auth/me expired token",
+                request_status(args.base_url, "/auth/me", token=args.expired_token),
+                401,
             )
         )
 
