@@ -130,4 +130,26 @@ def get_user_id(conn, email: str):
         {"email": email}
     ).fetchone()
 
-    return row.id if row else None
+   
+# =========================
+# GET USER MAIL
+# =========================
+def get_email_from_request(request: Request):
+    
+    """
+    Single source of truth for user identity resolution
+    """
+    # 1. fast path (middleware)
+    if hasattr(request.state, "user_email") and request.state.user_email != "anonymous":
+        return request.state.user_email
+
+    # 2. fallback header
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return None
+
+    parts = auth.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return decode_token(parts[1])
+
+    return None
