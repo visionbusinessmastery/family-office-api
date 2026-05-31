@@ -204,6 +204,24 @@ app.add_middleware(
 )
 
 # =========================
+# CSP FIX (Swagger /docs Render)
+# =========================
+@app.middleware("http")
+async def csp_fix_middleware(request: Request, call_next):
+    response = await call_next(request)
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' https: data:; "
+        "connect-src 'self' https:;"
+    )
+
+    return response
+
+# =========================
 # ERROR HANDLERS
 # =========================
 @app.exception_handler(RateLimitExceeded)
