@@ -6,7 +6,7 @@ from sqlalchemy import text
 from advisor.ethan.openai_gateway import ethan_chat_completion
 from core.cache import redis_client
 from database import engine
-from billing.routes import PLANS
+from billing.routes import PLANS, PLAN_INTERVALS, get_price_env
 
 
 def _timed(check):
@@ -120,11 +120,33 @@ def check_openai(live: bool = False):
 
 
 def check_stripe():
-    missing_prices = [
-        plan["price_env"]
-        for plan_id, plan in PLANS.items()
-        if plan_id != "free" and plan.get("price_env") and not os.getenv(plan["price_env"])
-    ]
+    missing_prices = []
+    for plan_id, plan in PLANS.items():
+        if plan_id == "free":
+            continue
+
+        legacy_price_env = plan.get("price_env")
+        has_legacy_price = bool(os.getenv(legacy_price_env or ""))
+        configured_intervals = [
+            interval
+            for interval in PLAN_INTERVALS
+            if os.getenv(get_price_env(plan_id, interval) or "")
+        ]
+
+        if not has_legacy_price and not configured_intervals:
+            missing_prices.append(
+                {
+                    "plan": plan_id.upper(),
+                    "accepted_envs": [
+                        legacy_price_env,
+                        *[
+                            get_price_env(plan_id, interval)
+                            for interval in PLAN_INTERVALS
+                        ],
+                    ],
+                }
+            )
+
     configured = bool(os.getenv("STRIPE_SECRET_KEY"))
     webhook = bool(os.getenv("STRIPE_WEBHOOK_SECRET"))
     status = "ok" if configured and webhook and not missing_prices else "degraded"

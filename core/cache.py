@@ -51,6 +51,9 @@ class SafeRedisClient:
     def setex(self, *args, **kwargs):
         return self._call("setex", *args, **kwargs)
 
+    def ping(self, *args, **kwargs):
+        return self._call("ping", *args, **kwargs)
+
     def delete(self, *args, **kwargs):
         return self._call("delete", *args, **kwargs)
 
