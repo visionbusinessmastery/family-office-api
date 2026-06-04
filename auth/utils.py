@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from sqlalchemy import text
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 import os
@@ -73,8 +73,15 @@ def decode_token(token: str):
 # GET CURRENT USER
 # =========================
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
+    print("")
+    print("===== AUTH CALL =====")
+    print("PATH =", request.url.path)
+    print("AUTH =", request.headers.get("authorization"))
+    print("=====================")
+
     try:
         token = credentials.credentials
 
@@ -131,3 +138,36 @@ def get_user_id(conn, email: str):
     ).fetchone()
 
     return row.id if row else None
+
+
+   
+# =========================
+# GET USER MAIL
+# =========================
+def get_email_from_request(request: Request):
+    
+    print("")
+    print("===== EMAIL RESOLUTION =====")
+    print("PATH =", request.url.path)
+    print("STATE =", getattr(request.state, "user_email", None))
+    print("AUTH =", request.headers.get("Authorization"))
+    print("============================")
+        
+    """
+    Single source of truth for user identity resolution
+    """
+    # 1. fast path (middleware)
+    if hasattr(request.state, "user_email") and request.state.user_email != "anonymous":
+        return request.state.user_email
+
+    # 2. fallback header
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return None
+
+    parts = auth.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return decode_token(parts[1])
+
+    return None
+

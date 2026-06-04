@@ -1,0 +1,502 @@
+[1mdiff --git a/advisor/autopilot_service.py b/advisor/autopilot_service.py[m
+[1mdeleted file mode 100644[m
+[1mindex b9efa39..0000000[m
+[1m--- a/advisor/autopilot_service.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,36 +0,0 @@[m
+[31m-from advisor.autopilot_v4_engine import get_autopilot_v4[m
+[31m-from advisor.ethan.context_engine import compact_portfolio[m
+[31m-from auth.utils import get_user_id[m
+[31m-from database import engine[m
+[31m-from portfolio.service import get_user_portfolio[m
+[31m-[m
+[31m-[m
+[31m-def run_autopilot_safely(user_email, portfolio, market, context, llm_text, level):[m
+[31m-    try:[m
+[31m-        autopilot = get_autopilot_v4()[m
+[31m-        return autopilot.run([m
+[31m-            user_email=user_email,[m
+[31m-            portfolio=portfolio,[m
+[31m-            market=market,[m
+[31m-            context=context,[m
+[31m-            llm_analysis=llm_text,[m
+[31m-            level=level,[m
+[31m-        )[m
+[31m-    except Exception as e:[m
+[31m-        return {"status": "unavailable", "message": str(e)}[m
+[31m-[m
+[31m-[m
+[31m-def portfolio_autopilot(user_email, message):[m
+[31m-    user_id = None[m
+[31m-[m
+[31m-    with engine.connect() as conn:[m
+[31m-        user_id = get_user_id(conn, user_email)[m
+[31m-[m
+[31m-    return run_autopilot_safely([m
+[31m-        user_email=user_email,[m
+[31m-        portfolio=compact_portfolio(get_user_portfolio(user_id) if user_id else {}),[m
+[31m-        market={},[m
+[31m-        context={},[m
+[31m-        llm_text=None,[m
+[31m-        level="free",[m
+[31m-    )[m
+[1mdiff --git a/advisor/autopilot_v4_engine.py b/advisor/autopilot_v4_engine.py[m
+[1mindex b9bf596..a11852a 100644[m
+[1m--- a/advisor/autopilot_v4_engine.py[m
+[1m+++ b/advisor/autopilot_v4_engine.py[m
+[36m@@ -1,60 +1,189 @@[m
+[31m-from datetime import datetime[m
+[32m+[m[32m# =========================[m
+[32m+[m[32m# AUTOPILOT V4 FULL ENGINE[m
+[32m+[m[32m# HEDGE FUND SIMULATION CORE[m
+[32m+[m[32m# =========================[m
+ [m
+[32m+[m[32mfrom datetime import datetime[m
+[32m+[m[32mimport uuid[m
+ [m
+[31m-SIMULATION_UNAVAILABLE = {[m
+[31m-    "status": "unavailable",[m
+[31m-    "role": "SIMULATION SATELLITE ONLY",[m
+[31m-    "message": "simulation unavailable without external market context",[m
+[31m-}[m
+[32m+[m[32m# =========================[m
+[32m+[m[32m# MEMORY STORE (SIMPLIFIED)[m
+[32m+[m[32m# =========================[m
+[32m+[m[32mTRADE_JOURNAL = [][m
+[32m+[m[32mPERFORMANCE_LOG = [][m
+ [m
+ [m
+[32m+[m[32m# =========================[m
+[32m+[m[32m# ENGINE CLASS[m
+[32m+[m[32m# =========================[m
+ class AutopilotV4:[m
+[31m-    """[m
+[31m-    Simulation satellite only.[m
+[31m-[m
+[31m-    This module never interprets user intent, never produces advice, and never[m
+[31m-    makes trade or allocation decisions. Ethan cognition remains exclusively[m
+[31m-    in advisor/service.py.[m
+[31m-    """[m
+ [m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    # MAIN ENTRY POINT[m
+[32m+[m[32m    # =========================[m
+     def run(self, user_email=None, portfolio=None, market=None, context=None, llm_analysis=None, level="free"):[m
+[31m-        scenario = self._extract_market_scenario(market)[m
+[31m-        if not scenario:[m
+[31m-            return dict(SIMULATION_UNAVAILABLE)[m
+[32m+[m
+[32m+[m[32m        # fallback compatibility (ancien appel simplifié)[m
+[32m+[m[32m        market_signal = extract_score_signal(context)[m
+[32m+[m
+[32m+[m[32m        risk_level = detect_risk(str(market_signal))[m
+[32m+[m[32m        target_alloc = optimal_allocation(risk_level)[m
+[32m+[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        # TRADE GENERATION[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        trade = self._generate_trade([m
+[32m+[m[32m            symbol="BTC",[m
+[32m+[m[32m            price=100,[m
+[32m+[m[32m            signal=market_signal,[m
+[32m+[m[32m            risk=risk_level[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        # EXECUTION SIMULATION[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        execution = self._execute_trade_simulation(trade, portfolio)[m
+[32m+[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        # PERFORMANCE[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        performance = self._compute_performance(execution)[m
+[32m+[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        # JOURNALING[m
+[32m+[m[32m        # =========================[m
+[32m+[m[32m        journal_entry = self._log_decision(trade, execution, performance, llm_analysis)[m
+ [m
+         return {[m
+[31m-            "status": "ready",[m
+[31m-            "role": "SIMULATION SATELLITE ONLY",[m
+[31m-            "authority": "no_decision_authority",[m
+[31m-            "simulation_context": {[m
+[31m-                "user_email": user_email,[m
+[31m-                "level": level,[m
+[31m-                "portfolio_snapshot": portfolio or {},[m
+[31m-                "context_snapshot": context or {},[m
+[32m+[m[32m            "analysis": {[m
+[32m+[m[32m                "risk_level": risk_level,[m
+[32m+[m[32m                "market_signal": market_signal,[m
+[32m+[m[32m                "target_allocation": target_alloc,[m
+[32m+[m[32m                "llm_summary": llm_analysis[m
+             },[m
+[31m-            "market_scenario": scenario,[m
+[31m-            "outputs": {[m
+[31m-                "decision": None,[m
+[31m-                "trade": None,[m
+[31m-                "recommendation": None,[m
+[31m-            },[m
+[31m-            "generated_at": datetime.utcnow().isoformat(),[m
+[32m+[m[32m            "trade": trade,[m
+[32m+[m[32m            "execution": execution,[m
+[32m+[m[32m            "performance": performance,[m
+[32m+[m[32m            "journal": journal_entry[m
+         }[m
+ [m
+[31m-    def _extract_market_scenario(self, market):[m
+[31m-        if not isinstance(market, dict) or not market:[m
+[31m-            return None[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    # TRADE GENERATION[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    def _generate_trade(self, symbol, price, signal, risk):[m
+[32m+[m
+[32m+[m[32m        direction = "BUY" if signal > 0.5 else "SELL"[m
+[32m+[m
+[32m+[m[32m        size_multiplier = {[m
+[32m+[m[32m            "low": 0.5,[m
+[32m+[m[32m            "medium": 1,[m
+[32m+[m[32m            "high": 1.5[m
+[32m+[m[32m        }.get(risk, 1)[m
+[32m+[m
+[32m+[m[32m        size = round(1000 * size_multiplier, 2)[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            "id": str(uuid.uuid4()),[m
+[32m+[m[32m            "symbol": symbol,[m
+[32m+[m[32m            "direction": direction,[m
+[32m+[m[32m            "size": size,[m
+[32m+[m[32m            "price": price,[m
+[32m+[m[32m            "timestamp": datetime.utcnow().isoformat()[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    # SIMULATION ENGINE[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    def _execute_trade_simulation(self, trade, portfolio):[m
+[32m+[m
+[32m+[m[32m        entry_price = trade["price"][m
+[32m+[m
+[32m+[m[32m        # simulation marché[m
+[32m+[m[32m        exit_price = entry_price * ([m
+[32m+[m[32m            1.02 if trade["direction"] == "BUY" else 0.98[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        pnl = (exit_price - entry_price) * (trade["size"] / entry_price)[m
+[32m+[m
+[32m+[m[32m        result = {[m
+[32m+[m[32m            "entry": entry_price,[m
+[32m+[m[32m            "exit": round(exit_price, 2),[m
+[32m+[m[32m            "pnl": round(pnl, 2),[m
+[32m+[m[32m            "status": "CLOSED"[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        return result[m
+[32m+[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    # PERFORMANCE TRACKING[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    def _compute_performance(self, execution):[m
+[32m+[m
+[32m+[m[32m        PERFORMANCE_LOG.append(execution)[m
+[32m+[m
+[32m+[m[32m        wins = len([t for t in PERFORMANCE_LOG if t["pnl"] > 0])[m
+[32m+[m[32m        total = len(PERFORMANCE_LOG)[m
+[32m+[m
+[32m+[m[32m        winrate = (wins / total * 100) if total > 0 else 0[m
+[32m+[m
+[32m+[m[32m        total_pnl = sum([t["pnl"] for t in PERFORMANCE_LOG])[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            "total_trades": total,[m
+[32m+[m[32m            "winrate": round(winrate, 2),[m
+[32m+[m[32m            "total_pnl": round(total_pnl, 2)[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    # JOURNAL ENGINE[m
+[32m+[m[32m    # =========================[m
+[32m+[m[32m    def _log_decision(self, trade, execution, performance, llm_analysis=None):[m
+[32m+[m
+[32m+[m[32m        entry = {[m
+[32m+[m[32m            "trade": trade,[m
+[32m+[m[32m            "execution": execution,[m
+[32m+[m[32m            "performance_snapshot": performance,[m
+[32m+[m[32m            "ai_summary": llm_analysis,[m
+[32m+[m[32m            "timestamp": datetime.utcnow().isoformat()[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        TRADE_JOURNAL.append(entry)[m
+[32m+[m
+[32m+[m[32m        return entry[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef detect_risk(signal: str):[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        s = float(signal)[m
+[32m+[m[32m    except:[m
+[32m+[m[32m        s = 0.5[m
+[32m+[m
+[32m+[m[32m    if s < 0.3:[m
+[32m+[m[32m        return "low"[m
+[32m+[m[32m    elif s < 0.7:[m
+[32m+[m[32m        return "medium"[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        return "high"[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef extract_score_signal(context):[m
+[32m+[m[32m    if not isinstance(context, dict):[m
+[32m+[m[32m        return 0.5[m
+ [m
+[31m-        scenario = market.get("scenario") or market.get("market_scenario")[m
+[31m-        if isinstance(scenario, dict) and scenario:[m
+[31m-            return scenario[m
+[32m+[m[32m    raw_score = context.get("global_score") or context.get("score", 0.5)[m
+ [m
+[31m-        signals = market.get("signals") or market.get("data")[m
+[31m-        if isinstance(signals, dict) and signals:[m
+[31m-            return {"signals": signals}[m
+[32m+[m[32m    if isinstance(raw_score, dict):[m
+[32m+[m[32m        raw_score = raw_score.get("score", 50)[m
+ [m
+[31m-        return None[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        score = float(raw_score)[m
+[32m+[m[32m    except:[m
+[32m+[m[32m        return 0.5[m
+ [m
+[32m+[m[32m    return score / 100 if score > 1 else score[m
+ [m
+[32m+[m[32m# =========================[m
+[32m+[m[32m# FACTORY FUNCTION[m
+[32m+[m[32m# =========================[m
+ def get_autopilot_v4():[m
+     return AutopilotV4()[m
+[1mdiff --git a/advisor/ethan/__init__.py b/advisor/ethan/__init__.py[m
+[1mdeleted file mode 100644[m
+[1mindex 360b5ce..0000000[m
+[1m--- a/advisor/ethan/__init__.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,20 +0,0 @@[m
+[31m-"""[m
+[31m-Ethan Core package.[m
+[31m-[m
+[31m-Target architecture:[m
+[31m-Frontend -> API Routes -> Ethan Core[m
+[31m-  -> Context Engine[m
+[31m-  -> Memory Engine[m
+[31m-  -> Strategy Engine[m
+[31m-  -> Runtime Engine[m
+[31m-  -> Persistence Engine[m
+[31m-  -> Prompt Engine (LLM context only)[m
+[31m-  -> Response Engine (data wrapper only)[m
+[31m-  -> Output Renderer (only authorized human text source)[m
+[31m-  -> Contract Validator (analysis + metadata only before frontend)[m
+[31m-  -> OpenAI Gateway[m
+[31m-[m
+[31m-Satellites feed backend data only; they do not call OpenAI and do not decide.[m
+[31m-Hard rule: no user-facing Ethan text may leave the backend unless it was[m
+[31m-generated by advisor.ethan.output_renderer and validated by contract_validator.[m
+[31m-"""[m
+[1mdiff --git a/advisor/ethan/cache_policy.py b/advisor/ethan/cache_policy.py[m
+[1mdeleted file mode 100644[m
+[1mindex 00120ee..0000000[m
+[1m--- a/advisor/ethan/cache_policy.py[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-ETHAN_GLOBAL_CACHE_VERSION = "v26-memory-priority"[m
+[1mdiff --git a/advisor/ethan/context_engine.py b/advisor/ethan/context_engine.py[m
+[1mdeleted file mode 100644[m
+[1mindex e3d2d90..0000000[m
+[1m--- a/advisor/ethan/context_engine.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,61 +0,0 @@[m
+[31m-def compact_context(context):[m
+[31m-    score = context.get("global_score") or context.get("score") or 0[m
+[31m-    if isinstance(score, dict):[m
+[31m-        score = score.get("score", 0)[m
+[31m-[m
+[31m-    data_profile = context.get("data_profile") or {}[m
+[31m-    financial = context.get("financial_features") or {}[m
+[31m-    opportunities = context.get("opportunities") or {}[m
+[31m-    opportunity_count = ([m
+[31m-        len(opportunities)[m
+[31m-        if isinstance(opportunities, list)[m
+[31m-        else opportunities.get("count", 0)[m
+[31m-        if isinstance(opportunities, dict)[m
+[31m-        else 0[m
+[31m-    )[m
+[31m-[m
+[31m-    return {[m
+[31m-        "score": score,[m
+[31m-        "level": context.get("level"),[m
+[31m-        "plan": context.get("plan"),[m
+[31m-        "status": context.get("state", "READY"),[m
+[31m-        "life_context": context.get("life_context") or {},[m
+[31m-        "opportunity_count": opportunity_count,[m
+[31m-        "completion_percent": data_profile.get("completion_percent"),[m
+[31m-        "cashflow": financial.get("cashflow_score"),[m
+[31m-        "debt_risk": financial.get("debt_risk_score"),[m
+[31m-        "savings_velocity": financial.get("savings_velocity_score"),[m
+[31m-        "module_signals": (context.get("module_signals") or [])[:5],[m
+[31m-    }[m
+[31m-[m
+[31m-[m
+[31m-def compact_portfolio(portfolio):[m
+[31m-    assets = portfolio.get("portfolio") if isinstance(portfolio, dict) else portfolio[m
+[31m-    if not isinstance(assets, list):[m
+[31m-        assets = portfolio.get("assets", []) if isinstance(portfolio, dict) else [][m
+[31m-[m
+[31m-    total_value = 0[m
+[31m-    exposures = {}[m
+[31m-    top_assets = [][m
+[31m-[m
+[31m-    for asset in assets[:80]:[m
+[31m-        name = asset.get("asset_name") or asset.get("name") or "Asset"[m
+[31m-        category = (asset.get("asset_type") or asset.get("category") or asset.get("type") or "OTHER").upper()[m
+[31m-        value = float(asset.get("value") or asset.get("current_value") or 0)[m
+[31m-        if not value:[m
+[31m-            qty = float(asset.get("quantity") or 0)[m
+[31m-            price = float(asset.get("current_price") or asset.get("purchase_price") or 0)[m
+[31m-            value = qty * price[m
+[31m-[m
+[31m-        total_value += value[m
+[31m-        exposures[category] = exposures.get(category, 0) + value[m
+[31m-        top_assets.append({"name": name, "category": category, "value": round(value, 2)})[m
+[31m-[m
+[31m-    top_assets = sorted(top_assets, key=lambda item: item["value"], reverse=True)[:5][m
+[31m-[m
+[31m-    return {[m
+[31m-        "asset_count": len(assets),[m
+[31m-        "total_value": round(total_value, 2),[m
+[31m-        "exposures": dict(sorted(exposures.items(), key=lambda item: item[1], reverse=True)[:6]),[m
+[31m-        "top_assets": top_assets,[m
+[31m-    }[m
+[1mdiff --git a/advisor/ethan/contract_validator.py b/advisor/ethan/contract_validator.py[m
+[1mdeleted file mode 100644[m
+[1mindex 4098746..0000000[m
+[1m--- a/advisor/ethan/contract_validator.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,72 +0,0 @@[m
+[31m-from fastapi import HTTPException[m
+[31m-[m
+[31m-from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION[m
+[31m-from advisor.ethan.output_renderer import ETHAN_TEXT_ORIGIN[m
+[31m-[m
+[31m-[m
+[31m-ALLOWED_FRONTEND_KEYS = {"analysis", "metadata"}[m
+[31m-FORBIDDEN_METADATA_KEYS = {[m
+[31m-    "input",[m
+[31m-    "message",[m
+[31m-    "prompt",[m
+[31m-    "raw",[m
+[31m-    "raw_signal",[m
+[31m-    "raw_llm_output",[m
+[31m-    "user_text",[m
+[31m-    "llm_text",[m
+[31m-}[m
+[31m-[m
+[31m-[m
+[31m-def _contract_error(reason):[m
+[31m-    raise HTTPException([m
+[31m-        status_code=500,[m
+[31m-        detail={[m
+[31m-            "error": "ethan_contract_violation",[m
+[31m-            "reason": reason,[m
+[31m-            "cache_version": ETHAN_GLOBAL_CACHE_VERSION,[m
+[31m-        },[m
+[31m-    )[m
+[31m-[m
+[31m-[m
+[31m-def _contains_forbidden_key(value):[m
+[31m-    if isinstance(value, dict):[m
+[31m-        for key, nested in value.items():[m
+[31m-            if str(key) in FORBIDDEN_METADATA_KEYS:[m
+[31m-                return True[m
+[31m-            if _contains_forbidden_key(nested):[m
+[31m-                return True[m
+[31m-    elif isinstance(value, list):[m
+[31m-        return any(_contains_forbidden_key(item) for item in value)[m
+[31m-    return False[m
+[31m-[m
+[31m-[m
+[31m-def validate_ethan_frontend_contract(payload):[m
+[31m-    if not isinstance(payload, dict):[m
+[31m-        _contract_error("payload_must_be_object")[m
+[31m-[m
+[31m-    extra_keys = set(payload.keys()) - ALLOWED_FRONTEND_KEYS[m
+[31m-    if extra_keys:[m
+[31m-        _contract_error(f"unexpected_top_level_keys:{sorted(extra_keys)}")[m
+[31m-[m
+[31m-    analysis = payload.get("analysis")[m
+[31m-    metadata = payload.get("metadata")[m
+[31m-[m
+[31m-    if not isinstance(analysis, str):[m
+[31m-        _contract_error("analysis_must_be_string")[m
+[31m-[m
+[31m-    if not isinstance(metadata, dict):[m
+[31m-        _contract_error("metadata_must_be_object")[m
+[31m-[m
+[31m-    if metadata.get("text_origin") != ETHAN_TEXT_ORIGIN:[m
+[31m-        _contract_error("analysis_text_origin_must_be_output_renderer")[m
+[31m-[m
+[31m-    if metadata.get("cache_version") != ETHAN_GLOBAL_CACHE_VERSION:[m
+[31m-        _contract_error("cache_version_mismatch")[m
+[31m-[m
+[31m-    if _contains_forbidden_key(metadata):[m
+[31m-        _contract_error("metadata_contains_forbidden_text_source")[m
+[31m-[m
+[31m-    return {[m
+[31m-        "analysis": analysis,[m
+[31m-        "metadata": metadata,[m
+[31m-    }[m
+[1mdiff --git a/advisor/ethan/memory_engine.py b/advisor/ethan/memory_engine.py[m
+[1mdeleted file mode 100644[m
+[1mindex 869e0ea..0000000[m
+[1m--- a/advisor/ethan/memory_engine.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,269 +0,0 @@[m
+[31m-import json[m
+[31m-import unicodedata[m
+[31m-[m
+[31m-from sqlalchemy import text[m
+[31m-[m
+[31m-from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION[m
+[31m-from advisor.ethan.strategy_engine import safe_int[m
+[31m-[m
+[31m-[m
+[31m-def _versioned_context_profile(profile):[m
+[31m-    profile = profile if isinstance(profile, dict) else {}[m
+[31m-    if profile.get("cache_version") == ETHAN_GLOBAL_CACHE_VERSION:[m
+[31m-        return profile[m
+[31m-[m
+[31m-    preserved_keys = [[m
+[31m-        "priority_goal",[m
+[31m-        "goals",[m
+[31m-        "time_constraint",[m
+[31m-        "family_constraint",[m
+[31m-        "has_children",[m
+[31m-        "expertise",[m
+[31m-        "professional_context",[m
+[31m-        "business_context",[m
+[31m-        "businesses",[m
+[31m-        "profile_correction",[m
+[31m-    ][m
+[31m-    return {[m
+[31m-        key: profile[key][m
+[31m-        for key in preserved_keys[m
+[31m-        if profile.get(key)[m
+[31m-    }[m
+[31m-[m
+[31m-[m
+[31m-def _normalize(value) -> str:[m
+[31m-    normalized = unicodedata.normalize("NFD", str(value or "").lower())[m
+[31m-    cleaned = "".join([m
+[31m-        char for char in normalized if unicodedata.category(char) != "Mn"[m
+[31m-    )[m
+[31m-    return ([m
+[31m-        cleaned[m
+[31m

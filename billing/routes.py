@@ -260,24 +260,110 @@ def get_plan_or_400(plan_id: str, interval: str | None = None, founder: bool = F
     return plan, price_id, price_env, billing_interval
 
 
+def get_or_create_stripe_customer(conn, user, email: str):
+    subscription = conn.execute(text("""
+        SELECT stripe_customer_id
+        FROM subscriptions
+        WHERE user_id = :uid
+    """), {"uid": user.id}).fetchone()
+
+    customer_id = subscription.stripe_customer_id if subscription else None
+
+    # 1. Pas de customer => create
+    if not customer_id:
+        customer = stripe.Customer.create(
+            email=email,
+            metadata={"user_id": str(user.id)}
+        )
+
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET stripe_customer_id = :cid
+            WHERE user_id = :uid
+        """), {"cid": customer.id, "uid": user.id})
+
+        return customer.id
+
+    # 2. Customer existe => vérifier côté Stripe
+    try:
+        stripe.Customer.retrieve(customer_id)
+        return customer_id
+
+    except stripe.error.InvalidRequestError:
+        # ❌ customer supprimé côté Stripe => reset DB + recreate
+
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET stripe_customer_id = NULL
+            WHERE user_id = :uid
+        """), {"uid": user.id})
+
+        customer = stripe.Customer.create(
+            email=email,
+            metadata={"user_id": str(user.id)}
+        )
+
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET stripe_customer_id = :cid
+            WHERE user_id = :uid
+        """), {"cid": customer.id, "uid": user.id})
+
+        return customer.id
+    
+
 def get_user_subscription(conn, email: str):
+    """
+    Récupère l'utilisateur et sa souscription éventuelle.
+
+    Retour :
+        user, subscription
+    """
+
     user = conn.execute(text("""
-        SELECT id, plan, is_founder, founder_tier, founder_discount
+        SELECT
+            id,
+            email,
+            plan,
+            is_founder,
+            founder_tier,
+            founder_discount,
+            level
         FROM users
         WHERE email = :email
-    """), {"email": email}).fetchone()
+    """), {
+        "email": email
+    }).fetchone()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Utilisateur introuvable : {email}"
+        )
 
     subscription = conn.execute(text("""
-        SELECT plan, status, current_period_end, stripe_price_id, environment,
-               stripe_customer_id, stripe_subscription_id, cancel_at_period_end,
-               pending_plan, pending_stripe_price_id, pending_effective_at,
-               pending_change_type
+        SELECT
+            id,
+            user_id,
+            plan,
+            status,
+            stripe_customer_id,
+            stripe_subscription_id,
+            stripe_price_id,
+            current_period_end,
+            environment,
+            cancel_at_period_end,
+            pending_plan,
+            pending_stripe_price_id,
+            pending_effective_at,
+            pending_change_type,
+            created_at,
+            updated_at
         FROM subscriptions
         WHERE user_id = :user_id
-    """), {"user_id": user.id}).fetchone()
+    """), {
+        "user_id": user.id
+    }).fetchone()
 
     return user, subscription
 
@@ -316,14 +402,15 @@ def stripe_object_id(value):
 def normalize_subscription_event(event_type: str, stripe_object):
     subscription_id = stripe_value(stripe_object, "id")
     status = normalize_subscription_status(stripe_value(stripe_object, "status"))
+    price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
 
     if event_type == "customer.subscription.deleted":
         status = "canceled"
-    if event_type == "customer.subscription.paused":
-        status = "paused"
-
-    price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
-    plan = plan_from_price_id(price_id)
+        plan = "FREE"
+    else:
+        plan = plan_from_price_id(price_id)
+        if event_type == "customer.subscription.paused":
+            status = "paused"
 
     return {
         "event_type": "SUBSCRIPTION_UPDATED",
@@ -411,8 +498,8 @@ def update_subscription_state(conn, event: dict):
         or (current_subscription.plan if current_subscription else None)
         or "FREE"
     )
-    active_status = status in {"active", "trialing", "past_due"}
-    effective_user_plan = plan if active_status else "FREE"
+    stored_plan = plan if status == "active" else "FREE"
+    effective_user_plan = stored_plan
 
     conn.execute(text("""
         INSERT INTO subscriptions (
@@ -458,7 +545,7 @@ def update_subscription_state(conn, event: dict):
             updated_at = NOW()
     """), {
         "user_id": user.id,
-        "plan": plan,
+        "plan": stored_plan,
         "status": status,
         "stripe_customer_id": event.get("stripe_customer_id"),
         "stripe_subscription_id": event.get("stripe_subscription_id"),
@@ -683,14 +770,17 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                 },
             )
 
+            customer_id = get_or_create_stripe_customer(conn, user, email)
+
         discounts = []
         founder_coupon = os.getenv("STRIPE_FOUNDER_COUPON_ID")
         if bool(user.is_founder) and int(user.founder_discount or 0) > 0 and founder_coupon:
             discounts.append({"coupon": founder_coupon})
+        
 
         session_kwargs = {
             "mode": "subscription",
-            "customer_email": email,
+            "customer": customer_id,
             "line_items": [{"price": price_id, "quantity": 1}],
             "success_url": f"{FRONTEND_URL}/dashboard?checkout=success",
             "cancel_url": f"{FRONTEND_URL}/dashboard?checkout=cancel",
@@ -944,7 +1034,7 @@ def cancel_subscription(email: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
         ensure_billing_tables(conn)
-        _, subscription = get_user_subscription(conn, email)
+        user, subscription = get_user_subscription(conn, email)
 
     if not subscription or not subscription.stripe_subscription_id:
         raise HTTPException(status_code=400, detail="Subscription Stripe introuvable")
