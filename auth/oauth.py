@@ -24,7 +24,7 @@ router = APIRouter()
 _oauth_schema_ready = False
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://vision-business.com").rstrip("/")
-BACKEND_URL = os.getenv("BACKEND_URL", "https://family-office-front-git-staging-visionbusinessmasterys-projects.vercel.app").rstrip("/")
+BACKEND_URL = os.getenv("BACKEND_URL", "https://family-office-front.vercel.app").rstrip("/")
 OAUTH_FLOW_TTL_MINUTES = 10
 OAUTH_SESSION_TTL_MINUTES = 5
 
