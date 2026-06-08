@@ -197,7 +197,7 @@ app.add_middleware(
         "http://localhost:3000",
         "https://https://family-office-api-1.onrender.com",
         "https://vision-business.com",
-        "https://family-office-front-git-staging-visionbusinessmasterys-projects.vercel.app/",
+        "https://family-office-front-git-staging-visionbusinessmasterys-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
