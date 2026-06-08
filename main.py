@@ -195,7 +195,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://family-office-api-n4sv.onrender.com",
+        "https://https://family-office-api-1.onrender.com",
         "https://vision-business.com",
         "https://family-office-front.vercel.app",
     ],
