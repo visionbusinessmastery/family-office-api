@@ -5,9 +5,11 @@
 # =========================
 # IMPORTS
 # =========================
+import csv
+import io
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import text
 from database import engine
 from auth.utils import get_current_user
@@ -56,6 +58,42 @@ def invalidate_finance_caches(email: str, user_id: Optional[int] = None):
 
 def get_item_name(data: dict):
     return data.get("name") or data.get("label") or ""
+
+
+def parse_amount(value):
+    cleaned = str(value or "0").strip().replace("\u202f", "").replace(" ", "")
+    cleaned = cleaned.replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def normalize_finance_type(value: str, scope: str):
+    raw = str(value or "").strip().lower()
+    aliases = {
+        "income": "revenus",
+        "revenue": "revenus",
+        "revenu": "revenus",
+        "revenus": "revenus",
+        "expense": "charges",
+        "charge": "charges",
+        "charges": "charges",
+        "saving": "epargne",
+        "savings": "epargne",
+        "epargne": "epargne",
+        "debt": "dettes",
+        "debts": "dettes",
+        "dette": "dettes",
+        "dettes": "dettes",
+    }
+    item_type = aliases.get(raw)
+    allowed = {"cashflow": {"revenus", "charges"}, "balance": {"epargne", "dettes"}}
+
+    if item_type in allowed.get(scope, set()):
+        return item_type
+
+    return None
 
 
 # =========================
@@ -234,6 +272,93 @@ def get_finance_overview(user=Depends(get_current_user)):
         "counts": counts,
         "reading": reading,
         "priority": priority,
+    }
+
+
+@router.post("/import")
+async def import_finance_items(
+    file: UploadFile = File(...),
+    scope: str = Form("cashflow"),
+    user=Depends(get_current_user),
+):
+    normalized_scope = str(scope or "cashflow").strip().lower()
+    if normalized_scope not in {"cashflow", "balance"}:
+        raise HTTPException(status_code=400, detail="Scope d'import invalide")
+
+    filename = (file.filename or "").lower()
+    if filename.endswith(".pdf") or file.content_type == "application/pdf":
+        raise HTTPException(
+            status_code=422,
+            detail="Import PDF non active sans parseur documentaire. Utilise un CSV ou passe par la Document Inbox.",
+        )
+
+    if not filename.endswith(".csv") and file.content_type not in {
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/csv",
+    }:
+        raise HTTPException(status_code=400, detail="Format supporte: CSV")
+
+    raw = await file.read()
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV vide ou colonnes manquantes")
+
+    inserted = 0
+    skipped = 0
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, user)
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        for row in reader:
+            item_type = normalize_finance_type(
+                row.get("type") or row.get("category") or row.get("categorie"),
+                normalized_scope,
+            )
+            name = (
+                row.get("name")
+                or row.get("label")
+                or row.get("libelle")
+                or row.get("description")
+                or ""
+            ).strip()
+            amount = parse_amount(row.get("amount") or row.get("montant") or row.get("value"))
+
+            if not item_type or not name or amount is None:
+                skipped += 1
+                continue
+
+            conn.execute(
+                text("""
+                    INSERT INTO finance_items (user_id, type, name, amount)
+                    VALUES (:user_id, :type, :name, :amount)
+                """),
+                {
+                    "user_id": user_id,
+                    "type": item_type,
+                    "name": name,
+                    "amount": amount,
+                },
+            )
+            inserted += 1
+
+        if inserted:
+            award_xp(conn, user_id, user, f"finance_{normalized_scope}_imported", 40)
+            invalidate_finance_caches(user, user_id)
+
+    return {
+        "status": "imported",
+        "scope": normalized_scope,
+        "inserted": inserted,
+        "skipped": skipped,
+        "accepted_columns": ["type", "name", "amount"],
     }
 
 

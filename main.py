@@ -1,4 +1,5 @@
 import logging
+import asyncio
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -105,6 +106,7 @@ from intelligence.opportunity_intelligence import (
 from intelligence.weekly_report_service import (
     ensure_weekly_report_tables,
     router as weekly_report_router,
+    weekly_report_scheduler_loop,
 )
 from intelligence.routes_finance import router as finance_router
 from intelligence.routes_score import router as intelligence_score_router
@@ -168,7 +170,15 @@ async def lifespan(app: FastAPI):
         ensure_opportunity_intelligence_tables(conn)
         ensure_weekly_report_tables(conn)
     logging.info("DB INIT OK")
-    yield
+    weekly_report_task = asyncio.create_task(weekly_report_scheduler_loop())
+    try:
+        yield
+    finally:
+        weekly_report_task.cancel()
+        try:
+            await weekly_report_task
+        except asyncio.CancelledError:
+            logging.info("Weekly report scheduler stopped")
 
 
 # =========================

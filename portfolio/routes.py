@@ -1,9 +1,12 @@
 # =========================
 # IMPORTS
 # =========================
+import csv
+import io
+
 from core.limiter import limiter
 from core.utils import safe_execute
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
@@ -58,6 +61,15 @@ def build_portfolio_db_payload(data: PortfolioRequest):
         "currency_base": pair["currency_base"] if pair else None,
         "currency_quote": pair["currency_quote"] if pair else None,
     }
+
+
+def parse_import_float(value):
+    cleaned = str(value or "0").strip().replace("\u202f", "").replace(" ", "")
+    cleaned = cleaned.replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
 
 # =========================
 # GET PORTFOLIO
@@ -131,6 +143,133 @@ def add_asset(request: Request, data: PortfolioRequest):
         return {"status": "asset ajouté"}
 
     return safe_execute(_add, module_name="PORTFOLIO")
+
+
+@router.post("/import")
+@limiter.limit("5/minute")
+async def import_portfolio_assets(
+    request: Request,
+    file: UploadFile = File(...),
+    scope: str = Form("investments"),
+):
+    def validate_file():
+        filename = (file.filename or "").lower()
+        if filename.endswith(".pdf") or file.content_type == "application/pdf":
+            raise HTTPException(
+                status_code=422,
+                detail="Import PDF non active sans parseur documentaire. Utilise un CSV ou passe par la Document Inbox.",
+            )
+        if not filename.endswith(".csv") and file.content_type not in {
+            "text/csv",
+            "application/vnd.ms-excel",
+            "application/csv",
+        }:
+            raise HTTPException(status_code=400, detail="Format supporte: CSV")
+
+    validate_file()
+    raw = await file.read()
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV vide ou colonnes manquantes")
+
+    def _import():
+        user_email = request.state.user_email
+        inserted = 0
+        skipped = 0
+
+        with engine.begin() as conn:
+            workspace = resolve_workspace_context(conn, request, user_email, write=True)
+            ensure_portfolio_schema(conn)
+
+            for row in reader:
+                asset_name = (
+                    row.get("asset_name")
+                    or row.get("name")
+                    or row.get("ticker")
+                    or row.get("symbol")
+                    or ""
+                ).strip()
+                asset_type = (
+                    row.get("asset_type")
+                    or row.get("type")
+                    or row.get("category")
+                    or row.get("categorie")
+                    or ""
+                ).strip()
+                quantity = parse_import_float(row.get("quantity") or row.get("quantite"))
+                purchase_price = parse_import_float(
+                    row.get("purchase_price")
+                    or row.get("price")
+                    or row.get("prix")
+                    or row.get("cost")
+                )
+
+                if not asset_name or not asset_type or not quantity or not purchase_price:
+                    skipped += 1
+                    continue
+
+                try:
+                    payload = build_portfolio_db_payload(
+                        PortfolioRequest(
+                            asset_name=asset_name,
+                            asset_type=asset_type,
+                            quantity=quantity,
+                            purchase_price=purchase_price,
+                        )
+                    )
+                except Exception:
+                    skipped += 1
+                    continue
+
+                conn.execute(text("""
+                    INSERT INTO portfolio (
+                        user_id,
+                        asset_name,
+                        category,
+                        quantity,
+                        purchase_price,
+                        pair_name,
+                        currency_base,
+                        currency_quote
+                    )
+                    VALUES (
+                        :user_id,
+                        :asset_name,
+                        :category,
+                        :quantity,
+                        :purchase_price,
+                        :pair_name,
+                        :currency_base,
+                        :currency_quote
+                    )
+                """), {
+                    "user_id": workspace["user_id"],
+                    **payload,
+                })
+                inserted += 1
+
+            user_id = workspace["user_id"]
+            cache_email = workspace["email"]
+            if inserted:
+                award_xp(conn, user_id, cache_email, "portfolio_imported", 50)
+
+        if inserted:
+            refresh_portfolio_side_effects(user_id, cache_email)
+
+        return {
+            "status": "imported",
+            "scope": scope,
+            "inserted": inserted,
+            "skipped": skipped,
+            "accepted_columns": ["asset_name", "asset_type", "quantity", "purchase_price"],
+        }
+
+    return safe_execute(_import, module_name="PORTFOLIO")
 
 
 # =========================
