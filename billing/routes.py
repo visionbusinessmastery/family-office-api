@@ -831,6 +831,32 @@ def current_subscription(email: str = Depends(get_current_user)):
     }
 
 
+@router.post("/pricing-table-session")
+def create_pricing_table_session(email: str = Depends(get_current_user)):
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        user, _ = get_user_subscription(conn, email)
+        customer_id = get_or_create_stripe_customer(conn, user, email)
+
+    try:
+        session = stripe.CustomerSession.create(
+            customer=customer_id,
+            components={"pricing_table": {"enabled": True}},
+        )
+    except Exception as exc:
+        capture_exception(exc, {"module": "billing", "operation": "pricing_table_session"})
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {
+        "client_secret": stripe_value(session, "client_secret"),
+        "client_reference_id": str(user.id),
+        "stripe_customer_id": customer_id,
+    }
+
+
 @router.post("/create-checkout-session")
 def create_checkout_session(data: dict, request: Request, email: str = Depends(get_current_user)):
     if not stripe.api_key:
