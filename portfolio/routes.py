@@ -7,6 +7,7 @@ import io
 from core.limiter import limiter
 from core.utils import safe_execute
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from openpyxl import load_workbook
 from .schemas import PortfolioRequest
 from sqlalchemy import text
 from database import engine
@@ -70,6 +71,66 @@ def parse_import_float(value):
         return float(cleaned)
     except ValueError:
         return None
+
+
+def normalize_import_row(row: dict):
+    return {
+        str(key or "").strip().lower(): str(value or "").strip()
+        for key, value in row.items()
+    }
+
+
+def read_csv_rows(raw: bytes):
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV vide ou colonnes manquantes")
+
+    return [normalize_import_row(row) for row in reader]
+
+
+def read_excel_rows(raw: bytes):
+    try:
+        workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Fichier Excel invalide ou illisible")
+
+    rows = workbook.active.iter_rows(values_only=True)
+    headers = next(rows, None)
+    if not headers:
+        raise HTTPException(status_code=400, detail="Excel vide ou colonnes manquantes")
+
+    normalized_headers = [str(header or "").strip().lower() for header in headers]
+    if not any(normalized_headers):
+        raise HTTPException(status_code=400, detail="Excel vide ou colonnes manquantes")
+
+    return [
+        normalize_import_row(dict(zip(normalized_headers, values)))
+        for values in rows
+        if any(value not in (None, "") for value in values)
+    ]
+
+
+def read_import_rows(filename: str, content_type: str | None, raw: bytes):
+    is_excel = filename.endswith(".xlsx") or content_type == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    if is_excel:
+        return read_excel_rows(raw), "excel"
+
+    if filename.endswith(".csv") or content_type in {
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/csv",
+    }:
+        return read_csv_rows(raw), "csv"
+
+    raise HTTPException(status_code=400, detail="Format supporte: CSV ou Excel (.xlsx)")
 
 # =========================
 # GET PORTFOLIO
@@ -159,23 +220,11 @@ async def import_portfolio_assets(
                 status_code=422,
                 detail="Import PDF non active sans parseur documentaire. Utilise un CSV ou passe par la Document Inbox.",
             )
-        if not filename.endswith(".csv") and file.content_type not in {
-            "text/csv",
-            "application/vnd.ms-excel",
-            "application/csv",
-        }:
-            raise HTTPException(status_code=400, detail="Format supporte: CSV")
 
     validate_file()
+    filename = (file.filename or "").lower()
     raw = await file.read()
-    try:
-        content = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        content = raw.decode("latin-1")
-
-    reader = csv.DictReader(io.StringIO(content))
-    if not reader.fieldnames:
-        raise HTTPException(status_code=400, detail="CSV vide ou colonnes manquantes")
+    rows, import_format = read_import_rows(filename, file.content_type, raw)
 
     def _import():
         user_email = request.state.user_email
@@ -186,7 +235,7 @@ async def import_portfolio_assets(
             workspace = resolve_workspace_context(conn, request, user_email, write=True)
             ensure_portfolio_schema(conn)
 
-            for row in reader:
+            for row in rows:
                 asset_name = (
                     row.get("asset_name")
                     or row.get("name")
@@ -264,6 +313,7 @@ async def import_portfolio_assets(
         return {
             "status": "imported",
             "scope": scope,
+            "format": import_format,
             "inserted": inserted,
             "skipped": skipped,
             "accepted_columns": ["asset_name", "asset_type", "quantity", "purchase_price"],
