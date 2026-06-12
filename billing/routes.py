@@ -109,8 +109,25 @@ STRIPE_STATUS_MAP = {
 }
 
 
+ACTIVE_STRIPE_STATUSES = {"active", "trialing", "past_due"}
+
+
 def normalize_subscription_status(status: str | None) -> str:
     return STRIPE_STATUS_MAP.get(str(status or "").lower(), "inactive")
+
+
+def normalize_billing_plan_id(plan_id: str | None) -> str:
+    value = str(plan_id or "").strip().lower()
+    aliases = {
+        "growth": "gold",
+        "platinum": "elite",
+        "wealth_os": "elite",
+        "dynasty": "legacy",
+        "dynasty_office": "legacy",
+        "legacy-dynasty": "legacy",
+        "legacy_dynasty": "legacy",
+    }
+    return aliases.get(value, value)
 
 
 def invalidate_subscription_caches(email: str | None, user_id: int | None = None):
@@ -221,6 +238,7 @@ def ensure_billing_tables(conn):
             created_at TIMESTAMP DEFAULT NOW()
         )
     """))
+    conn.execute(text("ALTER TABLE subscription_events ADD COLUMN IF NOT EXISTS processing_status TEXT DEFAULT 'received'"))
 
     _billing_schema_ready = True
 
@@ -237,7 +255,7 @@ def get_price_env(plan_id: str, interval: str, founder: bool = False):
 
 
 def get_plan_or_400(plan_id: str, interval: str | None = None, founder: bool = False):
-    plan_id = (plan_id or "").lower()
+    plan_id = normalize_billing_plan_id(plan_id)
     plan = PLANS.get(plan_id)
 
     if not plan or plan_id == "free":
@@ -260,24 +278,143 @@ def get_plan_or_400(plan_id: str, interval: str | None = None, founder: bool = F
     return plan, price_id, price_env, billing_interval
 
 
-def get_user_subscription(conn, email: str):
-    user = conn.execute(text("""
-        SELECT id, plan, is_founder, founder_tier, founder_discount
-        FROM users
-        WHERE email = :email
-    """), {"email": email}).fetchone()
+def find_existing_stripe_customer_by_email(email: str | None):
+    if not email:
+        return None
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    customers = stripe.Customer.list(email=email, limit=10)
+    for customer in stripe_value(customers, "data", []) or []:
+        if not bool(stripe_value(customer, "deleted")):
+            return stripe_object_id(customer)
+    return None
+
+
+def get_or_create_stripe_customer(conn, user, email: str):
+    conn.execute(text("""
+        INSERT INTO subscriptions (user_id, plan, status, updated_at)
+        VALUES (:uid, :plan, 'inactive', NOW())
+        ON CONFLICT (user_id) DO NOTHING
+    """), {"uid": user.id, "plan": normalize_plan(user.plan)})
 
     subscription = conn.execute(text("""
-        SELECT plan, status, current_period_end, stripe_price_id, environment,
-               stripe_customer_id, stripe_subscription_id, cancel_at_period_end,
-               pending_plan, pending_stripe_price_id, pending_effective_at,
-               pending_change_type
+        SELECT stripe_customer_id
+        FROM subscriptions
+        WHERE user_id = :uid
+    """), {"uid": user.id}).fetchone()
+
+    customer_id = subscription.stripe_customer_id if subscription else None
+
+    # 1. Pas de customer => create
+    if not customer_id:
+        existing_customer_id = find_existing_stripe_customer_by_email(email)
+        customer_id = existing_customer_id
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=email,
+                metadata={"user_id": str(user.id)}
+            )
+            customer_id = customer.id
+
+        conn.execute(text("""
+            INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, updated_at)
+            VALUES (:uid, :plan, 'inactive', :cid, NOW())
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                stripe_customer_id = EXCLUDED.stripe_customer_id,
+                updated_at = NOW()
+        """), {"cid": customer_id, "uid": user.id, "plan": normalize_plan(user.plan)})
+
+        return customer_id
+
+    # 2. Customer existe => vérifier côté Stripe
+    try:
+        customer = stripe.Customer.retrieve(customer_id)
+        if bool(stripe_value(customer, "deleted")):
+            raise stripe.error.InvalidRequestError(
+                "Customer deleted",
+                param="customer",
+            )
+        return customer_id
+
+    except stripe.error.InvalidRequestError:
+        # ❌ customer supprimé côté Stripe => reset DB + recreate
+
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET stripe_customer_id = NULL
+            WHERE user_id = :uid
+        """), {"uid": user.id})
+
+        existing_customer_id = find_existing_stripe_customer_by_email(email)
+        customer_id = existing_customer_id
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=email,
+                metadata={"user_id": str(user.id)}
+            )
+            customer_id = customer.id
+
+        conn.execute(text("""
+            UPDATE subscriptions
+            SET stripe_customer_id = :cid
+            WHERE user_id = :uid
+        """), {"cid": customer_id, "uid": user.id})
+
+        return customer_id
+    
+
+def get_user_subscription(conn, email: str):
+    """
+    Récupère l'utilisateur et sa souscription éventuelle.
+
+    Retour :
+        user, subscription
+    """
+
+    user = conn.execute(text("""
+        SELECT
+            id,
+            email,
+            plan,
+            is_founder,
+            founder_tier,
+            founder_discount,
+            level
+        FROM users
+        WHERE email = :email
+    """), {
+        "email": email
+    }).fetchone()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Utilisateur introuvable : {email}"
+        )
+
+    subscription = conn.execute(text("""
+        SELECT
+            id,
+            user_id,
+            plan,
+            status,
+            stripe_customer_id,
+            stripe_subscription_id,
+            stripe_price_id,
+            current_period_end,
+            environment,
+            cancel_at_period_end,
+            pending_plan,
+            pending_stripe_price_id,
+            pending_effective_at,
+            pending_change_type,
+            created_at,
+            updated_at
         FROM subscriptions
         WHERE user_id = :user_id
-    """), {"user_id": user.id}).fetchone()
+    """), {
+        "user_id": user.id
+    }).fetchone()
 
     return user, subscription
 
@@ -316,14 +453,15 @@ def stripe_object_id(value):
 def normalize_subscription_event(event_type: str, stripe_object):
     subscription_id = stripe_value(stripe_object, "id")
     status = normalize_subscription_status(stripe_value(stripe_object, "status"))
+    price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
 
     if event_type == "customer.subscription.deleted":
         status = "canceled"
-    if event_type == "customer.subscription.paused":
-        status = "paused"
-
-    price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
-    plan = plan_from_price_id(price_id)
+        plan = "FREE"
+    else:
+        plan = plan_from_price_id(price_id)
+        if event_type == "customer.subscription.paused":
+            status = "paused"
 
     return {
         "event_type": "SUBSCRIPTION_UPDATED",
@@ -411,8 +549,8 @@ def update_subscription_state(conn, event: dict):
         or (current_subscription.plan if current_subscription else None)
         or "FREE"
     )
-    active_status = status in {"active", "trialing", "past_due"}
-    effective_user_plan = plan if active_status else "FREE"
+    stored_plan = plan if status in ACTIVE_STRIPE_STATUSES else "FREE"
+    effective_user_plan = stored_plan
 
     conn.execute(text("""
         INSERT INTO subscriptions (
@@ -458,7 +596,7 @@ def update_subscription_state(conn, event: dict):
             updated_at = NOW()
     """), {
         "user_id": user.id,
-        "plan": plan,
+        "plan": stored_plan,
         "status": status,
         "stripe_customer_id": event.get("stripe_customer_id"),
         "stripe_subscription_id": event.get("stripe_subscription_id"),
@@ -655,7 +793,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
     if not stripe.api_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
 
-    plan_id = str(data.get("plan", "elite")).lower()
+    plan_id = normalize_billing_plan_id(data.get("plan", "elite"))
     interval = normalize_interval(data.get("interval") or data.get("billing_interval"))
     founder_checkout = bool(data.get("founder") or data.get("founder_plan"))
     plan, price_id, price_env, interval = get_plan_or_400(
@@ -668,7 +806,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
         with engine.begin() as conn:
             ensure_billing_tables(conn)
             ensure_security_tables(conn)
-            user, _ = get_user_subscription(conn, email)
+            user, subscription = get_user_subscription(conn, email)
             log_security_event(
                 conn,
                 "stripe_checkout_requested",
@@ -683,14 +821,79 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                 },
             )
 
+            customer_id = get_or_create_stripe_customer(conn, user, email)
+
+        target_plan = normalize_plan(plan_id)
+        current_plan = resolve_effective_plan(
+            user.plan,
+            subscription.plan if subscription else None,
+            subscription.status if subscription else None,
+        )
+        if (
+            subscription
+            and subscription.stripe_subscription_id
+            and normalize_subscription_status(subscription.status) in ACTIVE_STRIPE_STATUSES
+        ):
+            if plan_rank(target_plan) < plan_rank(current_plan):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Utilise /billing/schedule-downgrade pour un changement vers un plan inferieur.",
+                )
+
+            if target_plan == current_plan and subscription.stripe_price_id == price_id:
+                return {
+                    "url": f"{FRONTEND_URL}/dashboard?billing=current",
+                    "plan": plan["name"],
+                    "interval": interval,
+                    "founder": founder_checkout,
+                }
+
+            stripe_subscription = stripe.Subscription.retrieve(
+                subscription.stripe_subscription_id,
+                expand=["items.data.price"],
+            )
+            item = stripe_nested_value(stripe_subscription, "items", "data", 0)
+            item_id = stripe_object_id(item)
+            if not item_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Impossible de lire la ligne d'abonnement Stripe.",
+                )
+
+            stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                cancel_at_period_end=False,
+                items=[{"id": item_id, "price": price_id}],
+                proration_behavior="create_prorations",
+                metadata={
+                    "email": email,
+                    "plan": plan_id,
+                    "interval": interval,
+                    "stripe_price_id": price_id,
+                    "price_env": price_env or "",
+                    "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
+                    "founder_checkout": str(founder_checkout).lower(),
+                    "founder_tier": user.founder_tier or "",
+                    "founder_discount": str(int(user.founder_discount or 0)),
+                },
+            )
+
+            return {
+                "url": f"{FRONTEND_URL}/dashboard?billing=updated",
+                "plan": plan["name"],
+                "interval": interval,
+                "founder": founder_checkout,
+            }
+
         discounts = []
         founder_coupon = os.getenv("STRIPE_FOUNDER_COUPON_ID")
         if bool(user.is_founder) and int(user.founder_discount or 0) > 0 and founder_coupon:
             discounts.append({"coupon": founder_coupon})
+        
 
         session_kwargs = {
             "mode": "subscription",
-            "customer_email": email,
+            "customer": customer_id,
             "line_items": [{"price": price_id, "quantity": 1}],
             "success_url": f"{FRONTEND_URL}/dashboard?checkout=success",
             "cancel_url": f"{FRONTEND_URL}/dashboard?checkout=cancel",
@@ -724,6 +927,8 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
             session_kwargs["discounts"] = discounts
 
         session = stripe.checkout.Session.create(**session_kwargs)
+    except HTTPException:
+        raise
     except Exception as exc:
         capture_exception(exc, {"module": "billing", "operation": "checkout"})
         raise HTTPException(status_code=400, detail=str(exc))
@@ -944,7 +1149,7 @@ def cancel_subscription(email: str = Depends(get_current_user)):
 
     with engine.begin() as conn:
         ensure_billing_tables(conn)
-        _, subscription = get_user_subscription(conn, email)
+        user, subscription = get_user_subscription(conn, email)
 
     if not subscription or not subscription.stripe_subscription_id:
         raise HTTPException(status_code=400, detail="Subscription Stripe introuvable")
@@ -1021,31 +1226,52 @@ async def stripe_webhook(request: Request):
         capture_exception(exc, {"module": "billing", "operation": "webhook"})
         raise HTTPException(status_code=400, detail=str(exc))
 
-    event_id = event.id
-    event_type = event.type
+    event_id = stripe_value(event, "id")
+    event_type = stripe_value(event, "type")
+    if not event_id or not event_type:
+        raise HTTPException(status_code=400, detail="Event Stripe invalide")
 
     with engine.begin() as conn:
         ensure_billing_tables(conn)
         ensure_security_tables(conn)
         result = conn.execute(text("""
-            INSERT INTO subscription_events (stripe_event_id, event_type, status, payload)
-            VALUES (:stripe_event_id, :event_type, :status, :payload)
+            INSERT INTO subscription_events (
+                stripe_event_id, event_type, status, processing_status, payload
+            )
+            VALUES (
+                :stripe_event_id, :event_type, :status, :processing_status, :payload
+            )
             ON CONFLICT (stripe_event_id) DO NOTHING
         """), {
             "stripe_event_id": event_id,
             "event_type": event_type,
             "status": "received",
+            "processing_status": "received",
             "payload": str(event)[:8000],
         })
         if result.rowcount == 0:
+            existing_event = conn.execute(text("""
+                SELECT processing_status
+                FROM subscription_events
+                WHERE stripe_event_id = :stripe_event_id
+            """), {"stripe_event_id": event_id}).fetchone()
+            if existing_event and existing_event.processing_status == "processed":
+                log_security_event(
+                    conn,
+                    "stripe_webhook_replay_ignored",
+                    request,
+                    severity="warning",
+                    metadata={"event_id": event_id, "event_type": event_type},
+                )
+                return {"received": True, "duplicate": True}
+
             log_security_event(
                 conn,
-                "stripe_webhook_replay_ignored",
+                "stripe_webhook_retry_processing",
                 request,
                 severity="warning",
                 metadata={"event_id": event_id, "event_type": event_type},
             )
-            return {"received": True, "duplicate": True}
         log_security_event(
             conn,
             "stripe_webhook_received",
@@ -1062,10 +1288,11 @@ async def stripe_webhook(request: Request):
     }
 
     if event_type in subscription_events:
+        stripe_event_object = stripe_nested_value(event, "data", "object")
         normalized_event = (
-            normalize_checkout_event(event.data.object)
+            normalize_checkout_event(stripe_event_object)
             if event_type == "checkout.session.completed"
-            else normalize_subscription_event(event_type, event.data.object)
+            else normalize_subscription_event(event_type, stripe_event_object)
         )
 
         with engine.begin() as conn:
@@ -1099,7 +1326,7 @@ async def stripe_webhook(request: Request):
                 )
 
     if event_type in ["invoice.paid", "invoice.payment_failed"]:
-        invoice = event.data.object
+        invoice = stripe_nested_value(event, "data", "object")
         with engine.begin() as conn:
             ensure_billing_tables(conn)
             subscription = conn.execute(text("""
@@ -1109,8 +1336,8 @@ async def stripe_webhook(request: Request):
                 WHERE stripe_subscription_id = :stripe_subscription_id
                    OR stripe_customer_id = :stripe_customer_id
             """), {
-                "stripe_subscription_id": stripe_value(invoice, "subscription"),
-                "stripe_customer_id": stripe_value(invoice, "customer"),
+                "stripe_subscription_id": stripe_object_id(stripe_value(invoice, "subscription")),
+                "stripe_customer_id": stripe_object_id(stripe_value(invoice, "customer")),
             }).fetchone()
 
             conn.execute(text("""
@@ -1134,8 +1361,8 @@ async def stripe_webhook(request: Request):
             """), {
                 "user_id": subscription.user_id if subscription else None,
                 "stripe_invoice_id": stripe_value(invoice, "id"),
-                "stripe_customer_id": stripe_value(invoice, "customer"),
-                "stripe_subscription_id": stripe_value(invoice, "subscription"),
+                "stripe_customer_id": stripe_object_id(stripe_value(invoice, "customer")),
+                "stripe_subscription_id": stripe_object_id(stripe_value(invoice, "subscription")),
                 "amount_due": stripe_value(invoice, "amount_due") or 0,
                 "amount_paid": stripe_value(invoice, "amount_paid") or 0,
                 "currency": stripe_value(invoice, "currency") or "eur",
@@ -1157,7 +1384,7 @@ async def stripe_webhook(request: Request):
                 invalidate_subscription_caches(subscription.email, subscription.user_id)
 
     if event_type == "customer.deleted":
-        customer = event.data.object
+        customer = stripe_nested_value(event, "data", "object")
         with engine.begin() as conn:
             ensure_billing_tables(conn)
             current = conn.execute(text("""
@@ -1185,5 +1412,13 @@ async def stripe_webhook(request: Request):
                     WHERE id = :user_id
                 """), {"user_id": current.user_id})
                 invalidate_subscription_caches(current.email, current.user_id)
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        conn.execute(text("""
+            UPDATE subscription_events
+            SET processing_status = 'processed'
+            WHERE stripe_event_id = :stripe_event_id
+        """), {"stripe_event_id": event_id})
 
     return {"received": True}
