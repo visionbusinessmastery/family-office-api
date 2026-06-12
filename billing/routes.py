@@ -454,10 +454,26 @@ def normalize_subscription_event(event_type: str, stripe_object):
     subscription_id = stripe_value(stripe_object, "id")
     status = normalize_subscription_status(stripe_value(stripe_object, "status"))
     price_id = stripe_nested_value(stripe_object, "items", "data", 0, "price", "id")
+    metadata = stripe_value(stripe_object, "metadata", {}) or {}
+    pending_plan = stripe_value(metadata, "pending_plan")
+    pending_plan = normalize_plan(pending_plan) if pending_plan else None
+    pending_change_type = stripe_value(metadata, "pending_change_type")
+    pending_stripe_price_id = stripe_value(metadata, "pending_stripe_price_id")
+    pending_effective_at = stripe_timestamp(stripe_value(metadata, "pending_effective_at"))
+    founder_checkout = str(stripe_value(metadata, "founder_checkout") or "").lower() == "true"
+    clear_pending = str(stripe_value(metadata, "billing_action") or "").lower() in {
+        "upgrade",
+        "reactivate",
+    }
 
     if event_type == "customer.subscription.deleted":
         status = "canceled"
         plan = "FREE"
+        pending_plan = None
+        pending_change_type = None
+        pending_stripe_price_id = None
+        pending_effective_at = None
+        clear_pending = True
     else:
         plan = plan_from_price_id(price_id)
         if event_type == "customer.subscription.paused":
@@ -472,6 +488,12 @@ def normalize_subscription_event(event_type: str, stripe_object):
         "status": status,
         "cancel_at_period_end": bool(stripe_value(stripe_object, "cancel_at_period_end")),
         "current_period_end": stripe_timestamp(stripe_value(stripe_object, "current_period_end")),
+        "pending_plan": pending_plan,
+        "pending_stripe_price_id": pending_stripe_price_id,
+        "pending_effective_at": pending_effective_at,
+        "pending_change_type": pending_change_type,
+        "founder_checkout": founder_checkout,
+        "clear_pending": clear_pending,
     }
 
 
@@ -551,17 +573,25 @@ def update_subscription_state(conn, event: dict):
     )
     stored_plan = plan if status in ACTIVE_STRIPE_STATUSES else "FREE"
     effective_user_plan = stored_plan
+    pending_plan = normalize_plan(event.get("pending_plan")) if event.get("pending_plan") else None
+    if pending_plan == stored_plan:
+        pending_plan = None
+    pending_stripe_price_id = event.get("pending_stripe_price_id") if pending_plan else None
+    pending_effective_at = event.get("pending_effective_at") if pending_plan else None
+    pending_change_type = event.get("pending_change_type") if pending_plan else None
 
     conn.execute(text("""
         INSERT INTO subscriptions (
             user_id, plan, status, stripe_customer_id, stripe_subscription_id,
             stripe_price_id, current_period_end, environment,
-            cancel_at_period_end, updated_at
+            cancel_at_period_end, pending_plan, pending_stripe_price_id,
+            pending_effective_at, pending_change_type, updated_at
         )
         VALUES (
             :user_id, :plan, :status, :stripe_customer_id, :stripe_subscription_id,
             :stripe_price_id, :current_period_end, :environment,
-            :cancel_at_period_end, NOW()
+            :cancel_at_period_end, :pending_plan, :pending_stripe_price_id,
+            :pending_effective_at, :pending_change_type, NOW()
         )
         ON CONFLICT (user_id)
         DO UPDATE SET
@@ -575,21 +605,29 @@ def update_subscription_state(conn, event: dict):
             cancel_at_period_end = EXCLUDED.cancel_at_period_end,
             pending_plan = CASE
                 WHEN EXCLUDED.status NOT IN ('active', 'trialing', 'past_due') THEN NULL
+                WHEN :clear_pending THEN NULL
+                WHEN EXCLUDED.pending_plan IS NOT NULL AND EXCLUDED.plan <> EXCLUDED.pending_plan THEN EXCLUDED.pending_plan
                 WHEN subscriptions.pending_plan IS NOT NULL AND EXCLUDED.plan = subscriptions.pending_plan THEN NULL
                 ELSE subscriptions.pending_plan
             END,
             pending_stripe_price_id = CASE
                 WHEN EXCLUDED.status NOT IN ('active', 'trialing', 'past_due') THEN NULL
+                WHEN :clear_pending THEN NULL
+                WHEN EXCLUDED.pending_plan IS NOT NULL AND EXCLUDED.plan <> EXCLUDED.pending_plan THEN EXCLUDED.pending_stripe_price_id
                 WHEN subscriptions.pending_plan IS NOT NULL AND EXCLUDED.plan = subscriptions.pending_plan THEN NULL
                 ELSE subscriptions.pending_stripe_price_id
             END,
             pending_effective_at = CASE
                 WHEN EXCLUDED.status NOT IN ('active', 'trialing', 'past_due') THEN NULL
+                WHEN :clear_pending THEN NULL
+                WHEN EXCLUDED.pending_plan IS NOT NULL AND EXCLUDED.plan <> EXCLUDED.pending_plan THEN EXCLUDED.pending_effective_at
                 WHEN subscriptions.pending_plan IS NOT NULL AND EXCLUDED.plan = subscriptions.pending_plan THEN NULL
                 ELSE subscriptions.pending_effective_at
             END,
             pending_change_type = CASE
                 WHEN EXCLUDED.status NOT IN ('active', 'trialing', 'past_due') THEN NULL
+                WHEN :clear_pending THEN NULL
+                WHEN EXCLUDED.pending_plan IS NOT NULL AND EXCLUDED.plan <> EXCLUDED.pending_plan THEN EXCLUDED.pending_change_type
                 WHEN subscriptions.pending_plan IS NOT NULL AND EXCLUDED.plan = subscriptions.pending_plan THEN NULL
                 ELSE subscriptions.pending_change_type
             END,
@@ -604,6 +642,11 @@ def update_subscription_state(conn, event: dict):
         "current_period_end": event.get("current_period_end"),
         "environment": os.getenv("STRIPE_MODE", "sandbox"),
         "cancel_at_period_end": bool(event.get("cancel_at_period_end")),
+        "pending_plan": pending_plan,
+        "pending_stripe_price_id": pending_stripe_price_id,
+        "pending_effective_at": pending_effective_at,
+        "pending_change_type": pending_change_type,
+        "clear_pending": bool(event.get("clear_pending")),
     })
 
     conn.execute(text("""
@@ -871,6 +914,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                     "interval": interval,
                     "stripe_price_id": price_id,
                     "price_env": price_env or "",
+                    "billing_action": "upgrade",
                     "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
                     "founder_checkout": str(founder_checkout).lower(),
                     "founder_tier": user.founder_tier or "",
@@ -904,6 +948,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                 "interval": interval,
                 "stripe_price_id": price_id,
                 "price_env": price_env or "",
+                "billing_action": "checkout",
                 "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
                 "founder_checkout": str(founder_checkout).lower(),
                 "founder_tier": user.founder_tier or "",
@@ -916,6 +961,7 @@ def create_checkout_session(data: dict, request: Request, email: str = Depends(g
                     "interval": interval,
                     "stripe_price_id": price_id,
                     "price_env": price_env or "",
+                    "billing_action": "checkout",
                     "is_founder": str(bool(user.is_founder) or founder_checkout).lower(),
                     "founder_checkout": str(founder_checkout).lower(),
                     "founder_tier": user.founder_tier or "",
@@ -991,8 +1037,9 @@ def schedule_downgrade(data: dict, request: Request, email: str = Depends(get_cu
             subscription.stripe_subscription_id,
             expand=["items.data.price"],
         )
+        current_period_end_raw = stripe_value(stripe_subscription, "current_period_end")
         current_period_end = stripe_timestamp(
-            stripe_value(stripe_subscription, "current_period_end")
+            current_period_end_raw
         ) or subscription.current_period_end
 
         if target_plan == "FREE":
@@ -1002,6 +1049,7 @@ def schedule_downgrade(data: dict, request: Request, email: str = Depends(get_cu
                 metadata={
                     "pending_plan": "FREE",
                     "pending_change_type": "cancel",
+                    "pending_effective_at": str(current_period_end_raw or ""),
                 },
             )
             pending_price_id = None
@@ -1022,7 +1070,6 @@ def schedule_downgrade(data: dict, request: Request, email: str = Depends(get_cu
                 )
 
             current_period_start = stripe_value(stripe_subscription, "current_period_start")
-            current_period_end_raw = stripe_value(stripe_subscription, "current_period_end")
             schedule_ref = stripe_object_id(stripe_value(stripe_subscription, "schedule"))
             if schedule_ref:
                 schedule = stripe.SubscriptionSchedule.retrieve(schedule_ref)
@@ -1050,32 +1097,22 @@ def schedule_downgrade(data: dict, request: Request, email: str = Depends(get_cu
                 metadata={
                     "pending_plan": target_plan,
                     "pending_change_type": "downgrade",
+                    "pending_stripe_price_id": target_price_id,
+                    "pending_effective_at": str(current_period_end_raw or ""),
                     "pending_price_env": price_env or "",
+                },
+            )
+            stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                metadata={
+                    "pending_plan": target_plan,
+                    "pending_change_type": "downgrade",
+                    "pending_stripe_price_id": target_price_id,
+                    "pending_effective_at": str(current_period_end_raw or ""),
                 },
             )
             pending_price_id = target_price_id
             change_type = "downgrade"
-
-        with engine.begin() as conn:
-            conn.execute(text("""
-                UPDATE subscriptions
-                SET pending_plan = :pending_plan,
-                    pending_stripe_price_id = :pending_stripe_price_id,
-                    pending_effective_at = :pending_effective_at,
-                    pending_change_type = :pending_change_type,
-                    cancel_at_period_end = :cancel_at_period_end,
-                    current_period_end = COALESCE(:pending_effective_at, current_period_end),
-                    updated_at = NOW()
-                WHERE stripe_subscription_id = :stripe_subscription_id
-            """), {
-                "pending_plan": target_plan,
-                "pending_stripe_price_id": pending_price_id,
-                "pending_effective_at": current_period_end,
-                "pending_change_type": change_type,
-                "cancel_at_period_end": target_plan == "FREE",
-                "stripe_subscription_id": subscription.stripe_subscription_id,
-            })
-            invalidate_subscription_caches(email, user.id)
 
     except HTTPException:
         raise
@@ -1154,23 +1191,17 @@ def cancel_subscription(email: str = Depends(get_current_user)):
     if not subscription or not subscription.stripe_subscription_id:
         raise HTTPException(status_code=400, detail="Subscription Stripe introuvable")
 
+    stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+    current_period_end_raw = stripe_value(stripe_subscription, "current_period_end")
     stripe.Subscription.modify(
         subscription.stripe_subscription_id,
         cancel_at_period_end=True,
+        metadata={
+            "pending_plan": "FREE",
+            "pending_change_type": "cancel",
+            "pending_effective_at": str(current_period_end_raw or ""),
+        },
     )
-
-    with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE subscriptions
-            SET cancel_at_period_end = TRUE,
-                pending_plan = 'FREE',
-                pending_stripe_price_id = NULL,
-                pending_effective_at = current_period_end,
-                pending_change_type = 'cancel',
-                updated_at = NOW()
-            WHERE stripe_subscription_id = :stripe_subscription_id
-        """), {"stripe_subscription_id": subscription.stripe_subscription_id})
-        invalidate_subscription_caches(email, user.id)
 
     return {"status": "cancel_at_period_end"}
 
@@ -1190,20 +1221,14 @@ def reactivate_subscription(email: str = Depends(get_current_user)):
     stripe.Subscription.modify(
         subscription.stripe_subscription_id,
         cancel_at_period_end=False,
+        metadata={
+            "billing_action": "reactivate",
+            "pending_plan": "",
+            "pending_change_type": "",
+            "pending_stripe_price_id": "",
+            "pending_effective_at": "",
+        },
     )
-
-    with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE subscriptions
-            SET cancel_at_period_end = FALSE,
-                pending_plan = NULL,
-                pending_stripe_price_id = NULL,
-                pending_effective_at = NULL,
-                pending_change_type = NULL,
-                updated_at = NOW()
-            WHERE stripe_subscription_id = :stripe_subscription_id
-        """), {"stripe_subscription_id": subscription.stripe_subscription_id})
-        invalidate_subscription_caches(email, user.id)
 
     return {"status": "active"}
 
