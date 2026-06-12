@@ -2,12 +2,14 @@ import json
 import logging
 import unicodedata
 
+from advisor.ethan.budget_guard import check_budget, register_call
 from advisor.ethan.cache_policy import ETHAN_GLOBAL_CACHE_VERSION
 
-
 logger = logging.getLogger(__name__)
+
 ETHAN_CORE_SYSTEM = "ETHAN_CORE_V4"
 CORE_EMPTY_STATUS = "empty"
+
 SAFE_MODEL_FALLBACKS = ["gpt-4o-mini", "gpt-4.1-mini"]
 
 LEGACY_ETHAN_RESPONSE_PATTERNS = [
@@ -79,7 +81,15 @@ def get_context_score(context):
     return score
 
 
-def build_llm_response_data(raw_llm_output, context, tier="ESSENTIALS", *, complexity=None, soft_budget_active=False, cache_hit=False):
+def build_llm_response_data(
+    raw_llm_output,
+    context,
+    tier="ESSENTIALS",
+    *,
+    complexity=None,
+    soft_budget_active=False,
+    cache_hit=False
+):
     return {
         "status": "ready" if raw_llm_output else CORE_EMPTY_STATUS,
         "raw_llm_output": raw_llm_output or "",
@@ -109,6 +119,7 @@ def extract_llm_text(response):
     content = getattr(message, "content", "")
     if isinstance(content, str):
         return content.strip()
+
     if isinstance(content, list):
         return "\n".join(
             str(text).strip()
@@ -132,22 +143,75 @@ def get_llm_response(
     chat_completion_fn,
     fallback_model,
 ):
+
     import json
 
+    # =========================
+    # ETHAN BUDGET GUARD (V1)
+    # =========================
+    user_id = None
+    plan = "FREE"
+
+    try:
+        first_msg = messages[0] if messages else {}
+
+        if isinstance(first_msg, dict):
+            user_id = first_msg.get("user_email") or first_msg.get("user_id")
+            plan = first_msg.get("plan", "FREE")
+
+        if not user_id:
+            user_id = "anonymous"
+
+        budget = check_budget(user_id, plan)
+
+        if not budget["allowed"]:
+            return (
+                "⚠️ Limite quotidienne atteinte sur Ethan (FREE).\n"
+                "Passe en plan supérieur pour continuer à utiliser l’IA.",
+                False,
+                0,
+                0,
+                model,
+                "budget_blocked"
+            )
+
+        register_call(user_id)
+
+    except Exception as e:
+        logger.warning(f"Budget guard error: {e}")
+
+    # =========================
+    # CACHE KEY
+    # =========================
     prompt_hash = stable_hash_fn({
         "version": ETHAN_GLOBAL_CACHE_VERSION,
         "messages": messages,
         "model": model,
         "max": max_output_tokens,
     })
+
     llm_cache_key = f"llm:{prompt_hash}"
 
     cached = get_cache_fn(llm_cache_key)
     if cached and not is_legacy_ethan_response(cached):
-        return cached, True, estimate_tokens_fn(json.dumps(messages)), estimate_tokens_fn(cached), model, "cache_hit"
+        return (
+            cached,
+            True,
+            estimate_tokens_fn(json.dumps(messages)),
+            estimate_tokens_fn(cached),
+            model,
+            "cache_hit"
+        )
 
     if not is_model_configured_fn():
-        return None, False, estimate_tokens_fn(json.dumps(messages)), 0, model, "openai_unconfigured"
+        return (
+            None,
+            False,
+            estimate_tokens_fn(json.dumps(messages)),
+            0,
+            model,
+            "openai_unconfigured"
+        )
 
     def _call(selected_model, token_param="max_completion_tokens"):
         kwargs = {
@@ -173,7 +237,9 @@ def get_llm_response(
         try:
             response = _call(candidate, token_param)
             selected_model = candidate
+
             llm_text = extract_llm_text(response)
+
             usage = getattr(response, "usage", None)
             input_tokens = getattr(usage, "prompt_tokens", None) or estimate_tokens_fn(json.dumps(messages))
             output_tokens = getattr(usage, "completion_tokens", None) or estimate_tokens_fn(llm_text)
@@ -188,7 +254,16 @@ def get_llm_response(
 
             if not is_legacy_ethan_response(llm_text):
                 set_cache_fn(llm_cache_key, llm_text, ttl=1800)
-            return llm_text, False, input_tokens, output_tokens, selected_model, "ready"
+
+            return (
+                llm_text,
+                False,
+                input_tokens,
+                output_tokens,
+                selected_model,
+                "ready"
+            )
+
         except Exception:
             logger.warning(
                 "Ethan OpenAI attempt failed",

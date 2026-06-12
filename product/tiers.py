@@ -114,6 +114,9 @@ DISCOVERABLE_MODULES = {
     "legacy_timeline",
 }
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def normalize_plan(plan: str | None) -> str:
     value = str(plan or "FREE").strip().upper()
@@ -142,13 +145,20 @@ def resolve_effective_plan(
 ) -> str:
     status = str(subscription_status or "").lower()
 
-    if subscription_plan and status in ACTIVE_SUBSCRIPTION_STATUSES:
-        return normalize_plan(subscription_plan)
+    if status not in ACTIVE_SUBSCRIPTION_STATUSES:
+        result = "FREE"
+    else:
+        result = normalize_plan(subscription_plan or user_plan)
 
-    if subscription_plan and status in INACTIVE_SUBSCRIPTION_STATUSES:
-        return "FREE"
+    logger.info(
+        "resolve_effective_plan user_plan=%s subscription_plan=%s subscription_status=%s -> %s",
+        user_plan,
+        subscription_plan,
+        subscription_status,
+        result,
+    )
 
-    return normalize_plan(user_plan)
+    return result
 
 
 def is_feature_unlocked(user_plan: str, feature: str) -> bool:

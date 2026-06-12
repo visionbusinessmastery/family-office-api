@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import logging
 
 from fastapi import FastAPI, Request
@@ -18,6 +21,8 @@ from monitoring.routes import router as monitoring_router
 from analytics.posthog_service import ensure_analytics_tables
 from feature_flags.engine import ensure_feature_flags_table
 from feature_flags.routes import router as feature_flags_router
+
+
 
 PUBLIC_PATHS = {
     "/",
@@ -205,6 +210,24 @@ app.add_middleware(
 )
 
 # =========================
+# CSP FIX (Swagger /docs Render)
+# =========================
+@app.middleware("http")
+async def csp_fix_middleware(request: Request, call_next):
+    response = await call_next(request)
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' https: data:; "
+        "connect-src 'self' https:;"
+    )
+
+    return response
+
+# =========================
 # ERROR HANDLERS
 # =========================
 @app.exception_handler(RateLimitExceeded)
@@ -229,7 +252,7 @@ async def global_error_handler(request: Request, exc: Exception):
 # =========================
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    request.state.user_email = "anonymous"
+    request.state.user_email = None
     request.state.auth_error = None
 
     if request.method == "OPTIONS":
@@ -237,25 +260,28 @@ async def auth_middleware(request: Request, call_next):
 
     path = request.url.path
     public_path = is_public_path(path)
+
     token = extract_bearer_token(request.headers.get("Authorization"))
+
+    email = None
 
     if token:
         try:
-            request.state.user_email = decode_token(token)
+            email = decode_token(token)
         except Exception as e:
             logging.warning("AUTH TOKEN REJECTED: %s", str(e))
             request.state.auth_error = "invalid_token"
+
             if not public_path:
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Token invalide"},
-                )
-    elif not public_path:
-        request.state.auth_error = "missing_token"
+                return JSONResponse(status_code=401, content={"detail": "Token invalide"})
+
+    if not email and not public_path:
         return JSONResponse(
             status_code=401,
             content={"detail": "Authentification requise"},
         )
+
+    request.state.user_email = email or "anonymous"
 
     return await call_next(request)
 
