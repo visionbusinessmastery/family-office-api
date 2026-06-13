@@ -98,6 +98,7 @@ from workspaces.routes import router as workspaces_router, ensure_workspace_tabl
 from legacy.routes import router as legacy_router, ensure_legacy_tables
 
 from intelligence.routes import router as intelligence_router
+from intelligence.affiliates import router as affiliates_router
 from intelligence.category_opportunities import router as category_opportunities_router
 from intelligence.opportunity_intelligence import (
     ensure_opportunity_intelligence_tables,
@@ -108,7 +109,7 @@ from intelligence.weekly_report_service import (
     router as weekly_report_router,
     weekly_report_scheduler_loop,
 )
-from intelligence.routes_finance import router as finance_router
+from intelligence.routes_finance import ensure_child_accounts_table, router as finance_router
 from intelligence.routes_score import router as intelligence_score_router
 from intelligence.routes_onboarding import router as onboarding_router
 
@@ -169,6 +170,7 @@ async def lifespan(app: FastAPI):
         ensure_ethan_ai_tables(conn)
         ensure_opportunity_intelligence_tables(conn)
         ensure_weekly_report_tables(conn)
+        ensure_child_accounts_table(conn)
     logging.info("DB INIT OK")
     weekly_report_task = asyncio.create_task(weekly_report_scheduler_loop())
     try:
@@ -291,6 +293,7 @@ app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
 app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])
 
 app.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
+app.include_router(affiliates_router, prefix="/intelligence", tags=["Affiliates"])
 app.include_router(category_opportunities_router, prefix="/intelligence", tags=["Opportunities"])
 app.include_router(opportunity_intelligence_router, prefix="/intelligence", tags=["Opportunities"])
 app.include_router(weekly_report_router, prefix="/intelligence", tags=["Reports"])

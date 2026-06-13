@@ -18,7 +18,7 @@ from intelligence.scoring.family_office_score import (
 from intelligence.service import get_user_financial_overview
 from intelligence.strategic.feature_engine import compute_feature_access
 from intelligence.strategic.module_engine import get_all_opportunities
-from intelligence.strategic.opportunity_engine import compute_opportunities
+from intelligence.strategic.opportunity_engine import merge_opportunity_sets
 from intelligence.strategic.strategic_layer import compute_strategic_layer
 from product.entitlements import resolve_effective_plan
 
@@ -319,13 +319,11 @@ def compute_user_intelligence(user_email: str):
         upgrade = compute_upgrade_decision(effective_plan, score_value)
         features = compute_feature_access(profile_dict, {"score": score_value})
         module_opportunities = get_all_opportunities(profile_dict)
-        opportunities = {
-            "count": len(module_opportunities),
-            "opportunities": module_opportunities,
-            "analytics": {
-                "source": "command_center",
-            },
-        } if module_opportunities else compute_opportunities(profile_dict, portfolio_list)
+        opportunities = merge_opportunity_sets(
+            profile_dict,
+            portfolio_list,
+            module_opportunities,
+        )
 
         strategic_intelligence = compute_strategic_layer(
             profile_dict,

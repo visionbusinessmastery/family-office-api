@@ -263,7 +263,16 @@ def build_data_profile(conn, user_id: int):
     )
     monthly_income = finance_income or onboarding_income
     monthly_expenses = finance_expenses or onboarding_expenses
-    monthly_capacity = max(finance_savings, monthly_income - monthly_expenses, 0)
+    cashflow_capacity = max(monthly_income - monthly_expenses, 0)
+    savings_looks_monthly = (
+        finance_savings > 0
+        and monthly_income > 0
+        and finance_savings <= max(cashflow_capacity * 1.2, monthly_income * 0.5, 1)
+    )
+    monthly_capacity = max(cashflow_capacity, finance_savings if savings_looks_monthly else 0)
+    security_reserve = max(monthly_expenses * 12, 0)
+    mobilizable_liquidity = max(finance_savings - security_reserve, 0)
+    deployable_liquidity = mobilizable_liquidity * 0.35
     portfolio_value = safe_float(
         conn,
         """
@@ -309,6 +318,7 @@ def build_data_profile(conn, user_id: int):
     )
     business_value = yield_value + venture_value
     current_wealth = portfolio_value + real_estate_value + business_value
+    projection_wealth = current_wealth + deployable_liquidity
 
     completed_steps = sum([
         finance_count > 0,
@@ -330,7 +340,12 @@ def build_data_profile(conn, user_id: int):
         "monthly_income": round(monthly_income, 2),
         "monthly_expenses": round(monthly_expenses, 2),
         "monthly_savings": round(finance_savings, 2),
+        "cashflow_capacity": round(cashflow_capacity, 2),
         "monthly_capacity": round(monthly_capacity, 2),
+        "liquid_assets": round(finance_savings, 2),
+        "security_reserve": round(security_reserve, 2),
+        "mobilizable_liquidity": round(mobilizable_liquidity, 2),
+        "deployable_liquidity": round(deployable_liquidity, 2),
         "debt_total": round(finance_debt, 2),
         "portfolio_value": round(portfolio_value, 2),
         "real_estate_value": round(real_estate_value, 2),
@@ -338,6 +353,7 @@ def build_data_profile(conn, user_id: int):
         "venture_value": round(venture_value, 2),
         "business_value": round(business_value, 2),
         "current_wealth": round(current_wealth, 2),
+        "projection_wealth": round(projection_wealth, 2),
     }
 
 
@@ -477,8 +493,9 @@ def build_strategic_brief(data_profile: dict, score: int, plan: str):
 
 def build_future_view(data_profile: dict, score: int, plan: str):
     normalized = normalize_plan(plan)
-    current_wealth = float(data_profile.get("current_wealth") or 0)
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    deployable_liquidity = float(data_profile.get("deployable_liquidity") or 0)
 
     if plan_allows(normalized, "LIBERTY"):
         annual_return = 0.055
@@ -502,10 +519,10 @@ def build_future_view(data_profile: dict, score: int, plan: str):
 
     if current_wealth > 0 and monthly_capacity > 0:
         confidence = "solid"
-        assumption = "Projection backend: patrimoine actuel, capacite mensuelle declaree et rendement prudent."
+        assumption = "Projection prudente: patrimoine suivi, capacite mensuelle reelle et part mobilisable de liquidite apres reserve de securite."
     elif current_wealth > 0:
         confidence = "asset_based"
-        assumption = "Projection backend: patrimoine actuel uniquement, sans capacite mensuelle exploitable."
+        assumption = "Projection prudente: patrimoine suivi et liquidite mobilisable, sans capacite mensuelle exploitable."
     else:
         confidence = "data_light"
         assumption = "Projection backend limitee: ajoute revenus, charges et actifs pour rendre le futur lisible."
@@ -514,6 +531,7 @@ def build_future_view(data_profile: dict, score: int, plan: str):
         "title": "Future View",
         "current_wealth": round(current_wealth, 2),
         "monthly_capacity": round(monthly_capacity, 2),
+        "deployable_liquidity": round(deployable_liquidity, 2),
         "annual_return": round(annual_return * 100, 2),
         "confidence": confidence,
         "assumption": assumption,
@@ -554,7 +572,7 @@ def format_month_label(target_date: date):
 
 
 def build_wealth_timeline(data_profile: dict, future_view: dict | None = None):
-    current_wealth = float(data_profile.get("current_wealth") or 0)
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
     annual_return = float((future_view or {}).get("annual_return") or 4.5) / 100
     today = date.today()
@@ -692,7 +710,7 @@ def build_family_office_view(data_profile: dict, plan: str):
 
 
 def build_wealth_gps(data_profile: dict, future_view: dict):
-    current_wealth = float(data_profile.get("current_wealth") or 0)
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
     next_milestone = next(
         (item for item in [100000, 250000, 500000, 1000000] if current_wealth < item),
@@ -765,7 +783,7 @@ def build_wealth_gps(data_profile: dict, future_view: dict):
 
 
 def build_digital_twin(data_profile: dict):
-    current_wealth = float(data_profile.get("current_wealth") or 0)
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
     scenarios = [
         {
@@ -1063,12 +1081,13 @@ def build_time_value(data_profile: dict):
 
 
 def build_wealth_blocks(data_profile: dict):
-    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    liquid_assets = float(data_profile.get("liquid_assets") or 0)
+    security_reserve = float(data_profile.get("security_reserve") or 0)
     debt_total = float(data_profile.get("debt_total") or 0)
     return {
         "title": "Construction par blocs",
         "blocks": [
-            {"key": "security", "label": "Bloc securite", "value": max(monthly_capacity * 3, 0), "status": "active" if monthly_capacity > 0 else "to_build", "description": "Reserve et marge mensuelle disponibles."},
+            {"key": "security", "label": "Bloc securite", "value": liquid_assets, "status": "active" if liquid_assets >= security_reserve and liquid_assets > 0 else "to_build", "description": "Liquidites disponibles et reserve de securite."},
             {"key": "income", "label": "Bloc revenus", "value": float(data_profile.get("monthly_income") or 0), "status": "active" if data_profile.get("monthly_income", 0) else "to_build", "description": "Base de revenus suivie par le backend."},
             {"key": "markets", "label": "Bloc marches financiers", "value": float(data_profile.get("portfolio_value") or 0), "status": "active" if data_profile.get("portfolio_value", 0) else "to_build", "description": "Actifs financiers liquides."},
             {"key": "real_estate", "label": "Bloc immobilier", "value": float(data_profile.get("real_estate_value") or 0), "status": "active" if data_profile.get("real_estate_value", 0) else "to_build", "description": "Actifs immobiliers et valeur estimee."},
@@ -1107,7 +1126,7 @@ def build_personal_command_center(mission_control: dict, opportunity_radar: dict
 
 
 def build_wealth_map(data_profile: dict, wealth_timeline: dict):
-    current_wealth = float(data_profile.get("current_wealth") or 0)
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_velocity = float(wealth_timeline.get("monthly_velocity") or 0)
     destination = wealth_timeline.get("next_milestone") or {"label": "1M", "target": 1000000}
     target = float(destination.get("target") or 1000000)
@@ -1141,6 +1160,9 @@ def build_invisible_wealth(data_profile: dict, digital_twin: dict):
 def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency_detector: dict):
     current_wealth = float(data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    liquid_assets = float(data_profile.get("liquid_assets") or 0)
+    security_reserve = float(data_profile.get("security_reserve") or 0)
+    mobilizable_liquidity = float(data_profile.get("mobilizable_liquidity") or 0)
     portfolio_value = float(data_profile.get("portfolio_value") or 0)
     real_estate_value = float(data_profile.get("real_estate_value") or 0)
     business_value = float(data_profile.get("business_value") or 0)
@@ -1158,12 +1180,17 @@ def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency
         return "red"
 
     diversification_domains = sum(1 for value in [portfolio_value, real_estate_value, business_value] if value > 0)
+    liquidity_score = 40
+    if liquid_assets > 0:
+        liquidity_score = 75 if liquid_assets >= security_reserve else 55
+    if mobilizable_liquidity > 0:
+        liquidity_score = min(100, liquidity_score + 10)
     items = [
         ("growth", "Croissance", 80 if monthly_capacity > 0 or business_value > 0 else 40),
         ("diversification", "Diversification", 35 + diversification_domains * 20),
         ("concentration", "Concentration", 35 if concentration_flag else 80),
         ("income", "Revenus", 80 if data_profile.get("monthly_income", 0) else 35),
-        ("liquidity", "Liquidite", 75 if monthly_capacity > 0 else 40),
+        ("liquidity", "Liquidite", liquidity_score),
         ("debt", "Dette", 40 if debt_total > max(current_wealth * 0.35, 1) else 75),
     ]
     return {
@@ -1180,12 +1207,16 @@ def build_hidden_wealth(data_profile: dict):
     monthly_income = float(data_profile.get("monthly_income") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
     business_value = float(data_profile.get("business_value") or 0)
+    completion = float(data_profile.get("completion_percent") or 0)
     items = []
     if monthly_income > 0:
-        items.append({"key": "expertise", "label": "Expertise professionnelle", "potential_value": round(max(monthly_income * 36, 75000), 2), "confidence": "contextual", "description": "Valeur potentielle de monetisation d'une competence deja presente."})
-        items.append({"key": "network", "label": "Reseau professionnel", "potential_value": round(max(monthly_income * 12, 50000), 2), "confidence": "light", "description": "Potentiel commercial lie aux contacts et marches accessibles."})
+        expertise_months = 12 if completion >= 60 else 6
+        network_months = 4 if completion >= 60 else 3
+        items.append({"key": "expertise", "label": "Expertise professionnelle", "potential_value": round(max(monthly_income * expertise_months, 15000), 2), "confidence": "contextual", "description": "Potentiel prudent de monetisation d'une competence deja presente, a valider par une offre concrete."})
+        items.append({"key": "network", "label": "Reseau professionnel", "potential_value": round(max(monthly_income * network_months, 10000), 2), "confidence": "light", "description": "Potentiel commercial indicatif lie aux contacts accessibles, non acquis tant qu'aucune opportunite n'est signee."})
     if business_value > 0:
-        items.append({"key": "business", "label": "Business existant", "potential_value": round(max(business_value * 2, business_value), 2), "confidence": "asset_based", "description": "Potentiel de valorisation ou de systematisation du bloc business."})
+        business_multiplier = 1.25 if business_value >= 10000 else 1
+        items.append({"key": "business", "label": "Business existant", "potential_value": round(business_value * business_multiplier, 2), "confidence": "asset_based" if business_value >= 10000 else "early_signal", "description": "Potentiel base sur le business deja suivi; a structurer avant d'etre considere comme une valorisation."})
     if monthly_capacity > 0:
         items.append({"key": "borrowing_capacity", "label": "Capacite d'emprunt theorique", "potential_value": round(monthly_capacity * 240, 2), "confidence": "simulation", "description": "Simulation prudente basee sur la capacite mensuelle, sans validation bancaire."})
     activable = sum(float(item.get("potential_value") or 0) for item in items)
@@ -1227,11 +1258,13 @@ def build_stress_tests(data_profile: dict):
 def build_leverage_engine(data_profile: dict, hidden_wealth: dict):
     current_wealth = float(data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    deployable_liquidity = float(data_profile.get("deployable_liquidity") or 0)
     hidden_value = float(hidden_wealth.get("activable_wealth") or 0)
+    has_investment_base = monthly_capacity > 0 or deployable_liquidity > 0
     levers = [
         {"key": "business", "label": "Developper le business", "impact_score": min(100, 45 + int(hidden_value / max(current_wealth or 1, 1) * 35)), "reason": "Fort si une expertise ou une valeur activable existe."},
-        {"key": "real_estate", "label": "Immobilier", "impact_score": 70 if monthly_capacity > 0 else 45, "reason": "Pertinent si la capacite mensuelle permet de soutenir le levier."},
-        {"key": "markets", "label": "Marches financiers", "impact_score": 60 if monthly_capacity > 0 else 40, "reason": "Robuste si l'investissement reste automatique et diversifie."},
+        {"key": "real_estate", "label": "Immobilier", "impact_score": 70 if has_investment_base else 45, "reason": "Pertinent si une marge mensuelle ou une liquidite mobilisable peut soutenir le levier."},
+        {"key": "markets", "label": "Marches financiers", "impact_score": 60 if has_investment_base else 40, "reason": "Robuste si l'investissement reste automatique, progressif et diversifie."},
         {"key": "crypto", "label": "Crypto / actifs risques", "impact_score": 35, "reason": "Levier secondaire tant que la base patrimoniale n'est pas stabilisee."},
     ]
     levers = sorted(levers, key=lambda item: item["impact_score"], reverse=True)
@@ -1239,11 +1272,22 @@ def build_leverage_engine(data_profile: dict, hidden_wealth: dict):
 
 
 def build_life_wealth(data_profile: dict):
-    monthly_income = float(data_profile.get("monthly_income") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    monthly_expenses = float(data_profile.get("monthly_expenses") or 0)
+    liquid_assets = float(data_profile.get("liquid_assets") or 0)
+    mobilizable_liquidity = float(data_profile.get("mobilizable_liquidity") or 0)
     current_wealth = float(data_profile.get("current_wealth") or 0)
     domains = sum(1 for value in [data_profile.get("portfolio_value", 0), data_profile.get("real_estate_value", 0), data_profile.get("business_value", 0)] if float(value or 0) > 0)
-    security = min(100, round((monthly_capacity * 6 / max(monthly_income or 1, 1)) * 100)) if monthly_income else 35
+    reserve_months = liquid_assets / monthly_expenses if monthly_expenses > 0 else 0
+    security = 35
+    if monthly_expenses > 0:
+        security = min(100, round((reserve_months / 12) * 80))
+        if monthly_capacity > 0:
+            security = min(100, security + 10)
+        if mobilizable_liquidity > 0:
+            security = min(100, security + 10)
+    elif liquid_assets > 0:
+        security = 75
     return {"title": "Patrimoine de vie", "dimensions": [
         {"key": "security", "label": "Securite", "score": security},
         {"key": "freedom", "label": "Liberte", "score": min(100, round((current_wealth / 1000000) * 100, 1))},

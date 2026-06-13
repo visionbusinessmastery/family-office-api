@@ -19,6 +19,24 @@ from intelligence.gamification.progress_service import award_xp
 
 router = APIRouter(tags=["Finance"])
 
+
+def ensure_child_accounts_table(conn):
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS child_accounts (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            child_name TEXT NOT NULL,
+            goal TEXT,
+            target_amount NUMERIC DEFAULT 0,
+            current_amount NUMERIC DEFAULT 0,
+            monthly_contribution NUMERIC DEFAULT 0,
+            horizon TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
 # =========================
 # HELPER
 # =========================
@@ -33,6 +51,45 @@ def get_user_id(conn, email: str):
     ).fetchone()
 
     return row.id if row else None
+
+
+def child_account_payload(row):
+    target = float(row.target_amount or 0)
+    current = float(row.current_amount or 0)
+    progress = round((current / target) * 100, 1) if target > 0 else 0
+    return {
+        "id": row.id,
+        "child_name": row.child_name,
+        "goal": row.goal,
+        "target_amount": target,
+        "current_amount": current,
+        "monthly_contribution": float(row.monthly_contribution or 0),
+        "horizon": row.horizon,
+        "notes": row.notes,
+        "progress_percent": min(progress, 100),
+    }
+
+
+def get_child_accounts_payload(conn, user_id: int, plan: str | None = None):
+    ensure_child_accounts_table(conn)
+    rows = conn.execute(text("""
+        SELECT id, child_name, goal, target_amount, current_amount,
+               monthly_contribution, horizon, notes
+        FROM child_accounts
+        WHERE user_id = :user_id
+        ORDER BY id DESC
+    """), {"user_id": user_id}).fetchall()
+
+    accounts = [child_account_payload(row) for row in rows]
+    return {
+        "plan": plan,
+        "accounts": accounts,
+        "totals": {
+            "target_amount": round(sum(float(item.get("target_amount") or 0) for item in accounts), 2),
+            "current_amount": round(sum(float(item.get("current_amount") or 0) for item in accounts), 2),
+            "monthly_contribution": round(sum(float(item.get("monthly_contribution") or 0) for item in accounts), 2),
+        },
+    }
 
 # =========================
 # INVALIDATE FINANCE CACHE
@@ -155,6 +212,61 @@ def read_import_rows(filename: str, content_type: str | None, raw: bytes):
         return read_csv_rows(raw), "csv"
 
     raise HTTPException(status_code=400, detail="Format supporte: CSV ou Excel (.xlsx)")
+
+
+@router.get("/child-accounts")
+def get_child_accounts(user=Depends(get_current_user)):
+    email = user
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return get_child_accounts_payload(conn, user_id)
+
+
+@router.post("/child-accounts")
+def create_child_account(data: dict, user=Depends(get_current_user)):
+    email = user
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ensure_child_accounts_table(conn)
+        child_name = str(data.get("child_name") or "").strip()
+
+        if not child_name:
+            raise HTTPException(status_code=400, detail="child_name required")
+
+        conn.execute(text("""
+            INSERT INTO child_accounts (
+                user_id, child_name, goal, target_amount, current_amount,
+                monthly_contribution, horizon, notes, updated_at
+            )
+            VALUES (
+                :user_id, :child_name, :goal, :target_amount, :current_amount,
+                :monthly_contribution, :horizon, :notes, NOW()
+            )
+        """), {
+            "user_id": user_id,
+            "child_name": child_name,
+            "goal": data.get("goal"),
+            "target_amount": parse_amount(data.get("target_amount")) or 0,
+            "current_amount": parse_amount(data.get("current_amount")) or 0,
+            "monthly_contribution": parse_amount(data.get("monthly_contribution")) or 0,
+            "horizon": data.get("horizon"),
+            "notes": data.get("notes"),
+        })
+
+        award_xp(conn, user_id, email, "child_account_created", 40)
+        invalidate_finance_caches(email, user_id)
+
+        return get_child_accounts_payload(conn, user_id)
 
 
 # =========================

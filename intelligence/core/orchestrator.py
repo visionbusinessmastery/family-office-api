@@ -17,6 +17,7 @@ from intelligence.core.upgrade_engine import compute_upgrade_decision
 from intelligence.strategic.feature_engine import compute_feature_access
 from intelligence.strategic.dashboard_engine import build_dashboard
 from intelligence.strategic.module_engine import get_all_opportunities
+from intelligence.strategic.opportunity_engine import merge_opportunity_sets
 
 from intelligence.gamification.core.gamification_engine import build_gamification
 
@@ -162,7 +163,11 @@ def run_orchestrator(user_email: str):
         # =========================
         # MODULE OPPORTUNITIES
         # =========================
-        opportunities = get_all_opportunities(user_profile)
+        opportunities = merge_opportunity_sets(
+            user_profile,
+            portfolio,
+            get_all_opportunities(user_profile),
+        )
 
         # =========================
         # UPGRADE ENGINE
