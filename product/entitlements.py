@@ -469,6 +469,72 @@ PLAN_ENTITLEMENTS = {
     },
 }
 
+ROADMAP_FEATURES = [
+    {
+        "key": "ceo_daily_briefing_lite",
+        "label": "CEO Daily Briefing",
+        "group": "V4.1",
+        "required_plan": "FREE",
+        "description": "Briefing quotidien simple, action du jour et suivi de progression.",
+    },
+    {
+        "key": "ceo_daily_briefing_full",
+        "label": "CEO Daily Briefing renforce",
+        "group": "V4.1",
+        "required_plan": "ELITE",
+        "description": "Priorisation avancee, impact attendu, historique et orchestration Family Office.",
+    },
+    {
+        "key": "wealth_journey_full",
+        "label": "Wealth Journey 1/5/10/20 ans",
+        "group": "V4.1",
+        "required_plan": "GOLD",
+        "description": "Projection patrimoniale complete basee sur les donnees declarees et calculees.",
+    },
+    {
+        "key": "wealth_missions_data",
+        "label": "Missions reliees aux donnees",
+        "group": "V4.1",
+        "required_plan": "GOLD",
+        "description": "Missions personnalisees selon cashflow, actifs, score et progression.",
+    },
+    {
+        "key": "wealth_academy",
+        "label": "Wealth Academy",
+        "group": "V4.2",
+        "required_plan": "GOLD",
+        "description": "Lecons courtes, exercices, XP et missions liees.",
+    },
+    {
+        "key": "family_office_board",
+        "label": "Family Board IA",
+        "group": "V4.2",
+        "required_plan": "LIBERTY",
+        "description": "Conseil d'administration virtuel pour arbitrages et decisions prioritaires.",
+    },
+    {
+        "key": "dynasty_enriched",
+        "label": "Dynasty enrichi",
+        "group": "V4.2",
+        "required_plan": "LEGACY",
+        "description": "Gouvernance familiale, transmission, heritiers et vision generationnelle.",
+    },
+    {
+        "key": "alternative_assets",
+        "label": "Passion Assets",
+        "group": "V5",
+        "required_plan": "LIBERTY",
+        "description": "Art, montres, voitures, vins, metaux et collections a forte valeur.",
+    },
+    {
+        "key": "wealth_vault_secure",
+        "label": "Wealth Vault securise",
+        "group": "V5",
+        "required_plan": "LEGACY",
+        "description": "Documents patrimoniaux, assurances, succession et pieces sensibles.",
+    },
+]
+
 MODULE_REGISTRY = [
     {
         "key": "foundation",
@@ -718,6 +784,13 @@ def build_entitlements(plan: str):
         *inherited_values(normalized, "features"),
         *unlocked_features_for_plan(normalized),
     ]))
+    base["feature_access"] = [
+        {
+            **feature,
+            "available": plan_allows(normalized, feature["required_plan"]),
+        }
+        for feature in ROADMAP_FEATURES
+    ]
 
     return {
         "plan": normalized,

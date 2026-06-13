@@ -19,6 +19,7 @@ from monitoring.routes import router as monitoring_router
 from analytics.posthog_service import ensure_analytics_tables
 from feature_flags.engine import ensure_feature_flags_table
 from feature_flags.routes import router as feature_flags_router
+from company.routes import router as company_router
 
 PUBLIC_PATHS = {
     "/",
@@ -39,6 +40,7 @@ PUBLIC_PATHS = {
     "/auth/oauth/session",
     "/billing/plans",
     "/billing/config",
+    "/company/contact",
     "/billing/webhook",
     "/privacy/region",
     "/privacy/cookie-consent",
@@ -125,6 +127,10 @@ from portfolio.specialized_assets_routes import (
     ensure_venture_table,
     ensure_yield_table,
 )
+from portfolio.passion_assets_routes import (
+    router as passion_assets_router,
+    ensure_passion_assets_table,
+)
 from stocks.routes import router as stocks_router
 
 from intelligence.gamification.api.dashboard import router as gamification_router
@@ -157,6 +163,7 @@ async def lifespan(app: FastAPI):
         ensure_real_estate_table(conn)
         ensure_yield_table(conn)
         ensure_venture_table(conn)
+        ensure_passion_assets_table(conn)
         ensure_product_tables(conn)
         ensure_billing_tables(conn)
         ensure_profile_tables(conn)
@@ -207,7 +214,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://https://family-office-api-1.onrender.com",
+        "https://family-office-api-1.onrender.com",
         "https://vision-business.com",
         "https://family-office-front-git-staging-visionbusinessmasterys-projects.vercel.app",
     ],
@@ -288,6 +295,7 @@ app.include_router(privacy_router, prefix="/privacy", tags=["Privacy"])
 app.include_router(security_router, prefix="/security", tags=["Security"])
 app.include_router(monitoring_router, prefix="/system", tags=["System"])
 app.include_router(feature_flags_router, prefix="/feature-flags", tags=["Feature Flags"])
+app.include_router(company_router, prefix="/company", tags=["Company"])
 app.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
 app.include_router(workspaces_router, prefix="/workspaces", tags=["Workspaces"])
 app.include_router(legacy_router, prefix="/legacy", tags=["Legacy"])
@@ -307,6 +315,7 @@ app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 app.include_router(real_estate_router, prefix="/real-estate", tags=["Real Estate"])
 app.include_router(specialized_assets_router, tags=["Specialized Assets"])
+app.include_router(passion_assets_router, tags=["Passion Assets"])
 app.include_router(stocks_router, prefix="/stocks", tags=["Stocks"])
 
 app.include_router(

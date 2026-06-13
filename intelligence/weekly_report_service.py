@@ -2,6 +2,7 @@ import logging
 import os
 import json
 import asyncio
+from html import escape
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -13,6 +14,21 @@ from auth.utils import get_current_user, get_user_id
 from database import engine
 from intelligence.category_opportunities import get_category_opportunities
 from product.entitlements import resolve_effective_plan
+from product.daily_briefing import build_ceo_daily_briefing
+from product.routes import (
+    attach_daily_briefing_loop,
+    build_data_profile,
+    build_future_view,
+    build_wealth_academy,
+    build_mission_control,
+    build_missions,
+    build_strategic_brief,
+    ensure_product_tables,
+    get_academy_progress,
+    get_daily_briefing_loop,
+    get_mission_progress,
+    get_score,
+)
 
 
 router = APIRouter()
@@ -97,6 +113,134 @@ def _safe_sum(conn, query: str, params: dict) -> float:
         return 0.0
 
 
+def _status_label(status: str | None) -> str:
+    labels = {
+        "decided": "decision prise",
+        "ignored": "ignore",
+        "automation_requested": "automatisation demandee",
+        "todo": "a faire",
+        "in_progress": "en cours",
+        "done": "fait",
+        "cancelled": "annule",
+    }
+    return labels.get(str(status or "").lower(), "enregistre")
+
+
+def _action_label(action_key: str | None) -> str:
+    labels = {
+        "decide": "Decider",
+        "ignore": "Ignorer",
+        "automate": "Automatiser",
+    }
+    return labels.get(str(action_key or "").lower(), "Action")
+
+
+def build_daily_loop_report(conn, user_id: int, report_type: str) -> dict:
+    ensure_product_tables(conn)
+
+    action_rows = conn.execute(text("""
+        SELECT action_key, action_label, action_title, action_description, status, xp_awarded, created_at
+        FROM daily_briefing_actions
+        WHERE user_id = :user_id
+          AND created_at >= date_trunc('week', NOW())
+        ORDER BY created_at DESC
+        LIMIT 12
+    """), {"user_id": user_id}).fetchall()
+
+    task_rows = conn.execute(text("""
+        SELECT id, title, description, mission_key, priority, status, created_at, completed_at
+        FROM daily_action_tasks
+        WHERE user_id = :user_id
+          AND (
+            created_at >= date_trunc('week', NOW())
+            OR status IN ('todo', 'in_progress')
+          )
+        ORDER BY
+            CASE
+                WHEN status IN ('todo', 'in_progress') THEN 1
+                WHEN status = 'done' THEN 2
+                ELSE 3
+            END,
+            created_at DESC
+        LIMIT 12
+    """), {"user_id": user_id}).fetchall()
+
+    actions = [
+        {
+            "action_key": row.action_key,
+            "action_label": row.action_label or _action_label(row.action_key),
+            "action_title": row.action_title,
+            "action_description": row.action_description,
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "xp_awarded": int(row.xp_awarded or 0),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in action_rows
+    ]
+    tasks = [
+        {
+            "id": int(row.id),
+            "title": row.title,
+            "description": row.description,
+            "mission_key": row.mission_key,
+            "priority": row.priority,
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        }
+        for row in task_rows
+    ]
+    done_tasks = [task for task in tasks if task.get("status") == "done"]
+    open_tasks = [task for task in tasks if task.get("status") in {"todo", "in_progress"}]
+    xp_awarded = sum(action.get("xp_awarded", 0) for action in actions)
+
+    if report_type == "wealth_report":
+        headline = (
+            f"{len(actions)} decision(s) documentee(s), {len(done_tasks)} tache(s) terminee(s), {len(open_tasks)} tache(s) ouverte(s)."
+            if actions or tasks
+            else "Aucune boucle de progression documentee pour le moment."
+        )
+        next_focus = (
+            open_tasks[0].get("description")
+            if open_tasks
+            else "La prochaine priorite sera creee depuis le CEO Daily Briefing."
+        )
+    elif report_type == "friday":
+        headline = (
+            f"{len(actions)} decision(s), {len(done_tasks)} tache(s) terminee(s), {xp_awarded} XP de briefing cette semaine."
+            if actions or tasks
+            else "Aucune boucle quotidienne enregistree cette semaine: le prochain lundi peut servir a relancer une action simple."
+        )
+        next_focus = (
+            open_tasks[0].get("description")
+            if open_tasks
+            else "Choisir lundi une action courte, mesurable et reliee au briefing."
+        )
+    else:
+        headline = (
+            f"{len(open_tasks)} tache(s) ouverte(s) a traiter avant vendredi."
+            if open_tasks
+            else "La semaine peut demarrer par une decision simple dans le CEO Daily Briefing."
+        )
+        next_focus = (
+            open_tasks[0].get("description")
+            if open_tasks
+            else "Ouvrir le cockpit, lire le risque principal et choisir Decider ou Automatiser."
+        )
+
+    return {
+        "headline": headline,
+        "next_focus": next_focus,
+        "actions": actions,
+        "tasks": tasks,
+        "open_tasks": open_tasks,
+        "done_tasks": done_tasks,
+        "xp_awarded": xp_awarded,
+    }
+
+
 def build_weekly_report_payload(conn, user_id: int, email: str, report_type: str = "weekly") -> dict:
     row = conn.execute(text("""
         SELECT
@@ -179,6 +323,40 @@ def build_weekly_report_payload(conn, user_id: int, email: str, report_type: str
     except Exception:
         opportunities = []
 
+    ceo_daily_briefing = None
+    try:
+        data_profile = build_data_profile(conn, user_id)
+        score = get_score(email)
+        academy_progress = get_academy_progress(conn, user_id)
+        mission_progress = get_mission_progress(conn, user_id)
+        missions = build_missions(data_profile, score, plan, academy_progress, mission_progress)
+        wealth_academy = build_wealth_academy(data_profile, missions, score, plan, academy_progress)
+        strategic_brief = build_strategic_brief(data_profile, score, plan)
+        future_view = build_future_view(data_profile, score, plan)
+        mission_control = build_mission_control(strategic_brief, missions, future_view)
+        daily_loop = get_daily_briefing_loop(conn, user_id)
+        ceo_daily_briefing = build_ceo_daily_briefing(
+            data_profile,
+            score,
+            plan,
+            missions,
+            mission_control,
+            future_view,
+            {"items": opportunities},
+            {},
+            None,
+            wealth_academy,
+            daily_loop,
+        )
+        ceo_daily_briefing = attach_daily_briefing_loop(
+            ceo_daily_briefing,
+            daily_loop,
+        )
+    except Exception:
+        ceo_daily_briefing = None
+
+    daily_loop_report = build_daily_loop_report(conn, user_id, report_type)
+
     risk_alerts = []
     if portfolio_value == 0:
         risk_alerts.append("Ton portefeuille financier reste a construire.")
@@ -216,11 +394,78 @@ def build_weekly_report_payload(conn, user_id: int, email: str, report_type: str
             "ethan_tip",
             "La progression vient d'une petite decision bien executee, repetee chaque semaine.",
         ),
+        "ceo_daily_briefing": ceo_daily_briefing,
+        "daily_loop_report": daily_loop_report,
         "generated_at": datetime.utcnow().isoformat(),
     }
 
 
 def _render_report_html(payload: dict) -> str:
+    briefing = payload.get("ceo_daily_briefing") or {}
+    briefing_metrics = briefing.get("metrics") or {}
+    daily_loop = payload.get("daily_loop_report") or {}
+    report_type = payload.get("report_type")
+    briefing_html = ""
+    if briefing:
+        primary_action = briefing.get("primary_action") or {}
+        briefing_html = f"""
+        <h3>CEO Daily Briefing</h3>
+        <p><strong>{briefing.get('headline', '')}</strong></p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0;">
+          <div><small>Objectif liberte</small><br><strong>{briefing_metrics.get('financial_freedom_progress', 0)}%</strong></div>
+          <div><small>Score</small><br><strong>{briefing_metrics.get('wealth_score', 0)}/100</strong></div>
+          <div><small>Cashflow</small><br><strong>{briefing_metrics.get('monthly_cashflow', 0)} EUR</strong></div>
+        </div>
+        <p><strong>Risque:</strong> {(briefing.get('risk') or {}).get('description', '')}</p>
+        <p><strong>Action:</strong> {(briefing.get('recommended_action') or {}).get('description', '')}</p>
+        <div style="border:1px solid #16d99a33;background:#16d99a14;border-radius:14px;padding:14px;margin:12px 0;">
+          <small>Action prioritaire du prochain cockpit</small><br>
+          <strong>{escape(str(primary_action.get('title') or 'Action prioritaire'))}</strong>
+          <p>{escape(str(primary_action.get('description') or 'Action calculee depuis les donnees backend.'))}</p>
+          <p><strong>{escape(str(primary_action.get('cta_label') or 'Executer'))}</strong>
+          {f" - +{int(primary_action.get('xp') or 0)} XP" if int(primary_action.get('xp') or 0) > 0 else ""}</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0;">
+          <div><small>Priorite</small><br><strong>{briefing.get('priority_score', 0)}/100</strong></div>
+          <div><small>Resultat attendu</small><br><strong>{escape(str(briefing.get('expected_outcome') or 'Progression documentee.'))}</strong></div>
+        </div>
+        <p><strong>Pourquoi maintenant:</strong> {escape(str(briefing.get('why_today') or 'Action priorisee par le backend White Rock.'))}</p>
+        <p><strong>Alternative courte:</strong> {escape(str(briefing.get('alternative_action') or 'Revoir la decision dans le cockpit.'))}</p>
+        """
+
+    loop_actions = daily_loop.get("actions") or []
+    loop_tasks = daily_loop.get("tasks") or []
+    loop_title = "Bilan de boucle quotidienne" if report_type == "friday" else "Plan d'action de la semaine"
+    loop_actions_html = "".join(
+        "<li><strong>{}</strong> - {}{} </li>".format(
+            escape(str(item.get("action_label") or _action_label(item.get("action_key")))),
+            escape(str(item.get("status_label") or _status_label(item.get("status")))),
+            f" - +{int(item.get('xp_awarded') or 0)} XP" if int(item.get("xp_awarded") or 0) > 0 else "",
+        )
+        for item in loop_actions[:5]
+    ) or "<li>Aucune decision quotidienne enregistree cette semaine.</li>"
+    loop_tasks_html = "".join(
+        "<li><strong>{}</strong> - {}</li>".format(
+            escape(str(item.get("title") or "Action suivie")),
+            escape(str(item.get("status_label") or _status_label(item.get("status")))),
+        )
+        for item in loop_tasks[:5]
+    ) or "<li>Aucune tache suivie ouverte pour le moment.</li>"
+    loop_html = f"""
+        <h3>{loop_title}</h3>
+        <p><strong>{escape(str(daily_loop.get('headline') or 'Boucle quotidienne a activer.'))}</strong></p>
+        <p>{escape(str(daily_loop.get('next_focus') or 'Ouvrir le cockpit et choisir une action simple.'))}</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0;">
+          <div><small>Decisions</small><br><strong>{len(loop_actions)}</strong></div>
+          <div><small>Taches faites</small><br><strong>{len(daily_loop.get('done_tasks') or [])}</strong></div>
+          <div><small>XP briefing</small><br><strong>{int(daily_loop.get('xp_awarded') or 0)}</strong></div>
+        </div>
+        <p><strong>Decisions recentes</strong></p>
+        <ul>{loop_actions_html}</ul>
+        <p><strong>Taches suivies</strong></p>
+        <ul>{loop_tasks_html}</ul>
+    """
+
     opportunities = "".join(
         f"<li><strong>{item.get('title', 'Opportunite')}</strong> - {item.get('quick_action', 'Action a verifier')}</li>"
         for item in payload.get("opportunities", [])
@@ -255,6 +500,8 @@ def _render_report_html(payload: dict) -> str:
           <div><small>Immobilier</small><br><strong>{payload.get('real_estate_value')} EUR</strong></div>
           <div><small>Business</small><br><strong>{payload.get('business_value')} EUR</strong></div>
         </div>
+        {briefing_html}
+        {loop_html}
         <h3>Opportunites</h3>
         <ul>{opportunities}</ul>
         <h3>Alertes calmes</h3>

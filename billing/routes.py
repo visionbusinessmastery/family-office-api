@@ -650,6 +650,64 @@ def current_subscription(email: str = Depends(get_current_user)):
     }
 
 
+@router.post("/pricing-table-session")
+def create_pricing_table_session(email: str = Depends(get_current_user)):
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY manquant")
+
+    with engine.begin() as conn:
+        ensure_billing_tables(conn)
+        user, subscription = get_user_subscription(conn, email)
+        stripe_customer_id = subscription.stripe_customer_id if subscription else None
+
+        if not stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=email,
+                metadata={
+                    "email": email,
+                    "user_id": str(user.id),
+                    "source": "white_rock_pricing_table",
+                },
+            )
+            stripe_customer_id = stripe_value(customer, "id")
+
+            conn.execute(text("""
+                INSERT INTO subscriptions (
+                    user_id, plan, status, stripe_customer_id, environment, updated_at
+                )
+                VALUES (
+                    :user_id, :plan, :status, :stripe_customer_id, :environment, NOW()
+                )
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    stripe_customer_id = EXCLUDED.stripe_customer_id,
+                    updated_at = NOW()
+            """), {
+                "user_id": user.id,
+                "plan": normalize_plan(user.plan),
+                "status": "inactive",
+                "stripe_customer_id": stripe_customer_id,
+                "environment": os.getenv("STRIPE_MODE", "sandbox"),
+            })
+
+    try:
+        session = stripe.CustomerSession.create(
+            customer=stripe_customer_id,
+            components={
+                "pricing_table": {"enabled": True},
+            },
+        )
+    except Exception as exc:
+        capture_exception(exc, {"module": "billing", "operation": "pricing_table_session"})
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {
+        "client_secret": stripe_value(session, "client_secret"),
+        "client_reference_id": str(user.id),
+        "stripe_customer_id": stripe_customer_id,
+    }
+
+
 @router.post("/create-checkout-session")
 def create_checkout_session(data: dict, request: Request, email: str = Depends(get_current_user)):
     if not stripe.api_key:

@@ -16,6 +16,7 @@ from datetime import datetime
 from core.cache import redis_client
 from intelligence.gamification.progress_service import ensure_gamification_tables
 from product.entitlements import plan_allows, resolve_effective_plan
+from product.routes import ensure_product_tables
 
 router = APIRouter()
 GAMIFICATION_STATE_VERSION = "gamification-v1"
@@ -218,8 +219,30 @@ def timeline_description(event_type: str, metadata: dict | None = None):
     return "Un evenement de progression a ete enregistre par White Rock."
 
 
+def _action_label(action_key: str | None):
+    return {
+        "decide": "Decision prise",
+        "ignore": "Action ignoree",
+        "automate": "Automatisation demandee",
+    }.get(action_key or "", "Action quotidienne")
+
+
+def _status_label(status: str | None):
+    return {
+        "decided": "Decision prise",
+        "ignored": "Ignore",
+        "automation_requested": "Automatisation demandee",
+        "completed": "Valide",
+        "done": "Termine",
+        "todo": "A faire",
+        "in_progress": "En cours",
+        "cancelled": "Annule",
+    }.get(status or "", "Enregistre")
+
+
 def build_progression_timeline(conn, user_id: int):
     ensure_gamification_tables(conn)
+    ensure_product_tables(conn)
 
     events = []
 
@@ -299,10 +322,129 @@ def build_progression_timeline(conn, user_id: int):
                 "source": "user_gamification",
             })
 
+    daily_rows = conn.execute(text("""
+        SELECT action_key, action_label, action_title, status, xp_awarded, created_at
+        FROM daily_briefing_actions
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC
+        LIMIT 20
+    """), {"user_id": user_id}).fetchall()
+
+    for row in daily_rows:
+        events.append({
+            "date": row.created_at.isoformat() if row.created_at else None,
+            "type": "daily_briefing_action",
+            "title": row.action_title or row.action_label or _action_label(row.action_key),
+            "description": f"Decision quotidienne: {_status_label(row.status)}.",
+            "impact": "Transforme le CEO Daily Briefing en action suivie.",
+            "xp": int(row.xp_awarded or 0),
+            "source": "daily_briefing_actions",
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "action_key": row.action_key,
+        })
+
+    mission_rows = conn.execute(text("""
+        SELECT mission_key, status, xp_awarded, completed_at
+        FROM mission_progress
+        WHERE user_id = :user_id
+        ORDER BY completed_at DESC
+        LIMIT 20
+    """), {"user_id": user_id}).fetchall()
+
+    for row in mission_rows:
+        events.append({
+            "date": row.completed_at.isoformat() if row.completed_at else None,
+            "type": "mission_completed",
+            "title": "Mission patrimoniale validee",
+            "description": f"Mission {row.mission_key} validee par les donnees backend.",
+            "impact": "Un jalon concret de progression a ete atteint.",
+            "xp": int(row.xp_awarded or 0),
+            "source": "mission_progress",
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "mission_key": row.mission_key,
+        })
+
+    academy_rows = conn.execute(text("""
+        SELECT lesson_key, module_key, status, xp_awarded, completed_at
+        FROM academy_progress
+        WHERE user_id = :user_id
+        ORDER BY completed_at DESC
+        LIMIT 20
+    """), {"user_id": user_id}).fetchall()
+
+    for row in academy_rows:
+        events.append({
+            "date": row.completed_at.isoformat() if row.completed_at else None,
+            "type": "academy_lesson_completed",
+            "title": "Lecon Academy validee",
+            "description": f"Lecon {row.lesson_key} terminee dans le module {row.module_key or 'academy'}.",
+            "impact": "Renforce la comprehension de la prochaine action patrimoniale.",
+            "xp": int(row.xp_awarded or 0),
+            "source": "academy_progress",
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "lesson_key": row.lesson_key,
+            "module_key": row.module_key,
+        })
+
+    task_rows = conn.execute(text("""
+        SELECT title, description, mission_key, status, completed_at, created_at
+        FROM daily_action_tasks
+        WHERE user_id = :user_id
+          AND status = 'done'
+        ORDER BY completed_at DESC NULLS LAST, created_at DESC
+        LIMIT 20
+    """), {"user_id": user_id}).fetchall()
+
+    for row in task_rows:
+        events.append({
+            "date": (row.completed_at or row.created_at).isoformat() if (row.completed_at or row.created_at) else None,
+            "type": "daily_task_completed",
+            "title": row.title or "Action suivie terminee",
+            "description": row.description or "Une tache issue du briefing a ete finalisee.",
+            "impact": "Reduit les actions ouvertes et renforce la boucle d'execution.",
+            "xp": 30,
+            "source": "daily_action_tasks",
+            "status": row.status,
+            "status_label": _status_label(row.status),
+            "mission_key": row.mission_key,
+        })
+
     events = [event for event in events if event.get("date")]
     events.sort(key=lambda item: item.get("date") or "", reverse=True)
 
-    return events[:20]
+    return events[:30]
+
+
+def build_progression_summary(timeline: list[dict]):
+    week_events = timeline[:12]
+    decisions = [item for item in week_events if item.get("type") == "daily_briefing_action"]
+    missions = [item for item in week_events if item.get("type") == "mission_completed"]
+    lessons = [item for item in week_events if item.get("type") == "academy_lesson_completed"]
+    tasks = [item for item in week_events if item.get("type") == "daily_task_completed"]
+    xp_total = sum(int(item.get("xp") or 0) for item in week_events)
+
+    if missions:
+        next_milestone = "Capitaliser sur la mission validee avec une action concrete."
+    elif lessons:
+        next_milestone = "Transformer la lecon validee en action patrimoniale."
+    elif tasks:
+        next_milestone = "Choisir la prochaine tache prioritaire dans le briefing."
+    elif decisions:
+        next_milestone = "Executer la decision enregistree dans le cockpit."
+    else:
+        next_milestone = "Ouvrir le CEO Daily Briefing et choisir une premiere action."
+
+    return {
+        "xp_recent": xp_total,
+        "decisions": len(decisions),
+        "missions_completed": len(missions),
+        "academy_lessons_completed": len(lessons),
+        "tasks_completed": len(tasks),
+        "next_milestone": next_milestone,
+    }
 
 
 # =========================
@@ -450,12 +592,15 @@ def get_progression_timeline(user=Depends(get_current_user)):
                 "version": "progression-timeline-v1",
                 "plan": plan,
                 "timeline": [],
+                "summary": build_progression_summary([]),
             }
 
         timeline = build_progression_timeline(conn, user_id)
+        summary = build_progression_summary(timeline)
 
         return {
             "version": "progression-timeline-v1",
             "plan": plan,
             "timeline": timeline,
+            "summary": summary,
         }

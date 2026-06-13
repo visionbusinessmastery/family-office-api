@@ -1,10 +1,13 @@
+import json
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from auth.utils import get_current_user, get_user_id
 from database import engine
+from intelligence.gamification.progress_service import award_xp
 from intelligence.user_intelligence_engine import compute_user_intelligence
 from product.entitlements import (
     MODULE_REGISTRY,
@@ -14,10 +17,24 @@ from product.entitlements import (
     plan_allows,
     resolve_effective_plan,
 )
+from product.daily_briefing import build_ceo_daily_briefing
 
 
 router = APIRouter()
 _product_schema_ready = False
+
+
+class DailyBriefingActionRequest(BaseModel):
+    action_key: str
+    action_label: str | None = None
+    action_title: str | None = None
+    action_description: str | None = None
+    mission_key: str | None = None
+    briefing_version: str | None = None
+
+
+class DailyActionTaskUpdateRequest(BaseModel):
+    status: str
 
 
 def ensure_product_tables(conn):
@@ -79,6 +96,91 @@ def ensure_product_tables(conn):
             status TEXT NOT NULL DEFAULT 'unread',
             created_at TIMESTAMP DEFAULT NOW()
         )
+    """))
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS daily_briefing_actions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            action_key TEXT NOT NULL,
+            action_label TEXT,
+            action_title TEXT,
+            action_description TEXT,
+            briefing_version TEXT,
+            status TEXT NOT NULL DEFAULT 'recorded',
+            xp_awarded INTEGER NOT NULL DEFAULT 0,
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS daily_briefing_actions_user_created_idx
+        ON daily_briefing_actions(user_id, created_at DESC)
+    """))
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS daily_action_tasks (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            source TEXT NOT NULL DEFAULT 'ceo_daily_briefing',
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            mission_key TEXT,
+            priority TEXT NOT NULL DEFAULT 'normal',
+            status TEXT NOT NULL DEFAULT 'todo',
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW(),
+            completed_at TIMESTAMP
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS daily_action_tasks_user_status_idx
+        ON daily_action_tasks(user_id, status, created_at DESC)
+    """))
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS academy_progress (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            lesson_key TEXT NOT NULL,
+            module_key TEXT,
+            status TEXT NOT NULL DEFAULT 'completed',
+            xp_awarded INTEGER NOT NULL DEFAULT 0,
+            completed_at TIMESTAMP DEFAULT NOW(),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS academy_progress_user_lesson_unique
+        ON academy_progress(user_id, lesson_key)
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS academy_progress_user_completed_idx
+        ON academy_progress(user_id, completed_at DESC)
+    """))
+
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS mission_progress (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            mission_key TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            xp_awarded INTEGER NOT NULL DEFAULT 0,
+            completed_at TIMESTAMP DEFAULT NOW(),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS mission_progress_user_mission_unique
+        ON mission_progress(user_id, mission_key)
     """))
 
     conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT FALSE"))
@@ -156,6 +258,463 @@ def get_next_plan(plan: str):
     return None
 
 
+def get_effective_plan_for_user(conn, user_id: int):
+    plan_row = conn.execute(text("""
+        SELECT
+            users.plan AS user_plan,
+            subscriptions.plan AS subscription_plan,
+            subscriptions.status AS subscription_status
+        FROM users
+        LEFT JOIN subscriptions ON subscriptions.user_id = users.id
+        WHERE users.id = :user_id
+    """), {"user_id": user_id}).fetchone()
+
+    return resolve_effective_plan(
+        plan_row.user_plan if plan_row else "FREE",
+        plan_row.subscription_plan if plan_row else None,
+        plan_row.subscription_status if plan_row else None,
+    )
+
+
+@router.post("/daily-briefing/action")
+def record_daily_briefing_action(
+    payload: DailyBriefingActionRequest,
+    email: str = Depends(get_current_user),
+):
+    action_key = (payload.action_key or "").strip().lower()
+    status = daily_action_status(action_key)
+
+    if not status:
+        raise HTTPException(status_code=400, detail="Action briefing inconnue")
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ensure_product_tables(conn)
+
+        existing = conn.execute(text("""
+            SELECT id, status, xp_awarded, created_at
+            FROM daily_briefing_actions
+            WHERE user_id = :user_id
+              AND action_key = :action_key
+              AND created_at::date = CURRENT_DATE
+            ORDER BY created_at DESC
+            LIMIT 1
+        """), {
+            "user_id": user_id,
+            "action_key": action_key,
+        }).fetchone()
+
+        if existing:
+            loop = get_daily_briefing_loop(conn, user_id)
+            return {
+                "recorded": False,
+                "already_recorded": True,
+                "action_key": action_key,
+                "status": existing.status,
+                "xp_awarded": int(existing.xp_awarded or 0),
+                "message": "Action deja enregistree aujourd'hui.",
+                "daily_loop": loop,
+            }
+
+        xp_amount = daily_action_xp(action_key)
+        metadata = {
+            "source": "ceo_daily_briefing",
+            "briefing_version": payload.briefing_version,
+            "action_title": payload.action_title,
+            "action_description": payload.action_description,
+            "mission_key": payload.mission_key,
+        }
+
+        xp_result = award_xp(
+            conn,
+            user_id,
+            email,
+            f"daily_briefing_{action_key}",
+            xp_amount,
+            metadata,
+        )
+        xp_awarded = int(xp_result.get("awarded") or 0)
+
+        conn.execute(text("""
+            INSERT INTO daily_briefing_actions (
+                user_id, action_key, action_label, action_title,
+                action_description, briefing_version, status, xp_awarded, metadata
+            )
+            VALUES (
+                :user_id, :action_key, :action_label, :action_title,
+                :action_description, :briefing_version, :status, :xp_awarded,
+                CAST(:metadata AS JSONB)
+            )
+        """), {
+            "user_id": user_id,
+            "action_key": action_key,
+            "action_label": payload.action_label,
+            "action_title": payload.action_title,
+            "action_description": payload.action_description,
+            "briefing_version": payload.briefing_version,
+            "status": status,
+            "xp_awarded": xp_awarded,
+            "metadata": json.dumps(metadata),
+        })
+
+        if action_key == "automate":
+            task_title = payload.action_title or "Action patrimoniale a automatiser"
+            task_description = (
+                payload.action_description
+                or "Action creee depuis le briefing quotidien White Rock."
+            )
+            duplicate_task = conn.execute(text("""
+                SELECT id
+                FROM daily_action_tasks
+                WHERE user_id = :user_id
+                  AND source = 'ceo_daily_briefing'
+                  AND title = :title
+                  AND description = :description
+                  AND status IN ('todo', 'in_progress')
+                ORDER BY created_at DESC
+                LIMIT 1
+            """), {
+                "user_id": user_id,
+                "title": task_title,
+                "description": task_description,
+            }).fetchone()
+
+            if not duplicate_task:
+                conn.execute(text("""
+                    INSERT INTO daily_action_tasks (
+                        user_id, source, title, description, mission_key,
+                        priority, status, metadata
+                    )
+                    VALUES (
+                        :user_id, 'ceo_daily_briefing', :title, :description,
+                        :mission_key, :priority, 'todo', CAST(:metadata AS JSONB)
+                    )
+                """), {
+                    "user_id": user_id,
+                    "title": task_title,
+                    "description": task_description,
+                    "mission_key": payload.mission_key,
+                    "priority": "high" if payload.mission_key else "normal",
+                    "metadata": json.dumps(metadata),
+                })
+
+            conn.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, action_label, action_url)
+                VALUES (
+                    :user_id,
+                    'daily_briefing',
+                    'Automatisation demandee',
+                    :message,
+                    'Voir le briefing',
+                    '/dashboard'
+                )
+            """), {
+                "user_id": user_id,
+                "message": payload.action_description
+                or "White Rock a note cette action comme candidate a l'automatisation.",
+            })
+
+        loop = get_daily_briefing_loop(conn, user_id)
+
+    return {
+        "recorded": True,
+        "already_recorded": False,
+        "action_key": action_key,
+        "status": status,
+        "xp_awarded": xp_awarded,
+        "xp": xp_result.get("xp"),
+        "level": xp_result.get("level"),
+        "message": (
+            "Decision enregistree."
+            if action_key == "decide"
+            else "Action ignoree pour aujourd'hui."
+            if action_key == "ignore"
+            else "Automatisation ajoutee a la file de travail."
+        ),
+        "daily_loop": loop,
+    }
+
+
+@router.post("/daily-briefing/tasks/{task_id}/status")
+def update_daily_action_task_status(
+    task_id: int,
+    payload: DailyActionTaskUpdateRequest,
+    email: str = Depends(get_current_user),
+):
+    status = (payload.status or "").strip().lower()
+    allowed = {"todo", "in_progress", "done", "cancelled"}
+
+    if status not in allowed:
+        raise HTTPException(status_code=400, detail="Statut de tache inconnu")
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ensure_product_tables(conn)
+
+        task = conn.execute(text("""
+            SELECT id, status, title, description, mission_key
+            FROM daily_action_tasks
+            WHERE id = :task_id
+              AND user_id = :user_id
+        """), {
+            "task_id": task_id,
+            "user_id": user_id,
+        }).fetchone()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="Tache introuvable")
+
+        xp_result = {"awarded": 0}
+        if status == "done" and task.status != "done":
+            xp_result = award_xp(
+                conn,
+                user_id,
+                email,
+                "daily_action_task_done",
+                30,
+                {
+                    "task_id": task_id,
+                    "title": task.title,
+                    "mission_key": task.mission_key,
+                    "source": "ceo_daily_briefing",
+                },
+            )
+
+        conn.execute(text("""
+            UPDATE daily_action_tasks
+            SET status = :status,
+                updated_at = NOW(),
+                completed_at = CASE WHEN :status = 'done' THEN NOW() ELSE completed_at END
+            WHERE id = :task_id
+              AND user_id = :user_id
+        """), {
+            "status": status,
+            "task_id": task_id,
+            "user_id": user_id,
+        })
+
+        loop = get_daily_briefing_loop(conn, user_id)
+
+    return {
+        "updated": True,
+        "task_id": task_id,
+        "status": status,
+        "xp_awarded": int(xp_result.get("awarded") or 0),
+        "message": "Tache mise a jour.",
+        "daily_loop": loop,
+    }
+
+
+@router.post("/academy/lessons/{lesson_key}/complete")
+def complete_academy_lesson(
+    lesson_key: str,
+    email: str = Depends(get_current_user),
+):
+    normalized_lesson_key = (lesson_key or "").strip()
+
+    if not normalized_lesson_key:
+        raise HTTPException(status_code=400, detail="Lecon Academy inconnue")
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ensure_product_tables(conn)
+
+        plan = get_effective_plan_for_user(conn, user_id)
+        score = get_score(email)
+        progress = get_academy_progress(conn, user_id)
+        mission_progress = get_mission_progress(conn, user_id)
+        data_profile = build_data_profile(conn, user_id)
+        missions = build_missions(data_profile, score, plan, progress, mission_progress)
+        academy = build_wealth_academy(data_profile, missions, score, plan, progress)
+        lessons = {
+            lesson.get("key"): {
+                **lesson,
+                "module_key": module.get("key"),
+                "module_title": module.get("title"),
+            }
+            for module in academy.get("modules", [])
+            for lesson in module.get("lessons", [])
+        }
+        lesson = lessons.get(normalized_lesson_key)
+
+        if not lesson:
+            raise HTTPException(status_code=404, detail="Lecon Academy introuvable")
+
+        if lesson.get("completed"):
+            return {
+                "completed": False,
+                "already_completed": True,
+                "lesson_key": normalized_lesson_key,
+                "xp_awarded": int(lesson.get("xp_awarded") or 0),
+                "message": "Lecon deja validee.",
+                "wealth_academy": academy,
+            }
+
+        xp_result = award_xp(
+            conn,
+            user_id,
+            email,
+            "academy_lesson_completed",
+            academy_lesson_xp(),
+            {
+                "source": "wealth_academy",
+                "lesson_key": normalized_lesson_key,
+                "lesson_title": lesson.get("title"),
+                "module_key": lesson.get("module_key"),
+                "module_title": lesson.get("module_title"),
+            },
+        )
+        xp_awarded = int(xp_result.get("awarded") or 0)
+
+        conn.execute(text("""
+            INSERT INTO academy_progress (
+                user_id,
+                lesson_key,
+                module_key,
+                status,
+                xp_awarded,
+                completed_at,
+                updated_at
+            )
+            VALUES (
+                :user_id,
+                :lesson_key,
+                :module_key,
+                'completed',
+                :xp_awarded,
+                NOW(),
+                NOW()
+            )
+            ON CONFLICT (user_id, lesson_key) DO UPDATE
+            SET status = 'completed',
+                updated_at = NOW()
+        """), {
+            "user_id": user_id,
+            "lesson_key": normalized_lesson_key,
+            "module_key": lesson.get("module_key"),
+            "xp_awarded": xp_awarded,
+        })
+
+        progress = get_academy_progress(conn, user_id)
+        academy = build_wealth_academy(data_profile, missions, score, plan, progress)
+
+    return {
+        "completed": True,
+        "already_completed": False,
+        "lesson_key": normalized_lesson_key,
+        "xp_awarded": xp_awarded,
+        "message": "Lecon validee. Progression Academy mise a jour.",
+        "wealth_academy": academy,
+    }
+
+
+@router.post("/missions/{mission_key}/complete")
+def complete_product_mission(
+    mission_key: str,
+    email: str = Depends(get_current_user),
+):
+    normalized_mission_key = (mission_key or "").strip()
+
+    if not normalized_mission_key:
+        raise HTTPException(status_code=400, detail="Mission inconnue")
+
+    with engine.begin() as conn:
+        user_id = get_user_id(conn, email)
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ensure_product_tables(conn)
+
+        plan = get_effective_plan_for_user(conn, user_id)
+        score = get_score(email)
+        data_profile = build_data_profile(conn, user_id)
+        academy_progress = get_academy_progress(conn, user_id)
+        mission_progress = get_mission_progress(conn, user_id)
+        missions = build_missions(data_profile, score, plan, academy_progress, mission_progress)
+        mission = next((item for item in missions if item.get("key") == normalized_mission_key), None)
+
+        if not mission:
+            raise HTTPException(status_code=404, detail="Mission introuvable")
+
+        if mission.get("completed"):
+            return {
+                "completed": False,
+                "already_completed": True,
+                "mission_key": normalized_mission_key,
+                "xp_awarded": int(mission.get("xp_awarded") or 0),
+                "message": "Mission deja validee.",
+                "missions": missions,
+            }
+
+        if mission.get("status") != "ready":
+            raise HTTPException(status_code=400, detail="Mission pas encore prete")
+
+        xp_amount = int(mission.get("xp") or 0)
+        xp_result = award_xp(
+            conn,
+            user_id,
+            email,
+            "product_mission_completed",
+            xp_amount,
+            {
+                "source": "product_missions",
+                "mission_key": normalized_mission_key,
+                "mission_title": mission.get("title"),
+                "impact_dimension": mission.get("impact_dimension"),
+            },
+        )
+        xp_awarded = int(xp_result.get("awarded") or 0)
+
+        conn.execute(text("""
+            INSERT INTO mission_progress (
+                user_id,
+                mission_key,
+                status,
+                xp_awarded,
+                completed_at,
+                updated_at
+            )
+            VALUES (
+                :user_id,
+                :mission_key,
+                'completed',
+                :xp_awarded,
+                NOW(),
+                NOW()
+            )
+            ON CONFLICT (user_id, mission_key) DO NOTHING
+        """), {
+            "user_id": user_id,
+            "mission_key": normalized_mission_key,
+            "xp_awarded": xp_awarded,
+        })
+
+        mission_progress = get_mission_progress(conn, user_id)
+        missions = build_missions(data_profile, score, plan, academy_progress, mission_progress)
+
+    return {
+        "completed": True,
+        "already_completed": False,
+        "mission_key": normalized_mission_key,
+        "xp_awarded": xp_awarded,
+        "message": "Mission validee. XP et progression mis a jour.",
+        "missions": missions,
+    }
+
+
 def build_progression(conn, user_id: int, score: int, plan: str):
     ensure_product_tables(conn)
 
@@ -204,6 +763,182 @@ def build_progression(conn, user_id: int, score: int, plan: str):
     }
 
 
+def get_daily_briefing_loop(conn, user_id: int):
+    ensure_product_tables(conn)
+
+    today_rows = conn.execute(text("""
+        SELECT action_key, status, xp_awarded, created_at
+        FROM daily_briefing_actions
+        WHERE user_id = :user_id
+          AND created_at::date = CURRENT_DATE
+        ORDER BY created_at DESC
+    """), {"user_id": user_id}).fetchall()
+
+    history_rows = conn.execute(text("""
+        SELECT action_key, action_label, action_title, status, xp_awarded, created_at
+        FROM daily_briefing_actions
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC
+        LIMIT 10
+    """), {"user_id": user_id}).fetchall()
+
+    task_rows = conn.execute(text("""
+        SELECT id, title, description, mission_key, priority, status, created_at, updated_at, completed_at
+        FROM daily_action_tasks
+        WHERE user_id = :user_id
+        ORDER BY
+            CASE
+                WHEN status = 'todo' THEN 1
+                WHEN status = 'in_progress' THEN 2
+                WHEN status = 'done' THEN 3
+                ELSE 4
+            END,
+            created_at DESC
+        LIMIT 6
+    """), {"user_id": user_id}).fetchall()
+
+    today_actions = {}
+    for row in today_rows:
+        today_actions[row.action_key] = {
+            "status": row.status,
+            "xp_awarded": int(row.xp_awarded or 0),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+
+    history = [
+        {
+            "action_key": row.action_key,
+            "action_label": row.action_label,
+            "action_title": row.action_title,
+            "status": row.status,
+            "xp_awarded": int(row.xp_awarded or 0),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in history_rows
+    ]
+    tasks = [
+        {
+            "id": int(row.id),
+            "title": row.title,
+            "description": row.description,
+            "mission_key": row.mission_key,
+            "priority": row.priority,
+            "status": row.status,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        }
+        for row in task_rows
+    ]
+    done_tasks = [task for task in tasks if task.get("status") == "done"]
+    open_tasks = [task for task in tasks if task.get("status") not in ("done", "cancelled")]
+    xp_today = sum(int(action.get("xp_awarded") or 0) for action in today_actions.values())
+    xp_recent = sum(int(action.get("xp_awarded") or 0) for action in history)
+
+    return {
+        "today_actions": today_actions,
+        "history": history,
+        "tasks": tasks,
+        "summary": {
+            "actions_today": len(today_actions),
+            "actions_recent": len(history),
+            "open_tasks": len(open_tasks),
+            "done_tasks": len(done_tasks),
+            "xp_today": xp_today,
+            "xp_recent": xp_recent,
+            "last_action": history[0] if history else None,
+        },
+    }
+
+
+def attach_daily_briefing_loop(briefing: dict, loop: dict):
+    if not briefing:
+        return briefing
+
+    today_actions = loop.get("today_actions") or {}
+    briefing["daily_loop"] = loop
+    briefing["actions"] = [
+        {
+            **action,
+            "status": today_actions.get(action.get("key"), {}).get("status", action.get("status")),
+            "xp_awarded": today_actions.get(action.get("key"), {}).get("xp_awarded", 0),
+        }
+        for action in briefing.get("actions", [])
+    ]
+    return briefing
+
+
+def daily_action_status(action_key: str):
+    return {
+        "decide": "decided",
+        "ignore": "ignored",
+        "automate": "automation_requested",
+    }.get(action_key)
+
+
+def daily_action_xp(action_key: str):
+    return {
+        "decide": 20,
+        "ignore": 0,
+        "automate": 35,
+    }.get(action_key, 0)
+
+
+def academy_lesson_xp():
+    return 15
+
+
+def get_academy_progress(conn, user_id: int):
+    ensure_product_tables(conn)
+
+    rows = conn.execute(text("""
+        SELECT lesson_key, module_key, status, xp_awarded, completed_at
+        FROM academy_progress
+        WHERE user_id = :user_id
+        ORDER BY completed_at DESC
+    """), {"user_id": user_id}).fetchall()
+
+    completed = {}
+    total_xp = 0
+    for row in rows:
+        total_xp += int(row.xp_awarded or 0)
+        completed[row.lesson_key] = {
+            "lesson_key": row.lesson_key,
+            "module_key": row.module_key,
+            "status": row.status,
+            "xp_awarded": int(row.xp_awarded or 0),
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        }
+
+    return {
+        "completed": completed,
+        "completed_lessons": len(completed),
+        "xp_awarded": total_xp,
+    }
+
+
+def get_mission_progress(conn, user_id: int):
+    ensure_product_tables(conn)
+
+    rows = conn.execute(text("""
+        SELECT mission_key, status, xp_awarded, completed_at
+        FROM mission_progress
+        WHERE user_id = :user_id
+        ORDER BY completed_at DESC
+    """), {"user_id": user_id}).fetchall()
+
+    completed = {}
+    for row in rows:
+        completed[row.mission_key] = {
+            "mission_key": row.mission_key,
+            "status": row.status,
+            "xp_awarded": int(row.xp_awarded or 0),
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        }
+
+    return {"completed": completed}
+
+
 def build_data_profile(conn, user_id: int):
     finance_count = safe_count(
         conn,
@@ -230,7 +965,12 @@ def build_data_profile(conn, user_id: int):
         "SELECT COUNT(*) FROM venture_assets WHERE user_id = :user_id",
         {"user_id": user_id},
     )
-    total_assets_count = portfolio_count + real_estate_count + yield_count + venture_count
+    passion_assets_count = safe_count(
+        conn,
+        "SELECT COUNT(*) FROM passion_assets WHERE user_id = :user_id",
+        {"user_id": user_id},
+    )
+    total_assets_count = portfolio_count + real_estate_count + yield_count + venture_count + passion_assets_count
     finance_income = safe_float(
         conn,
         "SELECT COALESCE(SUM(amount), 0) FROM finance_items WHERE user_id = :user_id AND type = 'revenus'",
@@ -316,8 +1056,35 @@ def build_data_profile(conn, user_id: int):
         """,
         {"user_id": user_id},
     )
+    passion_assets_value = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(NULLIF(estimated_value, 0), acquisition_value, 0)), 0)
+        FROM passion_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    passion_assets_cost = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(acquisition_value, 0)), 0)
+        FROM passion_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
+    passion_assets_insured = safe_float(
+        conn,
+        """
+        SELECT COALESCE(SUM(COALESCE(insured_value, 0)), 0)
+        FROM passion_assets
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+    )
     business_value = yield_value + venture_value
-    current_wealth = portfolio_value + real_estate_value + business_value
+    current_wealth = portfolio_value + real_estate_value + business_value + passion_assets_value
     projection_wealth = current_wealth + deployable_liquidity
 
     completed_steps = sum([
@@ -326,6 +1093,7 @@ def build_data_profile(conn, user_id: int):
         real_estate_count > 0,
         yield_count > 0,
         venture_count > 0,
+        passion_assets_count > 0,
     ])
 
     return {
@@ -334,9 +1102,10 @@ def build_data_profile(conn, user_id: int):
         "real_estate_count": real_estate_count,
         "yield_count": yield_count,
         "venture_count": venture_count,
+        "passion_assets_count": passion_assets_count,
         "total_assets_count": total_assets_count,
         "completed_steps": completed_steps,
-        "completion_percent": round((completed_steps / 5) * 100),
+        "completion_percent": round((completed_steps / 6) * 100),
         "monthly_income": round(monthly_income, 2),
         "monthly_expenses": round(monthly_expenses, 2),
         "monthly_savings": round(finance_savings, 2),
@@ -352,6 +1121,11 @@ def build_data_profile(conn, user_id: int):
         "yield_value": round(yield_value, 2),
         "venture_value": round(venture_value, 2),
         "business_value": round(business_value, 2),
+        "passion_assets_value": round(passion_assets_value, 2),
+        "passion_assets_cost": round(passion_assets_cost, 2),
+        "passion_assets_gain": round(passion_assets_value - passion_assets_cost, 2),
+        "passion_assets_performance": round(((passion_assets_value - passion_assets_cost) / passion_assets_cost * 100) if passion_assets_cost > 0 else 0, 2),
+        "passion_assets_insured": round(passion_assets_insured, 2),
         "current_wealth": round(current_wealth, 2),
         "projection_wealth": round(projection_wealth, 2),
     }
@@ -386,26 +1160,31 @@ def build_modules(plan: str, score: int):
     return {"visible": visible, "locked": locked}
 
 
-def build_missions(data_profile: dict, score: int, plan: str):
-    missions = []
-
-    if data_profile["finance_count"] == 0:
-        missions.append({
+def build_missions(
+    data_profile: dict,
+    score: int,
+    plan: str,
+    academy_progress: dict | None = None,
+    mission_progress: dict | None = None,
+):
+    missions = [
+        {
             "key": "complete_finance",
             "title": "Completer ton cashflow",
             "description": "Ajoute revenus, charges, epargne et dettes pour clarifier tes fondations.",
             "xp": 100,
             "module": "finance",
-        })
-
-    if data_profile["portfolio_count"] == 0:
-        missions.append({
+        },
+        {
             "key": "add_first_asset",
             "title": "Ajouter ton premier actif",
             "description": "C'est le premier pas vers une vision patrimoniale centralisee.",
             "xp": 120,
             "module": "portfolio",
-        })
+        },
+    ]
+    completed_lessons = (academy_progress or {}).get("completed") or {}
+    completed_missions = (mission_progress or {}).get("completed") or {}
 
     if score >= 45 and normalize_plan(plan) == "FREE":
         missions.append({
@@ -447,7 +1226,531 @@ def build_missions(data_profile: dict, score: int, plan: str):
             "recommended_plan": "legacy",
         })
 
-    return missions[:3]
+    def enrich_mission(mission: dict, index: int):
+        key = mission.get("key")
+        current_value = 0
+        target_value = 1
+        impact_dimension = "Pilotage"
+        linked_daily_action = mission.get("description")
+        academy_lesson = {
+            "module_key": "family_office",
+            "module_title": "Family Office",
+            "lesson_key": "weekly_board",
+            "lesson_title": "Organiser une decision patrimoniale",
+            "duration": "7 min",
+            "reason": "Cette lecon aide a transformer une lecture White Rock en decision suivie.",
+        }
+
+        if key == "complete_finance":
+            current_value = data_profile.get("finance_count", 0)
+            target_value = 1
+            impact_dimension = "Cashflow"
+            linked_daily_action = "Ajouter au moins une ligne de revenu, charge, epargne ou dette pour rendre le cashflow lisible."
+            academy_lesson = {
+                "module_key": "foundations",
+                "module_title": "Fondations",
+                "lesson_key": "cashflow",
+                "lesson_title": "Lire son cashflow",
+                "duration": "6 min",
+                "reason": "Comprendre les flux rend la mission finance plus concrete et mesurable.",
+            }
+        elif key == "add_first_asset":
+            current_value = data_profile.get("portfolio_count", 0)
+            target_value = 1
+            impact_dimension = "Allocation"
+            linked_daily_action = "Ajouter un actif financier pour commencer a mesurer l'exposition et la performance."
+            academy_lesson = {
+                "module_key": "investing",
+                "module_title": "Investissement",
+                "lesson_key": "first_asset",
+                "lesson_title": "Ajouter son premier actif",
+                "duration": "5 min",
+                "reason": "La mission devient plus simple quand l'utilisateur comprend ce qu'une ligne d'actif apporte au cockpit.",
+            }
+        elif key == "unlock_growth":
+            current_value = score
+            target_value = 45
+            impact_dimension = "Croissance"
+            linked_daily_action = "Comparer la valeur des leviers Growth avec ton score et tes donnees deja renseignees."
+            academy_lesson = {
+                "module_key": "investing",
+                "module_title": "Investissement",
+                "lesson_key": "allocation",
+                "lesson_title": "Comprendre l'allocation",
+                "duration": "8 min",
+                "reason": "Growth devient utile quand les poches patrimoniales ont chacune un role clair.",
+            }
+        elif key == "unlock_wealth_os":
+            current_value = score
+            target_value = 70
+            impact_dimension = "Gouvernance"
+            linked_daily_action = "Verifier si le pilotage avance devient utile au regard de ton score et de tes actifs suivis."
+            academy_lesson = {
+                "module_key": "family_office",
+                "module_title": "Family Office",
+                "lesson_key": "weekly_board",
+                "lesson_title": "Organiser une decision patrimoniale",
+                "duration": "7 min",
+                "reason": "Le pilotage Wealth OS doit deboucher sur des arbitrages suivis, pas seulement sur des scores.",
+            }
+        elif key == "unlock_liberty":
+            current_value = score
+            target_value = 85
+            impact_dimension = "Souverainete"
+            linked_daily_action = "Evaluer les besoins de controle, transmission et arbitrage avances."
+            academy_lesson = {
+                "module_key": "family_office",
+                "module_title": "Family Office",
+                "lesson_key": "transmission_basics",
+                "lesson_title": "Bases de transmission",
+                "duration": "9 min",
+                "reason": "Liberty suppose une vision plus claire du controle, de la protection et de la continuite.",
+            }
+        elif key == "unlock_legacy":
+            current_value = score
+            target_value = 92
+            impact_dimension = "Transmission"
+            linked_daily_action = "Clarifier les enjeux familiaux, de protection et de patrimoine transmissible."
+            academy_lesson = {
+                "module_key": "family_office",
+                "module_title": "Family Office",
+                "lesson_key": "transmission_basics",
+                "lesson_title": "Bases de transmission",
+                "duration": "9 min",
+                "reason": "Legacy doit etre compris comme une architecture familiale durable, pas comme un simple niveau premium.",
+            }
+
+        progress_percent = (
+            min(100, round((float(current_value or 0) / float(target_value or 1)) * 100, 1))
+            if target_value
+            else 0
+        )
+        lesson_progress = completed_lessons.get(academy_lesson["lesson_key"])
+        mission_done = completed_missions.get(key)
+        computed_status = "completed" if mission_done else "ready" if progress_percent >= 100 else "pending"
+        academy_lesson = {
+            **academy_lesson,
+            "completed": bool(lesson_progress),
+            "completed_at": lesson_progress.get("completed_at") if lesson_progress else None,
+            "xp_awarded": int(lesson_progress.get("xp_awarded") or 0) if lesson_progress else 0,
+        }
+
+        return {
+            **mission,
+            "current_value": round(float(current_value or 0), 2),
+            "target_value": round(float(target_value or 0), 2),
+            "progress_percent": progress_percent,
+            "impact_dimension": impact_dimension,
+            "linked_daily_action": linked_daily_action,
+            "linked_academy_lesson": academy_lesson,
+            "is_priority": index == 0,
+            "completed": bool(mission_done),
+            "completed_at": mission_done.get("completed_at") if mission_done else None,
+            "xp_awarded": int(mission_done.get("xp_awarded") or 0) if mission_done else 0,
+            "status": mission.get("status") or computed_status,
+        }
+
+    return [enrich_mission(mission, index) for index, mission in enumerate(missions[:3])]
+
+
+def build_wealth_academy(
+    data_profile: dict,
+    missions: list[dict],
+    score: int,
+    plan: str,
+    academy_progress: dict | None = None,
+):
+    modules = [
+        {
+            "key": "foundations",
+            "title": "Fondations",
+            "description": "Cashflow, fonds d'urgence, dettes et patrimoine net.",
+            "lessons": [
+                {
+                    "key": "cashflow",
+                    "title": "Lire son cashflow",
+                    "duration": "6 min",
+                    "outcome": "Comprendre ce qui entre, ce qui sort et ce qui peut etre deploye.",
+                },
+                {
+                    "key": "emergency_fund",
+                    "title": "Construire un fonds d'urgence",
+                    "duration": "7 min",
+                    "outcome": "Transformer la liquidite en marge de securite mesurable.",
+                },
+                {
+                    "key": "debt_weight",
+                    "title": "Mesurer le poids des dettes",
+                    "duration": "5 min",
+                    "outcome": "Identifier si la dette freine ou accelere la trajectoire.",
+                },
+            ],
+        },
+        {
+            "key": "investing",
+            "title": "Investissement",
+            "description": "Allocation, diversification, risque et horizon.",
+            "lessons": [
+                {
+                    "key": "first_asset",
+                    "title": "Ajouter son premier actif",
+                    "duration": "5 min",
+                    "outcome": "Commencer a suivre exposition, performance et poids relatif.",
+                },
+                {
+                    "key": "allocation",
+                    "title": "Comprendre l'allocation",
+                    "duration": "8 min",
+                    "outcome": "Relier chaque actif a un role clair dans le patrimoine.",
+                },
+                {
+                    "key": "risk_horizon",
+                    "title": "Risque et horizon",
+                    "duration": "7 min",
+                    "outcome": "Eviter les decisions incompatibles avec son temps disponible.",
+                },
+            ],
+        },
+        {
+            "key": "real_estate",
+            "title": "Immobilier",
+            "description": "Valeur, dette, rendement et cashflow locatif.",
+            "lessons": [
+                {
+                    "key": "property_value",
+                    "title": "Lire la valeur d'un bien",
+                    "duration": "6 min",
+                    "outcome": "Comparer valeur estimee, prix d'achat et plus-value latente.",
+                },
+                {
+                    "key": "rental_yield",
+                    "title": "Comprendre le rendement locatif",
+                    "duration": "7 min",
+                    "outcome": "Ne pas confondre rendement brut, charges et flux reel.",
+                },
+            ],
+        },
+        {
+            "key": "business",
+            "title": "Business",
+            "description": "Revenus, charges, marge et valorisation.",
+            "lessons": [
+                {
+                    "key": "business_margin",
+                    "title": "Lire une marge operationnelle",
+                    "duration": "6 min",
+                    "outcome": "Savoir si l'activite cree de la valeur ou absorbe du cash.",
+                },
+                {
+                    "key": "business_value",
+                    "title": "Suivre une valeur business",
+                    "duration": "8 min",
+                    "outcome": "Passer d'une activite suivie a un actif patrimonial lisible.",
+                },
+            ],
+        },
+        {
+            "key": "family_office",
+            "title": "Family Office",
+            "description": "Gouvernance, transmission, documentation et pilotage.",
+            "lessons": [
+                {
+                    "key": "weekly_board",
+                    "title": "Organiser une decision patrimoniale",
+                    "duration": "7 min",
+                    "outcome": "Transformer une lecture en decision, puis en action suivie.",
+                },
+                {
+                    "key": "transmission_basics",
+                    "title": "Bases de transmission",
+                    "duration": "9 min",
+                    "outcome": "Identifier les informations a documenter avant toute strategie avancee.",
+                },
+            ],
+        },
+    ]
+
+    mission = missions[0] if missions else None
+    finance_count = int(data_profile.get("finance_count") or 0)
+    portfolio_count = int(data_profile.get("portfolio_count") or 0)
+    real_estate_count = int(data_profile.get("real_estate_count") or 0)
+    venture_count = int(data_profile.get("venture_count") or 0)
+    monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
+    debt_total = float(data_profile.get("debt_total") or 0)
+
+    recommended_module = "family_office"
+    recommended_lesson = "weekly_board"
+    why_now = "La boucle quotidienne est active: apprendre a transformer une decision en action suivie renforce le pilotage."
+
+    if finance_count == 0:
+        recommended_module = "foundations"
+        recommended_lesson = "cashflow"
+        why_now = "Le backend ne voit pas encore assez de donnees de revenus, charges, epargne ou dettes."
+    elif debt_total > 0:
+        recommended_module = "foundations"
+        recommended_lesson = "debt_weight"
+        why_now = "Une dette suivie existe: comprendre son poids rend la trajectoire plus realiste."
+    elif portfolio_count == 0:
+        recommended_module = "investing"
+        recommended_lesson = "first_asset"
+        why_now = "Aucun actif financier n'est encore suivi: la premiere ligne rend l'allocation mesurable."
+    elif monthly_capacity > 0:
+        recommended_module = "investing"
+        recommended_lesson = "allocation"
+        why_now = "Une capacite mensuelle existe: l'allocation aide a transformer cette marge en trajectoire."
+    elif real_estate_count > 0:
+        recommended_module = "real_estate"
+        recommended_lesson = "property_value"
+        why_now = "Une poche immobiliere existe: relire valeur et rendement clarifie le patrimoine visible."
+    elif venture_count > 0:
+        recommended_module = "business"
+        recommended_lesson = "business_margin"
+        why_now = "Une poche business existe: la marge dit si elle cree vraiment de la valeur."
+
+    if mission and mission.get("key") == "complete_finance":
+        recommended_module = "foundations"
+        recommended_lesson = "cashflow"
+    elif mission and mission.get("key") == "add_first_asset":
+        recommended_module = "investing"
+        recommended_lesson = "first_asset"
+
+    lesson_content = {
+        "cashflow": {
+            "reading": "Le cashflow est la difference entre ce qui entre chaque mois et ce qui sort. Dans White Rock, il sert a savoir si la trajectoire peut accelerer sans fragiliser la securite.",
+            "key_points": [
+                "Un cashflow positif cree une capacite d'action mensuelle.",
+                "Un cashflow negatif demande d'abord de comprendre les charges.",
+                "La qualite des projections depend de revenus et charges bien renseignes.",
+            ],
+            "exercise": "Verifie que tes revenus et charges principales sont bien presents dans la page Finances.",
+            "action_steps": [
+                "Ajouter au moins un revenu mensuel.",
+                "Ajouter les charges fixes principales.",
+                "Relire le cashflow mensuel dans White Rock Center.",
+            ],
+        },
+        "emergency_fund": {
+            "reading": "Le fonds d'urgence protege la trajectoire. Il evite de vendre un actif ou de s'endetter pour absorber un imprevu.",
+            "key_points": [
+                "La reserve se mesure en mois de charges.",
+                "Une reserve trop faible rend l'investissement plus stressant.",
+                "Une reserve trop elevee peut aussi laisser du capital dormir.",
+            ],
+            "exercise": "Compare ton epargne disponible avec 3 a 6 mois de charges mensuelles.",
+            "action_steps": [
+                "Identifier les charges mensuelles essentielles.",
+                "Calculer 3 mois de securite.",
+                "Decider si la reserve doit etre renforcee ou partiellement mobilisee.",
+            ],
+        },
+        "debt_weight": {
+            "reading": "La dette n'est pas toujours mauvaise. Elle devient un probleme quand elle absorbe trop de revenus ou reduit la marge de manoeuvre.",
+            "key_points": [
+                "Le ratio dette / revenus aide a mesurer la pression.",
+                "Une dette productive finance un actif ou une capacite future.",
+                "Une dette de consommation doit etre surveillee plus strictement.",
+            ],
+            "exercise": "Regarde le poids total des dettes face a tes revenus mensuels.",
+            "action_steps": [
+                "Verifier les dettes renseignees.",
+                "Identifier la dette la plus lourde.",
+                "Choisir entre remboursement prioritaire ou simple surveillance.",
+            ],
+        },
+        "first_asset": {
+            "reading": "Ajouter un premier actif transforme le patrimoine en portefeuille lisible. Meme une seule ligne permet de suivre exposition, valeur et performance.",
+            "key_points": [
+                "Un actif renseigne donne un point de depart mesurable.",
+                "La valeur actuelle permet de distinguer patrimoine et cout d'achat.",
+                "La categorie de l'actif aide a lire la concentration.",
+            ],
+            "exercise": "Ajoute l'actif financier le plus important ou le plus representatif.",
+            "action_steps": [
+                "Choisir une action, ETF, crypto ou autre actif suivi.",
+                "Renseigner quantite et prix d'achat.",
+                "Relire l'exposition dominante dans Investissements.",
+            ],
+        },
+        "allocation": {
+            "reading": "L'allocation repond a une question simple: quel role joue chaque poche dans ton patrimoine ? Securite, croissance, rendement ou option future.",
+            "key_points": [
+                "Une allocation lisible reduit les decisions impulsives.",
+                "La concentration n'est pas toujours mauvaise, mais elle doit etre consciente.",
+                "La capacite mensuelle doit aller vers un role prioritaire.",
+            ],
+            "exercise": "Associe chaque grande poche patrimoniale a un role clair.",
+            "action_steps": [
+                "Identifier la poche dominante.",
+                "Verifier si elle correspond a ton objectif.",
+                "Choisir la poche a renforcer en premier.",
+            ],
+        },
+        "risk_horizon": {
+            "reading": "Le risque depend du temps disponible. Un actif volatil peut etre acceptable a long terme et dangereux a court terme.",
+            "key_points": [
+                "Plus l'horizon est court, plus la liquidite compte.",
+                "Plus l'horizon est long, plus la volatilite peut etre absorbee.",
+                "Un objectif familial ou immobilier demande une marge de securite.",
+            ],
+            "exercise": "Classe ton objectif principal en horizon court, moyen ou long.",
+            "action_steps": [
+                "Choisir l'objectif prioritaire.",
+                "Associer un horizon de temps.",
+                "Verifier si les actifs actuels sont coherents avec cet horizon.",
+            ],
+        },
+        "property_value": {
+            "reading": "La valeur immobiliere utile n'est pas seulement le prix d'achat. White Rock compare cout, valeur estimee et plus-value latente.",
+            "key_points": [
+                "La valeur estimee donne une photo actuelle.",
+                "La plus-value latente reste theorique tant que le bien n'est pas vendu.",
+                "L'immobilier peut dominer fortement le patrimoine visible.",
+            ],
+            "exercise": "Verifie que chaque bien a une valeur estimee realiste.",
+            "action_steps": [
+                "Mettre a jour la valeur estimee.",
+                "Comparer avec le prix d'achat.",
+                "Relire le poids immobilier dans Patrimoine.",
+            ],
+        },
+        "rental_yield": {
+            "reading": "Le rendement locatif doit etre lu apres charges. Un bien peut prendre de la valeur mais produire peu de cashflow.",
+            "key_points": [
+                "Le loyer seul ne suffit pas a mesurer la performance.",
+                "Les charges reduisent le rendement reel.",
+                "Un rendement faible peut rester acceptable si la strategie est patrimoniale.",
+            ],
+            "exercise": "Compare loyer, charges et valeur du bien.",
+            "action_steps": [
+                "Renseigner le loyer mensuel.",
+                "Renseigner les charges mensuelles.",
+                "Lire le rendement locatif dans Immobilier.",
+            ],
+        },
+        "business_margin": {
+            "reading": "Une activite business devient patrimoniale quand elle cree une marge suivie. Le chiffre d'affaires seul ne suffit pas.",
+            "key_points": [
+                "La marge mesure ce qui reste apres charges.",
+                "Une activite negative peut etre une phase d'investissement ou un signal de vigilance.",
+                "La performance operationnelle passe avant la complexite.",
+            ],
+            "exercise": "Compare chiffre d'affaires, charges et resultat suivi.",
+            "action_steps": [
+                "Verifier le chiffre d'affaires renseigne.",
+                "Verifier les charges business.",
+                "Identifier une action pour ameliorer la marge.",
+            ],
+        },
+        "business_value": {
+            "reading": "La valeur business depend de la capacite a transformer une activite en actif: revenus, marge, systematisation et potentiel.",
+            "key_points": [
+                "Une valorisation doit rester prudente si la marge est faible.",
+                "La systematisation augmente la valeur potentielle.",
+                "Un business suivi devient un bloc patrimonial distinct.",
+            ],
+            "exercise": "Relis si le business cree de la valeur ou consomme du cash.",
+            "action_steps": [
+                "Verifier revenus, charges et valeur suivie.",
+                "Identifier le levier operationnel principal.",
+                "Mettre a jour la valeur si elle est justifiee.",
+            ],
+        },
+        "weekly_board": {
+            "reading": "Une decision patrimoniale utile doit etre simple, suivie et relue. Le Family Office ne multiplie pas les idees: il priorise.",
+            "key_points": [
+                "Une bonne decision tient en une action concrete.",
+                "La priorite vient des donnees, pas de l'envie du moment.",
+                "Le suivi evite d'oublier les arbitrages choisis.",
+            ],
+            "exercise": "Choisis une seule action a suivre cette semaine.",
+            "action_steps": [
+                "Lire l'action prioritaire du CEO Daily Briefing.",
+                "Decider, ignorer ou automatiser.",
+                "Revenir dans Progression pour verifier le suivi.",
+            ],
+        },
+        "transmission_basics": {
+            "reading": "La transmission commence par la clarte: qui doit comprendre quoi, quels documents existent, et quelles decisions doivent survivre au temps.",
+            "key_points": [
+                "La gouvernance familiale reduit l'ambiguite.",
+                "Les documents importants doivent etre identifies avant l'urgence.",
+                "Legacy concerne la continuite, pas seulement le niveau de patrimoine.",
+            ],
+            "exercise": "Liste les informations qui seraient utiles a un proche ou conseiller en cas d'imprevu.",
+            "action_steps": [
+                "Identifier documents importants.",
+                "Clarifier les personnes concernees.",
+                "Noter le premier point de gouvernance a structurer.",
+            ],
+        },
+    }
+
+    for module in modules:
+        for module_lesson in module.get("lessons") or []:
+            module_lesson.update(lesson_content.get(module_lesson["key"], {}))
+
+    progress = academy_progress or {"completed": {}, "completed_lessons": 0, "xp_awarded": 0}
+    completed = progress.get("completed") or {}
+    total_lessons = 0
+
+    for module in modules:
+        completed_count = 0
+        lessons = module.get("lessons") or []
+        total_lessons += len(lessons)
+
+        for module_lesson in lessons:
+            lesson_progress = completed.get(module_lesson["key"])
+            module_lesson["completed"] = bool(lesson_progress)
+            module_lesson["completed_at"] = lesson_progress.get("completed_at") if lesson_progress else None
+            module_lesson["xp_awarded"] = int(lesson_progress.get("xp_awarded") or 0) if lesson_progress else 0
+            if lesson_progress:
+                completed_count += 1
+
+        module["lesson_count"] = len(lessons)
+        module["completed_count"] = completed_count
+        module["progress_percent"] = (
+            round((completed_count / len(lessons)) * 100, 1)
+            if lessons
+            else 0
+        )
+
+    selected_module = next((item for item in modules if item["key"] == recommended_module), modules[0])
+    lesson = next(
+        (item for item in selected_module["lessons"] if item["key"] == recommended_lesson),
+        selected_module["lessons"][0],
+    )
+    completed_lessons = int(progress.get("completed_lessons") or 0)
+
+    return {
+        "title": "Wealth Academy",
+        "plan": plan,
+        "score": score,
+        "progress": {
+            "completed_lessons": completed_lessons,
+            "total_lessons": total_lessons,
+            "progress_percent": round((completed_lessons / total_lessons) * 100, 1) if total_lessons else 0,
+            "xp_awarded": int(progress.get("xp_awarded") or 0),
+        },
+        "recommended": {
+            "module_key": selected_module["key"],
+            "module_title": selected_module["title"],
+            "lesson_key": lesson["key"],
+            "lesson_title": lesson["title"],
+            "duration": lesson["duration"],
+            "outcome": lesson["outcome"],
+            "reading": lesson.get("reading"),
+            "key_points": lesson.get("key_points") or [],
+            "exercise": lesson.get("exercise"),
+            "action_steps": lesson.get("action_steps") or [],
+            "why_now": why_now,
+            "linked_mission_key": mission.get("key") if mission else None,
+            "linked_mission_title": mission.get("title") if mission else None,
+            "completed": bool(lesson.get("completed")),
+            "completed_at": lesson.get("completed_at"),
+            "xp_awarded": int(lesson.get("xp_awarded") or 0),
+        },
+        "modules": modules,
+    }
 
 
 def build_strategic_brief(data_profile: dict, score: int, plan: str):
@@ -691,6 +1994,12 @@ def build_family_office_view(data_profile: dict, plan: str):
             "value": round(float(data_profile.get("business_value") or 0), 2),
             "description": "Yield assets, private equity et activites valorisees.",
         },
+        {
+            "key": "passion_assets",
+            "label": "Passion Assets",
+            "value": round(float(data_profile.get("passion_assets_value") or 0), 2),
+            "description": "Art, montres, voitures, vins, bijoux et collections declarees.",
+        },
     ]
     active_domains = sum(1 for item in allocation if item["value"] > 0)
     summary = (
@@ -838,6 +2147,7 @@ def build_weak_signals(data_profile: dict):
         "investments": float(data_profile.get("portfolio_value") or 0),
         "real_estate": float(data_profile.get("real_estate_value") or 0),
         "business": float(data_profile.get("business_value") or 0),
+        "passion_assets": float(data_profile.get("passion_assets_value") or 0),
     }
     signals = []
 
@@ -858,7 +2168,7 @@ def build_weak_signals(data_profile: dict):
     if current_wealth > 0:
         main_domain, main_value = max(allocation.items(), key=lambda item: item[1])
         if main_value / current_wealth >= 0.7:
-            labels = {"investments": "investissements", "real_estate": "immobilier", "business": "business"}
+            labels = {"investments": "investissements", "real_estate": "immobilier", "business": "business", "passion_assets": "Passion Assets"}
             signals.append({
                 "type": "concentration",
                 "title": "Concentration patrimoniale",
@@ -1092,6 +2402,7 @@ def build_wealth_blocks(data_profile: dict):
             {"key": "markets", "label": "Bloc marches financiers", "value": float(data_profile.get("portfolio_value") or 0), "status": "active" if data_profile.get("portfolio_value", 0) else "to_build", "description": "Actifs financiers liquides."},
             {"key": "real_estate", "label": "Bloc immobilier", "value": float(data_profile.get("real_estate_value") or 0), "status": "active" if data_profile.get("real_estate_value", 0) else "to_build", "description": "Actifs immobiliers et valeur estimee."},
             {"key": "business", "label": "Bloc business", "value": float(data_profile.get("business_value") or 0), "status": "active" if data_profile.get("business_value", 0) else "to_build", "description": "Valeur entrepreneuriale, yield assets et ventures."},
+            {"key": "passion_assets", "label": "Passion Assets", "value": float(data_profile.get("passion_assets_value") or 0), "status": "active" if data_profile.get("passion_assets_value", 0) else "to_build", "description": "Art, montres, voitures, vins, bijoux et collections declarees."},
             {"key": "debt", "label": "Bloc dette", "value": debt_total, "status": "watch" if debt_total > 0 else "clear", "description": "Dette suivie dans les finances."},
         ],
     }
@@ -1179,7 +2490,8 @@ def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency
             return "amber"
         return "red"
 
-    diversification_domains = sum(1 for value in [portfolio_value, real_estate_value, business_value] if value > 0)
+    passion_assets_value = float(data_profile.get("passion_assets_value") or 0)
+    diversification_domains = sum(1 for value in [portfolio_value, real_estate_value, business_value, passion_assets_value] if value > 0)
     liquidity_score = 40
     if liquid_assets > 0:
         liquidity_score = 75 if liquid_assets >= security_reserve else 55
@@ -1224,7 +2536,7 @@ def build_hidden_wealth(data_profile: dict):
 
 
 def build_gravity_center(data_profile: dict, hidden_wealth: dict):
-    visible_domains = [("investments", "Financier", float(data_profile.get("portfolio_value") or 0)), ("real_estate", "Immobilier", float(data_profile.get("real_estate_value") or 0)), ("business", "Business", float(data_profile.get("business_value") or 0))]
+    visible_domains = [("investments", "Financier", float(data_profile.get("portfolio_value") or 0)), ("real_estate", "Immobilier", float(data_profile.get("real_estate_value") or 0)), ("business", "Business", float(data_profile.get("business_value") or 0)), ("passion_assets", "Passion Assets", float(data_profile.get("passion_assets_value") or 0))]
     visible_total = sum(value for _, _, value in visible_domains)
     future_domains = visible_domains + [("hidden", "Patrimoine activable", float(hidden_wealth.get("activable_wealth") or 0))]
     future_total = sum(value for _, _, value in future_domains)
@@ -1246,10 +2558,12 @@ def build_stress_tests(data_profile: dict):
     real_estate_value = float(data_profile.get("real_estate_value") or 0)
     business_value = float(data_profile.get("business_value") or 0)
     portfolio_value = float(data_profile.get("portfolio_value") or 0)
+    passion_assets_value = float(data_profile.get("passion_assets_value") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
     return {"title": "Stress tests Family Office", "base_value": round(current_wealth, 2), "tests": [
         {"key": "real_estate_down_20", "label": "Immobilier -20%", "result_value": round(current_wealth - real_estate_value * 0.2, 2), "delta": round(-real_estate_value * 0.2, 2), "reading": "Mesure la sensibilite a une baisse immobiliere."},
         {"key": "markets_down_15", "label": "Marches financiers -15%", "result_value": round(current_wealth - portfolio_value * 0.15, 2), "delta": round(-portfolio_value * 0.15, 2), "reading": "Mesure la sensibilite aux actifs financiers liquides."},
+        {"key": "passion_assets_down_25", "label": "Passion Assets -25%", "result_value": round(current_wealth - passion_assets_value * 0.25, 2), "delta": round(-passion_assets_value * 0.25, 2), "reading": "Mesure la sensibilite aux valeurs declarees non liquides."},
         {"key": "business_double", "label": "Business x2", "result_value": round(current_wealth + business_value, 2), "delta": round(business_value, 2), "reading": "Mesure l'effet d'une acceleration business."},
         {"key": "extra_500_month", "label": "+500 EUR/mois sur 10 ans", "result_value": round(current_wealth + (monthly_capacity + 500) * 12 * 10, 2), "delta": round(500 * 12 * 10, 2), "reading": "Mesure la puissance d'un effort mensuel additionnel avant rendement."},
     ]}
@@ -1277,7 +2591,7 @@ def build_life_wealth(data_profile: dict):
     liquid_assets = float(data_profile.get("liquid_assets") or 0)
     mobilizable_liquidity = float(data_profile.get("mobilizable_liquidity") or 0)
     current_wealth = float(data_profile.get("current_wealth") or 0)
-    domains = sum(1 for value in [data_profile.get("portfolio_value", 0), data_profile.get("real_estate_value", 0), data_profile.get("business_value", 0)] if float(value or 0) > 0)
+    domains = sum(1 for value in [data_profile.get("portfolio_value", 0), data_profile.get("real_estate_value", 0), data_profile.get("business_value", 0), data_profile.get("passion_assets_value", 0)] if float(value or 0) > 0)
     reserve_months = liquid_assets / monthly_expenses if monthly_expenses > 0 else 0
     security = 35
     if monthly_expenses > 0:
@@ -1530,7 +2844,10 @@ def product_context(email: str = Depends(get_current_user)):
         data_profile = build_data_profile(conn, user_id)
         progression = build_progression(conn, user_id, score, plan)
         modules = build_modules(plan, score)
-        missions = build_missions(data_profile, score, plan)
+        academy_progress = get_academy_progress(conn, user_id)
+        mission_progress = get_mission_progress(conn, user_id)
+        missions = build_missions(data_profile, score, plan, academy_progress, mission_progress)
+        wealth_academy = build_wealth_academy(data_profile, missions, score, plan, academy_progress)
         strategic_brief = build_strategic_brief(data_profile, score, plan)
         future_view = build_future_view(data_profile, score, plan)
         wealth_timeline = build_wealth_timeline(data_profile, future_view)
@@ -1568,6 +2885,29 @@ def product_context(email: str = Depends(get_current_user)):
         strategic_intelligence = build_strategic_intelligence(mission_control, opportunity_radar, decision_engine, leverage_engine, board_briefing)
         family_office_intelligence = build_family_office_intelligence(family_office_scorecard, stress_tests, dependency_detector, weak_signals, life_wealth, family_office_radar)
         family_office_ceo = build_family_office_ceo_dashboard(data_profile, strategic_intelligence, wealth_narrative, family_office_intelligence, missions)
+        profile_row = conn.execute(text("""
+            SELECT first_name
+            FROM user_wealth_profiles
+            WHERE user_id = :user_id
+        """), {"user_id": user_id}).fetchone()
+        daily_loop = get_daily_briefing_loop(conn, user_id)
+        ceo_daily_briefing = build_ceo_daily_briefing(
+            data_profile,
+            score,
+            plan,
+            missions,
+            mission_control,
+            future_view,
+            opportunity_radar,
+            board_briefing,
+            profile_row.first_name if profile_row else None,
+            wealth_academy,
+            daily_loop,
+        )
+        ceo_daily_briefing = attach_daily_briefing_loop(
+            ceo_daily_briefing,
+            daily_loop,
+        )
         wealth_intelligence = build_wealth_intelligence(wealth_narrative, family_office_view, hidden_wealth, gravity_center)
         decision_intelligence = build_decision_intelligence(strategic_intelligence, family_office_ceo)
         gated_experience = apply_plan_experience_gates(
@@ -1595,6 +2935,7 @@ def product_context(email: str = Depends(get_current_user)):
         "data_profile": data_profile,
         "modules": modules,
         "missions": missions,
+        "wealth_academy": wealth_academy,
         "strategic_brief": strategic_brief,
         "mission_control": mission_control,
         "future_view": future_view,
@@ -1629,6 +2970,7 @@ def product_context(email: str = Depends(get_current_user)):
         "decision_intelligence": decision_intelligence,
         "family_office_intelligence": family_office_intelligence,
         "family_office_ceo": family_office_ceo,
+        "ceo_daily_briefing": ceo_daily_briefing,
         "founder": {
             "is_founder": bool(plan_row.is_founder) if plan_row else False,
             "tier": plan_row.founder_tier if plan_row else None,

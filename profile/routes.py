@@ -16,7 +16,20 @@ from portfolio.specialized_assets_routes import (
     ensure_yield_table,
 )
 from product.entitlements import resolve_effective_plan
-from product.routes import build_data_profile
+from intelligence.weekly_report_service import build_daily_loop_report
+from product.routes import (
+    attach_daily_briefing_loop,
+    build_data_profile,
+    build_future_view,
+    build_mission_control,
+    build_missions,
+    build_strategic_brief,
+    build_wealth_academy,
+    get_academy_progress,
+    get_daily_briefing_loop,
+    get_mission_progress,
+)
+from product.daily_briefing import build_ceo_daily_briefing
 from profile.report_config import get_report_config
 
 
@@ -331,6 +344,34 @@ def get_wealth_report(
     finance_totals = _finance_totals_from_data_profile(data_profile)
     visible_wealth = _safe_float(data_profile.get("current_wealth"))
     projected_wealth = _safe_float(data_profile.get("projection_wealth"))
+    with engine.begin() as conn:
+        score_value = int(intelligence.get("global_score") or 0)
+        academy_progress = get_academy_progress(conn, user_id)
+        mission_progress = get_mission_progress(conn, user_id)
+        missions = build_missions(data_profile, score_value, effective_plan, academy_progress, mission_progress)
+        wealth_academy = build_wealth_academy(data_profile, missions, score_value, effective_plan, academy_progress)
+        strategic_brief = build_strategic_brief(data_profile, score_value, effective_plan)
+        future_view = build_future_view(data_profile, score_value, effective_plan)
+        mission_control = build_mission_control(strategic_brief, missions, future_view)
+        daily_loop = get_daily_briefing_loop(conn, user_id)
+        briefing = build_ceo_daily_briefing(
+            data_profile,
+            score_value,
+            effective_plan,
+            missions,
+            mission_control,
+            future_view,
+            {},
+            {},
+            profile.get("first_name"),
+            wealth_academy,
+            daily_loop,
+        )
+        briefing = attach_daily_briefing_loop(
+            briefing,
+            daily_loop,
+        )
+        daily_loop_report = build_daily_loop_report(conn, user_id, "wealth_report")
 
     score = intelligence.get("family_office_score") or {}
     opportunities = intelligence.get("opportunities") or []
@@ -388,6 +429,8 @@ def get_wealth_report(
             "advice": intelligence.get("advice") or score.get("advice") or [],
             "opportunities": opportunities[:8],
         },
+        "ceo_daily_briefing": briefing,
+        "daily_loop_report": daily_loop_report,
         "sources": [
             "users",
             "user_wealth_profiles",
