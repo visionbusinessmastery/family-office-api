@@ -1874,6 +1874,74 @@ def format_month_label(target_date: date):
     return f"{MONTH_LABELS[target_date.month - 1]} {target_date.year}"
 
 
+def build_financial_freedom_score(data_profile: dict, future_view: dict | None = None):
+    current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
+    monthly_expenses = float(data_profile.get("monthly_expenses") or 0)
+    monthly_capacity = max(float(data_profile.get("monthly_capacity") or 0), 0)
+    annual_return = float((future_view or {}).get("annual_return") or 4.5) / 100
+    yearly_expenses = monthly_expenses * 12
+    target = max(yearly_expenses * 25, 500000)
+    score = min(100, round((current_wealth / target) * 100, 1)) if target > 0 else 0
+    months_to_target = estimate_months_to_target(current_wealth, monthly_capacity, annual_return, target)
+    estimated_date = add_months(date.today(), months_to_target).isoformat() if months_to_target is not None else None
+    estimated_label = format_month_label(add_months(date.today(), months_to_target)) if months_to_target is not None else None
+
+    scenarios = []
+    for key, label, extra_monthly, extra_return in [
+        ("plus_300", "+300 EUR/mois", 300, 0),
+        ("plus_500", "+500 EUR/mois", 500, 0),
+        ("plus_1_return", "+1% rendement", 0, 0.01),
+    ]:
+        scenario_months = estimate_months_to_target(
+            current_wealth,
+            monthly_capacity + extra_monthly,
+            annual_return + extra_return,
+            target,
+        )
+        months_saved = (
+            max(months_to_target - scenario_months, 0)
+            if months_to_target is not None and scenario_months is not None
+            else None
+        )
+        scenarios.append({
+            "key": key,
+            "label": label,
+            "months_to_target": scenario_months,
+            "months_saved": months_saved,
+            "estimated_label": format_month_label(add_months(date.today(), scenario_months)) if scenario_months is not None else None,
+        })
+
+    if monthly_expenses <= 0:
+        blocker = "Charges mensuelles a completer pour calculer une cible fiable."
+        action = "Renseigner ou verifier les charges mensuelles."
+    elif monthly_capacity <= 0:
+        blocker = "Marge mensuelle insuffisante pour accelerer la trajectoire."
+        action = "Retrouver un cashflow positif avant d'augmenter le risque."
+    elif score < 50:
+        blocker = "Distance encore importante entre patrimoine actuel et cible de liberte."
+        action = "Automatiser une contribution mensuelle realiste."
+    else:
+        blocker = "Le rythme existe; le levier devient l'optimisation du rendement et des revenus passifs."
+        action = "Comparer les scenarios et choisir l'accelerateur le plus soutenable."
+
+    return {
+        "title": "Score de liberte financiere",
+        "score_percent": score,
+        "target_amount": round(target, 2),
+        "current_wealth": round(current_wealth, 2),
+        "distance_remaining": max(round(target - current_wealth, 2), 0),
+        "monthly_capacity": round(monthly_capacity, 2),
+        "annual_return": round(annual_return * 100, 2),
+        "months_to_target": months_to_target,
+        "estimated_date": estimated_date,
+        "estimated_label": estimated_label,
+        "main_blocker": blocker,
+        "next_action": action,
+        "scenarios": scenarios,
+        "basis": "Simulation informative backend basee sur 25 annees de charges declarees.",
+    }
+
+
 def build_wealth_timeline(data_profile: dict, future_view: dict | None = None):
     current_wealth = float(data_profile.get("projection_wealth") or data_profile.get("current_wealth") or 0)
     monthly_capacity = float(data_profile.get("monthly_capacity") or 0)
@@ -2497,11 +2565,12 @@ def build_family_office_radar(data_profile: dict, weak_signals: dict, dependency
         liquidity_score = 75 if liquid_assets >= security_reserve else 55
     if mobilizable_liquidity > 0:
         liquidity_score = min(100, liquidity_score + 10)
+    protection_score = min(100, round((liquidity_score + (75 if debt_total <= max(current_wealth * 0.35, 1) else 40)) / 2))
     items = [
         ("growth", "Croissance", 80 if monthly_capacity > 0 or business_value > 0 else 40),
         ("diversification", "Diversification", 35 + diversification_domains * 20),
         ("concentration", "Concentration", 35 if concentration_flag else 80),
-        ("income", "Revenus", 80 if data_profile.get("monthly_income", 0) else 35),
+        ("protection", "Protection", protection_score),
         ("liquidity", "Liquidite", liquidity_score),
         ("debt", "Dette", 40 if debt_total > max(current_wealth * 0.35, 1) else 75),
     ]
@@ -2697,6 +2766,66 @@ def build_decision_intelligence(strategic_intelligence: dict, family_office_ceo:
     return {"title": "Decision Intelligence", "question": "Qu'est-ce que je fais maintenant ?", "why_it_matters": "Une bonne interface patrimoniale ne montre pas toutes les possibilites: elle isole la decision utile.", "decision": decision, "risk": risk, "opportunity": opportunity, "leverage": leverage, "next_action": decision.get("action") or opportunity.get("action") or mission.get("description"), "cards": [risk, opportunity, decision, leverage]}
 
 
+def build_pilotage_ceo(strategic_intelligence: dict, board_briefing: dict, financial_freedom: dict, daily_loop: dict):
+    cards = strategic_intelligence.get("cards") or []
+    decision = next((card for card in cards if card.get("key") == "decision"), {})
+    risk = next((card for card in cards if card.get("key") == "risk"), {})
+    opportunity = next((card for card in cards if card.get("key") == "opportunity"), {})
+    leverage = next((card for card in cards if card.get("key") == "leverage"), {})
+    scenarios = financial_freedom.get("scenarios") or []
+    best_scenario = max(
+        scenarios,
+        key=lambda item: float(item.get("months_saved") or 0),
+        default=None,
+    )
+    summary = (daily_loop or {}).get("summary") or {}
+    today_actions = (daily_loop or {}).get("today_actions") or {}
+    action_status = "done" if today_actions else "to_decide"
+    freedom_score = financial_freedom.get("score_percent")
+    impact = None
+    if best_scenario and best_scenario.get("months_saved") is not None:
+        impact = f"Peut rapprocher la liberte financiere d'environ {int(best_scenario.get('months_saved') or 0)} mois."
+    elif freedom_score is not None:
+        impact = f"Score de liberte financiere suivi a {freedom_score}%."
+
+    return {
+        "title": "Mode Pilotage CEO",
+        "question": "Que dois-je faire maintenant ?",
+        "status": action_status,
+        "priority_decision": {
+            "title": decision.get("title") or board_briefing.get("next_step") or "Decision prioritaire",
+            "description": decision.get("description") or board_briefing.get("headline"),
+            "action": decision.get("action") or board_briefing.get("next_step"),
+        },
+        "major_risk": {
+            "title": risk.get("title") or board_briefing.get("main_risk") or "Risque a surveiller",
+            "description": risk.get("description") or board_briefing.get("what_changed"),
+        },
+        "main_opportunity": {
+            "title": opportunity.get("title") or board_briefing.get("main_opportunity") or "Opportunite a qualifier",
+            "description": opportunity.get("description"),
+            "action": opportunity.get("action"),
+        },
+        "recommended_arbitrage": {
+            "title": leverage.get("title") or "Arbitrage a clarifier",
+            "description": leverage.get("description"),
+            "score": leverage.get("score"),
+        },
+        "freedom_impact": {
+            "score_percent": freedom_score,
+            "estimated_label": financial_freedom.get("estimated_label"),
+            "accelerator": best_scenario,
+            "reading": impact,
+        },
+        "execution": {
+            "actions_today": summary.get("actions_today") or 0,
+            "open_tasks": summary.get("open_tasks") or 0,
+            "xp_today": summary.get("xp_today") or 0,
+            "last_action": summary.get("last_action"),
+        },
+    }
+
+
 def build_wealth_narrative(data_profile: dict, hidden_wealth: dict, gravity_center: dict, wealth_map: dict, leverage_engine: dict):
     current_wealth = float(data_profile.get("current_wealth") or 0)
     activable = float(hidden_wealth.get("activable_wealth") or 0)
@@ -2850,6 +2979,7 @@ def product_context(email: str = Depends(get_current_user)):
         wealth_academy = build_wealth_academy(data_profile, missions, score, plan, academy_progress)
         strategic_brief = build_strategic_brief(data_profile, score, plan)
         future_view = build_future_view(data_profile, score, plan)
+        financial_freedom = build_financial_freedom_score(data_profile, future_view)
         wealth_timeline = build_wealth_timeline(data_profile, future_view)
         mission_control = build_mission_control(strategic_brief, missions, future_view)
         family_office_view = build_family_office_view(data_profile, plan)
@@ -2910,6 +3040,7 @@ def product_context(email: str = Depends(get_current_user)):
         )
         wealth_intelligence = build_wealth_intelligence(wealth_narrative, family_office_view, hidden_wealth, gravity_center)
         decision_intelligence = build_decision_intelligence(strategic_intelligence, family_office_ceo)
+        pilotage_ceo = build_pilotage_ceo(strategic_intelligence, board_briefing, financial_freedom, daily_loop)
         gated_experience = apply_plan_experience_gates(
             plan,
             wealth_intelligence,
@@ -2939,6 +3070,7 @@ def product_context(email: str = Depends(get_current_user)):
         "strategic_brief": strategic_brief,
         "mission_control": mission_control,
         "future_view": future_view,
+        "financial_freedom": financial_freedom,
         "wealth_timeline": wealth_timeline,
         "family_office_view": family_office_view,
         "wealth_gps": wealth_gps,
@@ -2968,6 +3100,7 @@ def product_context(email: str = Depends(get_current_user)):
         "future_intelligence": future_intelligence,
         "strategic_intelligence": strategic_intelligence,
         "decision_intelligence": decision_intelligence,
+        "pilotage_ceo": pilotage_ceo,
         "family_office_intelligence": family_office_intelligence,
         "family_office_ceo": family_office_ceo,
         "ceo_daily_briefing": ceo_daily_briefing,

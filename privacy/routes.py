@@ -374,6 +374,62 @@ def privacy_region(request: Request):
     return {"policy_version": POLICY_VERSION, **detect_privacy_region(meta.get("country"), None)}
 
 
+def build_security_posture(consents: dict, counts: dict, deletion: list, preferences: list):
+    sensitive_data_count = int(counts.get("portfolio", 0) or 0)
+    sensitive_data_count += int(counts.get("real_estate", 0) or 0)
+    sensitive_data_count += int(counts.get("legacy", 0) or 0)
+
+    required_ok = all(
+        bool(consents.get(key, {}).get("accepted"))
+        for key in ("terms_accepted", "privacy_policy_accepted", "ai_processing_accepted")
+    )
+    email_prefs = (preferences[0].get("email_preferences") if preferences else {}) or {}
+    has_email_controls = len(email_prefs) > 0
+    deletion_pending = bool(deletion and deletion[0].get("status") in {"pending", "confirmed"})
+
+    score = 35
+    if required_ok:
+        score += 15
+    if has_email_controls:
+        score += 10
+    if sensitive_data_count > 0:
+        score += 10
+    if counts.get("oauth_accounts", 0):
+        score += 5
+    if deletion_pending:
+        score -= 10
+
+    score = max(0, min(100, score))
+    level = "Solide" if score >= 75 else "Correcte" if score >= 55 else "A renforcer"
+
+    strengths = [
+        "Consentements centralises et modifiables.",
+        "Exports temporaires et journalises.",
+        "Suppression du compte avec email de confirmation et delai de securite.",
+    ]
+    if has_email_controls:
+        strengths.append("Preferences email configurables.")
+    if sensitive_data_count > 0:
+        strengths.append("Donnees patrimoniales visibles dans une empreinte de donnees lisible.")
+
+    gaps = [
+        "Double authentification TOTP pas encore activee.",
+        "Verification supplementaire a ajouter pour exports complets et changements Dynasty sensibles.",
+    ]
+    if not has_email_controls:
+        gaps.append("Preferences email a configurer.")
+    if deletion_pending:
+        gaps.append("Une demande de suppression est en cours.")
+
+    return {
+        "score": score,
+        "level": level,
+        "strengths": strengths[:4],
+        "gaps": gaps[:4],
+        "sensitive_data_count": sensitive_data_count,
+    }
+
+
 @router.get("/center")
 def privacy_center(request: Request, email: str = Depends(get_current_user)):
     with engine.begin() as conn:
@@ -407,6 +463,7 @@ def privacy_center(request: Request, email: str = Depends(get_current_user)):
             "legacy": len(_fetch_rows(conn, "SELECT id FROM legacy_family_vault WHERE user_id = :user_id", {"user_id": user_id})),
             "oauth_accounts": len(_fetch_rows(conn, "SELECT id FROM oauth_accounts WHERE user_id = :user_id", {"user_id": user_id})),
         }
+        security_posture = build_security_posture(consents, counts, deletion, preferences)
         log_privacy_event(conn, user_id, "privacy_center_opened", {}, request)
 
     return {
@@ -416,12 +473,38 @@ def privacy_center(request: Request, email: str = Depends(get_current_user)):
         "consent_history": history,
         "preferences": preferences[0] if preferences else {},
         "deletion_request": deletion[0] if deletion else None,
+        "security_posture": security_posture,
         "ai_disclosure": {
             "provider": "OpenAI",
             "purpose": "Ethan analyse ton contexte patrimonial pour formuler des explications, priorites et opportunites.",
             "training": "Les donnees envoyees a Ethan ne sont pas destinees a entrainer un modele public de WHITE ROCK.",
             "retention": "La memoire Ethan est compressee et peut etre supprimee sur demande.",
             "human_note": "Ethan ne remplace pas un conseil legal, fiscal ou financier reglemente.",
+        },
+        "trust_center": {
+            "promise": "WHITE ROCK utilise tes donnees pour produire une lecture patrimoniale utile: score, projections, missions, opportunites et synthese.",
+            "data_minimization": [
+                "Les libelles libres permettent de pseudonymiser les actifs sensibles.",
+                "Les analyses privilegient les montants, categories et tendances plutot que les informations administratives inutiles.",
+                "Les donnees Dynasty peuvent rester descriptives: reference de document, heritier, regle, sans fichier obligatoire.",
+            ],
+            "user_controls": [
+                "Modifier les consentements.",
+                "Exporter les donnees.",
+                "Demander la suppression du compte.",
+                "Masquer des donnees sensibles dans le rapport patrimonial.",
+            ],
+            "sensitive_actions": [
+                {"label": "Export complet", "status": "Lien temporaire et journalisation backend."},
+                {"label": "Suppression du compte", "status": "Mot de passe, email de confirmation et delai de securite."},
+                {"label": "Dynasty et heritiers", "status": "Zone sensible a renforcer par verification supplementaire."},
+                {"label": "Wealth Vault futur", "status": "2FA recommandee avant stockage de fichiers sensibles."},
+            ],
+            "next_security_steps": [
+                "Activer une double authentification par application TOTP.",
+                "Ajouter des codes de recuperation.",
+                "Demander une verification supplementaire pour exports, heritiers et Vault.",
+            ],
         },
         "legal_links": {
             "privacy_policy": f"{FRONTEND_URL}/privacy-center#policy",
